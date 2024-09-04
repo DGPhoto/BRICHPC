@@ -1,0 +1,106 @@
+<html><head><style>body {
+   color: black;
+}
+</style></head><body><h1 id="comprehensive-guide-to-using-slurm">Comprehensive Guide to Using Slurm</h1>
+<p>Slurm (Simple Linux Utility for Resource Management) is a popular open-source workload manager and job scheduling system for Linux clusters. 
+This guide will walk you through the basics of using Slurm to submit, manage, and monitor jobs on a cluster.</p>
+<h2 id="table-of-contents">Table of Contents</h2>
+<ol>
+<li><a href="#understanding-slurm-concepts">Understanding Slurm Concepts</a></li>
+<li><a href="#basic-slurm-commands">Basic Slurm Commands</a></li>
+<li><a href="#submitting-jobs">Submitting Jobs</a></li>
+<li><a href="#monitoring-jobs">Monitoring Jobs</a></li>
+<li><a href="#managing-jobs">Managing Jobs</a></li>
+<li><a href="#advanced-slurm-usage">Advanced Slurm Usage</a></li>
+<li><a href="#best-practices">Best Practices</a></li>
+</ol>
+<h2 id="understanding-slurm-concepts">Understanding Slurm Concepts</h2>
+<p>Before diving into Slurm usage, it&#39;s important to understand some key concepts:</p>
+<ul>
+<li><strong>Node</strong>: A computer in the cluster.</li>
+<li><strong>Partition</strong>: A group of nodes with specific characteristics.</li>
+<li><strong>Job</strong>: A resource allocation request for a specific program or task.</li>
+<li><strong>Task</strong>: An instance of a running program within a job.</li>
+<li><strong>Job Step</strong>: A set of tasks within a job.</li>
+</ul>
+<h2 id="basic-slurm-commands">Basic Slurm Commands</h2>
+<p>Here are some essential Slurm commands you&#39;ll use frequently:</p>
+<ul>
+<li><code>srun</code>: Run a parallel job</li>
+<li><code>sbatch</code>: Submit a batch script</li>
+<li><code>salloc</code>: Allocate resources for interactive use</li>
+<li><code>scancel</code>: Cancel a job</li>
+<li><code>squeue</code>: View information about jobs in the queue</li>
+<li><code>sinfo</code>: View information about Slurm nodes and partitions</li>
+</ul>
+<h2 id="submitting-jobs">Submitting Jobs</h2>
+<h3 id="interactive-jobs">Interactive Jobs</h3>
+<p>To run an interactive job, use the <code>srun</code> command:</p>
+<pre><code class="lang-bash">srun <span class="hljs-comment">--pty bash</span>
+</code></pre>
+<p>This will allocate resources and start an interactive bash session.</p>
+<h3 id="batch-jobs">Batch Jobs</h3>
+<p>For batch jobs, create a submission script and use <code>sbatch</code>:</p>
+<ol>
+<li>Create a script (e.g., <code>job_script.sh</code>):</li>
+</ol>
+<pre><code class="lang-bash"><span class="hljs-meta">#!/bin/bash</span>
+<span class="hljs-comment">#SBATCH --job-name=my_job</span>
+<span class="hljs-comment">#SBATCH --output=output_%j.log</span>
+<span class="hljs-comment">#SBATCH --error=error_%j.log</span>
+<span class="hljs-comment">#SBATCH --ntasks=1</span>
+<span class="hljs-comment">#SBATCH --time=01:00:00</span>
+<span class="hljs-comment">#SBATCH --mem=1G</span>
+
+<span class="hljs-comment"># Your commands here</span>
+<span class="hljs-built_in">echo</span> <span class="hljs-string">"Hello, Slurm!"</span>
+</code></pre>
+<ol>
+<li>Submit the job:</li>
+</ol>
+<pre><code class="lang-bash"><span class="hljs-selector-tag">sbatch</span> <span class="hljs-selector-tag">job_script</span><span class="hljs-selector-class">.sh</span>
+</code></pre>
+<h2 id="monitoring-jobs">Monitoring Jobs</h2>
+<p>To view information about your jobs in the queue:</p>
+<pre><code class="lang-bash"><span class="hljs-attribute">squeue</span> -u <span class="hljs-variable">$USER</span>
+</code></pre>
+<p>To see detailed information about a specific job:</p>
+<pre><code class="lang-bash"><span class="hljs-keyword">scontrol </span><span class="hljs-keyword">show </span><span class="hljs-keyword">job </span>&lt;<span class="hljs-keyword">job_id&gt;</span>
+</code></pre>
+<h2 id="managing-jobs">Managing Jobs</h2>
+<p>To cancel a job:</p>
+<pre><code class="lang-bash">scancel <span class="hljs-tag">&lt;<span class="hljs-name">job_id</span>&gt;</span>
+</code></pre>
+<p>To hold a job:</p>
+<pre><code class="lang-bash">scontrol hold <span class="hljs-tag">&lt;<span class="hljs-name">job_id</span>&gt;</span>
+</code></pre>
+<p>To release a held job:</p>
+<pre><code class="lang-bash">scontrol <span class="hljs-built_in">release</span> &lt;job_id&gt;
+</code></pre>
+<h2 id="advanced-slurm-usage">Advanced Slurm Usage</h2>
+<h3 id="job-arrays">Job Arrays</h3>
+<p>Job arrays allow you to submit and manage collections of similar jobs:</p>
+<pre><code class="lang-bash">#SBATCH --array=<span class="hljs-number">1</span><span class="hljs-number">-10</span>
+</code></pre>
+<p>This will submit 10 jobs with array indices from 1 to 10.</p>
+<h3 id="resource-constraints">Resource Constraints</h3>
+<p>Specify resource requirements in your job script:</p>
+<pre><code class="lang-bash"><span class="hljs-selector-id">#SBATCH</span> --cpus-per-task=<span class="hljs-number">4</span>
+<span class="hljs-selector-id">#SBATCH</span> --mem=<span class="hljs-number">8</span>G
+<span class="hljs-selector-id">#SBATCH</span> --gres=gpu:<span class="hljs-number">2</span>
+</code></pre>
+<h3 id="job-dependencies">Job Dependencies</h3>
+<p>Create dependencies between jobs:</p>
+<pre><code class="lang-bash"><span class="hljs-keyword">sbatch </span>--dependency=afterok:&lt;<span class="hljs-keyword">job_id&gt; </span>next_job.<span class="hljs-keyword">sh</span>
+</code></pre>
+<h2 id="best-practices">Best Practices</h2>
+<ol>
+<li><strong>Estimate resources accurately</strong>: Request only the resources you need to avoid long queue times.</li>
+<li><strong>Use job arrays</strong> for multiple similar jobs instead of submitting them individually.</li>
+<li><strong>Set appropriate time limits</strong>: This helps the scheduler plan more effectively.</li>
+<li><strong>Use job names</strong>: Give your jobs meaningful names for easier management.</li>
+<li><strong>Monitor your jobs</strong>: Regularly check the status of your jobs and kill them if they&#39;re not behaving as expected.</li>
+<li><strong>Use appropriate partitions</strong>: Choose the right partition based on your job&#39;s requirements.</li>
+<li><strong>Optimize your code</strong>: Well-optimized code can reduce resource usage and improve job throughput.</li>
+</ol>
+</body></html>

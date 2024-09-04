@@ -1,0 +1,130 @@
+<html><head><style>body {
+   color: black;
+}
+</style></head><body><h1 id="comprehensive-guide-to-using-slurm">Comprehensive Guide to Using Slurm</h1>
+<h2 id="using-the-module-system-in-slurm-jobs">Using the Module System in Slurm Jobs</h2>
+<p>The module system allows users to dynamically modify their shell environment to access different software packages and versions. Here&#39;s how to effectively use the module system in your Slurm jobs:</p>
+<h3 id="1-basic-module-commands">1. Basic Module Commands</h3>
+<p>Before diving into Slurm-specific usage, let&#39;s review some basic module commands:</p>
+<ul>
+<li><code>module avail</code>: List all available modules</li>
+<li><code>module list</code>: Show currently loaded modules</li>
+<li><code>module load &lt;module_name&gt;</code>: Load a specific module</li>
+<li><code>module unload &lt;module_name&gt;</code>: Unload a specific module</li>
+<li><code>module purge</code>: Unload all currently loaded modules</li>
+<li><code>module show &lt;module_name&gt;</code>: Display information about a module</li>
+</ul>
+<h3 id="2-using-modules-in-slurm-job-scripts">2. Using Modules in Slurm Job Scripts</h3>
+<p>Here&#39;s an example of how to use modules in a Slurm job script:</p>
+<pre><code class="lang-bash"><span class="hljs-meta">#!/bin/bash</span>
+<span class="hljs-meta">#SBATCH --job-name=module_job</span>
+<span class="hljs-meta">#SBATCH --output=output_%j.log</span>
+<span class="hljs-meta">#SBATCH --error=error_%j.log</span>
+<span class="hljs-meta">#SBATCH --time=01:00:00</span>
+<span class="hljs-meta">#SBATCH --ntasks=1</span>
+<span class="hljs-meta">#SBATCH --cpus-per-task=1</span>
+<span class="hljs-meta">#SBATCH --mem=4G</span>
+
+<span class="hljs-meta"># Purge all loaded modules</span>
+module purge
+
+<span class="hljs-meta"># Load required modules</span>
+module load gcc/<span class="hljs-number">9.3</span><span class="hljs-number">.0</span>
+module load python/<span class="hljs-number">3.8</span><span class="hljs-number">.5</span>
+module load openmpi/<span class="hljs-number">4.0</span><span class="hljs-number">.4</span>
+
+<span class="hljs-meta"># Your job commands here</span>
+python my_script.py
+</code></pre>
+<h3 id="3-loading-software-stacks">3. Loading Software Stacks</h3>
+<p>Sometimes, you might need to load a complete software stack. Many HPC systems provide meta-modules for this purpose:</p>
+<pre><code class="lang-bash"><span class="hljs-meta">#!/bin/bash</span>
+<span class="hljs-comment">#SBATCH --job-name=stack_job</span>
+<span class="hljs-comment">#SBATCH --output=output_%j.log</span>
+<span class="hljs-comment">#SBATCH --error=error_%j.log</span>
+<span class="hljs-comment">#SBATCH --time=01:00:00</span>
+<span class="hljs-comment">#SBATCH --ntasks=1</span>
+<span class="hljs-comment">#SBATCH --cpus-per-task=1</span>
+<span class="hljs-comment">#SBATCH --mem=4G</span>
+
+<span class="hljs-comment"># Load a complete software stack</span>
+module load foss/2020a
+
+<span class="hljs-comment"># Load additional modules as needed</span>
+module load python/3.8.5
+
+<span class="hljs-comment"># Your job commands here</span>
+</code></pre>
+<h3 id="4-module-dependencies">4. Module Dependencies</h3>
+<p>Some modules may have dependencies or conflicts. The module system often handles these automatically, but it&#39;s good to be aware of them:</p>
+<pre><code class="lang-bash"><span class="hljs-meta">#!/bin/bash</span>
+<span class="hljs-comment">#SBATCH --job-name=dep_job</span>
+<span class="hljs-comment">#SBATCH --output=output_%j.log</span>
+<span class="hljs-comment">#SBATCH --error=error_%j.log</span>
+<span class="hljs-comment">#SBATCH --time=01:00:00</span>
+<span class="hljs-comment">#SBATCH --ntasks=1</span>
+<span class="hljs-comment">#SBATCH --cpus-per-task=1</span>
+<span class="hljs-comment">#SBATCH --mem=4G</span>
+
+<span class="hljs-comment"># Load a module with dependencies</span>
+module load tensorflow/2.4.1-cuda11.0-python3
+
+<span class="hljs-comment"># The above might automatically load CUDA, cuDNN, and Python modules</span>
+
+<span class="hljs-comment"># Your job commands here</span>
+python my_tensorflow_script.py
+</code></pre>
+<h3 id="5-using-module-collections">5. Using Module Collections</h3>
+<p>If you frequently use the same set of modules, you can create a module collection:</p>
+<pre><code class="lang-bash"><span class="hljs-comment"># Create a module collection</span>
+module save my_collection
+
+<span class="hljs-comment"># In your Slurm script</span>
+<span class="hljs-meta">#!/bin/bash</span>
+<span class="hljs-comment">#SBATCH --job-name=collection_job</span>
+<span class="hljs-comment">#SBATCH --output=output_%j.log</span>
+<span class="hljs-comment">#SBATCH --error=error_%j.log</span>
+<span class="hljs-comment">#SBATCH --time=01:00:00</span>
+<span class="hljs-comment">#SBATCH --ntasks=1</span>
+<span class="hljs-comment">#SBATCH --cpus-per-task=1</span>
+<span class="hljs-comment">#SBATCH --mem=4G</span>
+
+<span class="hljs-comment"># Load your module collection</span>
+module restore my_collection
+
+<span class="hljs-comment"># Your job commands here</span>
+</code></pre>
+<h3 id="6-best-practices-for-using-modules-with-slurm">6. Best Practices for Using Modules with Slurm</h3>
+<ol>
+<li><p><strong>Purge before loading</strong>: Start your script with <code>module purge</code> to ensure a clean environment.</p>
+</li>
+<li><p><strong>Be specific</strong>: Use full module names including versions to ensure reproducibility.</p>
+</li>
+<li><p><strong>Check for conflicts</strong>: Use <code>module show</code> to check for potential conflicts before loading modules.</p>
+</li>
+<li><p><strong>Use module collections</strong>: For complex environments, create and use module collections.</p>
+</li>
+<li><p><strong>Document your modules</strong>: Comment your Slurm script to explain why each module is needed.</p>
+</li>
+<li><p><strong>Test interactively</strong>: Before submitting a job, test your module setup in an interactive Slurm session.</p>
+</li>
+<li><p><strong>Use module load in job scripts</strong>: Don&#39;t rely on modules loaded in your login environment; explicitly load them in your job script.</p>
+</li>
+</ol>
+<h3 id="7-troubleshooting-module-issues-in-slurm-jobs">7. Troubleshooting Module Issues in Slurm Jobs</h3>
+<p>If you encounter module-related issues:</p>
+<ul>
+<li>Check your Slurm output and error logs for module-related errors.</li>
+<li>Ensure the modules you&#39;re trying to load are available on the compute nodes (they might differ from login nodes).</li>
+<li>Use <code>module show &lt;module_name&gt;</code> to verify module details and dependencies.</li>
+<li>If a module isn&#39;t found, check if you need to load a specific compiler or MPI implementation first.</li>
+</ul>
+<h3 id="8-advanced-module-usage">8. Advanced Module Usage</h3>
+<p>Some HPC systems offer advanced module features:</p>
+<ul>
+<li><strong>Module versioning</strong>: <code>module load &lt;software&gt;/&lt;version&gt;</code></li>
+<li><strong>Swapping modules</strong>: <code>module swap &lt;old_module&gt; &lt;new_module&gt;</code></li>
+<li><strong>Module aliases</strong>: <code>module alias my_python python/3.8.5</code></li>
+</ul>
+<p>Remember, the exact available modules and their usage can vary significantly between different HPC systems. Always consult your system&#39;s documentation or contact your system administrators for specific guidance on using modules in your Slurm environment.</p>
+</body></html>

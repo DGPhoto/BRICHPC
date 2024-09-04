@@ -1,0 +1,116 @@
+<html><head><style>body {
+   color: black;
+}
+</style></head><body><h1 id="comprehensive-guide-to-using-slurm">Comprehensive Guide to Using Slurm</h1>
+<h2 id="using-conda-in-slurm-jobs">Using Conda in Slurm Jobs</h2>
+<p>Conda is a popular package management system and environment management system. When using Slurm on a cluster, you may need to activate and use Conda environments in your job scripts. </p>
+<h3 id="1-loading-conda">1. Loading Conda</h3>
+<p>First, you need to ensure Conda is available in your Slurm job. This usually involves loading a module or sourcing a script to initialize Conda. </p>
+<pre><code class="lang-bash"><span class="hljs-comment"># Option 1: Loading a module</span>
+module load anaconda3
+
+<span class="hljs-comment"># Option 2: Sourcing a script</span>
+source <span class="hljs-regexp">/path/</span>to<span class="hljs-regexp">/conda/</span>etc<span class="hljs-regexp">/profile.d/</span>conda.sh
+</code></pre>
+<h3 id="2-activating-a-conda-environment">2. Activating a Conda Environment</h3>
+<p>Once Conda is loaded, you can activate your environment. Here&#39;s how you might do this in a Slurm script:</p>
+<pre><code class="lang-bash"><span class="hljs-meta">#!/bin/bash</span>
+<span class="hljs-comment">#SBATCH --job-name=conda_job</span>
+<span class="hljs-comment">#SBATCH --output=output_%j.log</span>
+<span class="hljs-comment">#SBATCH --error=error_%j.log</span>
+<span class="hljs-comment">#SBATCH --time=01:00:00</span>
+<span class="hljs-comment">#SBATCH --ntasks=1</span>
+<span class="hljs-comment">#SBATCH --cpus-per-task=1</span>
+<span class="hljs-comment">#SBATCH --mem=4G</span>
+
+<span class="hljs-comment"># Load Conda</span>
+module load anaconda3
+
+<span class="hljs-comment"># Activate your environment</span>
+conda activate myenv
+
+<span class="hljs-comment"># Run your Python script</span>
+python my_script.py
+</code></pre>
+<h3 id="3-creating-conda-environments-on-the-fly">3. Creating Conda Environments on the Fly</h3>
+<p>Sometimes, you might want to create a Conda environment as part of your job. Here&#39;s an example:</p>
+<pre><code class="lang-bash"><span class="hljs-meta">#!/bin/bash</span>
+<span class="hljs-comment">#SBATCH --job-name=conda_create_job</span>
+<span class="hljs-comment">#SBATCH --output=output_%j.log</span>
+<span class="hljs-comment">#SBATCH --error=error_%j.log</span>
+<span class="hljs-comment">#SBATCH --time=01:00:00</span>
+<span class="hljs-comment">#SBATCH --ntasks=1</span>
+<span class="hljs-comment">#SBATCH --cpus-per-task=1</span>
+<span class="hljs-comment">#SBATCH --mem=4G</span>
+
+<span class="hljs-comment"># Load Conda</span>
+module load anaconda3
+
+<span class="hljs-comment"># Create a new environment</span>
+conda create -n job_env python=3.8 numpy pandas -y
+
+<span class="hljs-comment"># Activate the new environment</span>
+conda activate job_env
+
+<span class="hljs-comment"># Run your Python script</span>
+python my_script.py
+
+<span class="hljs-comment"># Optionally, remove the environment at the end of the job</span>
+conda deactivate
+conda env remove -n job_env -y
+</code></pre>
+<h3 id="4-using-conda-pack-for-portable-environments">4. Using conda-pack for Portable Environments</h3>
+<p>For more complex environments or when you need to ensure consistency across nodes, you can use <code>conda-pack</code> to create portable environments:</p>
+<pre><code class="lang-bash"><span class="hljs-meta">#!/bin/bash</span>
+<span class="hljs-comment">#SBATCH --job-name=conda_pack_job</span>
+<span class="hljs-comment">#SBATCH --output=output_%j.log</span>
+<span class="hljs-comment">#SBATCH --error=error_%j.log</span>
+<span class="hljs-comment">#SBATCH --time=01:00:00</span>
+<span class="hljs-comment">#SBATCH --ntasks=1</span>
+<span class="hljs-comment">#SBATCH --cpus-per-task=1</span>
+<span class="hljs-comment">#SBATCH --mem=4G</span>
+
+<span class="hljs-comment"># Assume you've already created and packed your environment</span>
+PACKED_ENV=/path/to/packed_env.tar.gz
+ENV_DIR=<span class="hljs-variable">$SLURM_TMPDIR</span>/env
+
+<span class="hljs-comment"># Unpack the environment</span>
+mkdir -p <span class="hljs-variable">$ENV_DIR</span>
+tar -xzf <span class="hljs-variable">$PACKED_ENV</span> -C <span class="hljs-variable">$ENV_DIR</span>
+
+<span class="hljs-comment"># Activate the environment</span>
+<span class="hljs-built_in">source</span> <span class="hljs-variable">$ENV_DIR</span>/bin/activate
+
+<span class="hljs-comment"># Run your Python script</span>
+python my_script.py
+
+<span class="hljs-comment"># Deactivate the environment</span>
+deactivate
+</code></pre>
+<h3 id="5-best-practices-for-using-conda-with-slurm">5. Best Practices for Using Conda with Slurm</h3>
+<ol>
+<li><p><strong>Specify exact versions</strong>: When creating environments, specify exact versions of packages to ensure reproducibility.</p>
+</li>
+<li><p><strong>Use environment files</strong>: For complex environments, use a <code>environment.yml</code> file to specify dependencies.</p>
+</li>
+<li><p><strong>Avoid creating environments in home directories</strong>: Instead, create them in a shared space or use <code>conda-pack</code> for portability.</p>
+</li>
+<li><p><strong>Clean up after your job</strong>: If you create temporary environments, make sure to remove them to free up space.</p>
+</li>
+<li><p><strong>Consider using Mamba</strong>: Mamba is a faster drop-in replacement for Conda and can speed up environment creation and package installation.</p>
+</li>
+<li><p><strong>Use environment variables</strong>: Use Slurm&#39;s environment variables (like <code>$SLURM_TMPDIR</code>) for temporary storage.</p>
+</li>
+<li><p><strong>Test interactively first</strong>: Before submitting a job, test your Conda setup in an interactive Slurm session.</p>
+</li>
+</ol>
+<h3 id="6-troubleshooting-conda-in-slurm-jobs">6. Troubleshooting Conda in Slurm Jobs</h3>
+<p>If you encounter issues:</p>
+<ul>
+<li>Check your Slurm output and error logs for Conda-related errors.</li>
+<li>Ensure Conda is properly initialized in your job script.</li>
+<li>Verify that the specified Conda environment exists and contains the necessary packages.</li>
+<li>Check for any conflicts between Conda and other modules loaded in your job.</li>
+</ul>
+<p>Remember, the exact method for using Conda with Slurm can vary depending on your cluster&#39;s configuration. Always consult your system&#39;s documentation or administrators for specific guidelines.</p>
+</body></html>
