@@ -38,7 +38,10 @@ code {
     color: #202c22;
 }
 
-
+code {
+    color: #ddd;
+    background-color: #3e3c3c;
+}
 
 code::before {
     content: '$ ';
