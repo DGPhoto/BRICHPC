@@ -40,7 +40,7 @@
 <ol>
 <li>Create a script (e.g., <code>job_script.sh</code>):</li>
 </ol>
-<code class="code">
+<pre class="code">
 <span>#!/bin/bash</span>
 <span>#SBATCH --job-name=my_job</span>
 <span>#SBATCH --output=output_%j.log</span>
@@ -51,7 +51,7 @@
 
 <span># Your commands here</span>
 <span>echo</span> <span>"Hello, Slurm!"</span>
-</code>
+</pre>
 <ol>
 <li>Submit the job:</li>
 </ol>
