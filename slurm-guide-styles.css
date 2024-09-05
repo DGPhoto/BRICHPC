@@ -27,15 +27,14 @@ p {
 code, code {
     font-family: 'Courier New', Courier, monospace;
     background-color: #3e3c3c;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+   
     padding: 10px;
     margin-bottom: 1em;
     overflow-x: auto;
 }
 
 code {
-    color: #202c22;
+    color: #f2f4f3;
 }
 
 code {
@@ -45,7 +44,7 @@ code {
 
 code::before {
     content: '$ ';
-    color: #0f0;
+    color: rgb(219, 223, 219);
 }
 
 /* List styles */
