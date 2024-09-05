@@ -40,7 +40,7 @@
 <ol>
 <li>Create a script (e.g., <code>job_script.sh</code>):</li>
 </ol>
-<pre><class="command-line">
+<pre class="command-line">
 <span>#!/bin/bash</span>
 <span>#SBATCH --job-name=my_job</span>
 <span>#SBATCH --output=output_%j.log</span>
@@ -49,8 +49,8 @@
 <span>#SBATCH --time=01:00:00</span>
 <span>#SBATCH --mem=1G</span>
 
-<span class="code"># Your commands here</span>
-<span class="hljs-built_in">echo</span> <span class="hljs-string">"Hello, Slurm!"</span>
+<span># Your commands here</span>
+<span>echo</span> <span>"Hello, Slurm!"</span>
 </pre>
 <ol>
 <li>Submit the job:</li>
