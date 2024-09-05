@@ -41,14 +41,14 @@
 <li>Create a script (e.g., <code>job_script.sh</code>):</li>
 </ol>
 <pre><code class="command-line"><span class="hljs-meta">#!/bin/bash</span>
-<span class=".code">#SBATCH --job-name=my_job</span>
-<span class=".code">#SBATCH --output=output_%j.log</span>
-<span class=".code">#SBATCH --error=error_%j.log</span>
-<span class=".code">#SBATCH --ntasks=1</span>
-<span class=".code">#SBATCH --time=01:00:00</span>
-<span class=".code">#SBATCH --mem=1G</span>
+<span class="code">#SBATCH --job-name=my_job</span>
+<span class="code">#SBATCH --output=output_%j.log</span>
+<span class="code">#SBATCH --error=error_%j.log</span>
+<span class="code">#SBATCH --ntasks=1</span>
+<span class="code">#SBATCH --time=01:00:00</span>
+<span class="code">#SBATCH --mem=1G</span>
 
-<span class=".code"># Your commands here</span>
+<span class="code"># Your commands here</span>
 <span class="hljs-built_in">echo</span> <span class="hljs-string">"Hello, Slurm!"</span>
 </code></pre>
 <ol>
