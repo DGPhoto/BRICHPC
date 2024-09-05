@@ -39,60 +39,60 @@ python my_script.py
 <h3 id="3-loading-software-stacks">3. Loading Software Stacks</h3>
 <p>Sometimes, you might need to load a complete software stack. Many HPC systems provide meta-modules for this purpose:</p>
 <pre><code class="lang-bash"><span class="hljs-meta">#!/bin/bash</span>
-<span class="hljs-comment">#SBATCH --job-name=stack_job</span>
-<span class="hljs-comment">#SBATCH --output=output_%j.log</span>
-<span class="hljs-comment">#SBATCH --error=error_%j.log</span>
-<span class="hljs-comment">#SBATCH --time=01:00:00</span>
-<span class="hljs-comment">#SBATCH --ntasks=1</span>
-<span class="hljs-comment">#SBATCH --cpus-per-task=1</span>
-<span class="hljs-comment">#SBATCH --mem=4G</span>
+<span class=".code">#SBATCH --job-name=stack_job</span>
+<span class=".code">#SBATCH --output=output_%j.log</span>
+<span class=".code">#SBATCH --error=error_%j.log</span>
+<span class=".code">#SBATCH --time=01:00:00</span>
+<span class=".code">#SBATCH --ntasks=1</span>
+<span class=".code">#SBATCH --cpus-per-task=1</span>
+<span class=".code">#SBATCH --mem=4G</span>
 
-<span class="hljs-comment"># Load a complete software stack</span>
+<span class=".code"># Load a complete software stack</span>
 module load foss/2020a
 
-<span class="hljs-comment"># Load additional modules as needed</span>
+<span class=".code"># Load additional modules as needed</span>
 module load python/3.8.5
 
-<span class="hljs-comment"># Your job commands here</span>
+<span class=".code"># Your job commands here</span>
 </code></pre>
 <h3 id="4-module-dependencies">4. Module Dependencies</h3>
 <p>Some modules may have dependencies or conflicts. The module system often handles these automatically, but it&#39;s good to be aware of them:</p>
 <pre><code class="lang-bash"><span class="hljs-meta">#!/bin/bash</span>
-<span class="hljs-comment">#SBATCH --job-name=dep_job</span>
-<span class="hljs-comment">#SBATCH --output=output_%j.log</span>
-<span class="hljs-comment">#SBATCH --error=error_%j.log</span>
-<span class="hljs-comment">#SBATCH --time=01:00:00</span>
-<span class="hljs-comment">#SBATCH --ntasks=1</span>
-<span class="hljs-comment">#SBATCH --cpus-per-task=1</span>
-<span class="hljs-comment">#SBATCH --mem=4G</span>
+<span class=".code">#SBATCH --job-name=dep_job</span>
+<span class=".code">#SBATCH --output=output_%j.log</span>
+<span class=".code">#SBATCH --error=error_%j.log</span>
+<span class=".code">#SBATCH --time=01:00:00</span>
+<span class=".code">#SBATCH --ntasks=1</span>
+<span class=".code">#SBATCH --cpus-per-task=1</span>
+<span class=".code">#SBATCH --mem=4G</span>
 
-<span class="hljs-comment"># Load a module with dependencies</span>
+<span class=".code"># Load a module with dependencies</span>
 module load tensorflow/2.4.1-cuda11.0-python3
 
-<span class="hljs-comment"># The above might automatically load CUDA, cuDNN, and Python modules</span>
+<span class=".code"># The above might automatically load CUDA, cuDNN, and Python modules</span>
 
-<span class="hljs-comment"># Your job commands here</span>
+<span class=".code"># Your job commands here</span>
 python my_tensorflow_script.py
 </code></pre>
 <h3 id="5-using-module-collections">5. Using Module Collections</h3>
 <p>If you frequently use the same set of modules, you can create a module collection:</p>
-<pre><code class="lang-bash"><span class="hljs-comment"># Create a module collection</span>
+<pre><code class="lang-bash"><span class=".code"># Create a module collection</span>
 module save my_collection
 
-<span class="hljs-comment"># In your Slurm script</span>
+<span class=".code"># In your Slurm script</span>
 <span class="hljs-meta">#!/bin/bash</span>
-<span class="hljs-comment">#SBATCH --job-name=collection_job</span>
-<span class="hljs-comment">#SBATCH --output=output_%j.log</span>
-<span class="hljs-comment">#SBATCH --error=error_%j.log</span>
-<span class="hljs-comment">#SBATCH --time=01:00:00</span>
-<span class="hljs-comment">#SBATCH --ntasks=1</span>
-<span class="hljs-comment">#SBATCH --cpus-per-task=1</span>
-<span class="hljs-comment">#SBATCH --mem=4G</span>
+<span class=".code">#SBATCH --job-name=collection_job</span>
+<span class=".code">#SBATCH --output=output_%j.log</span>
+<span class=".code">#SBATCH --error=error_%j.log</span>
+<span class=".code">#SBATCH --time=01:00:00</span>
+<span class=".code">#SBATCH --ntasks=1</span>
+<span class=".code">#SBATCH --cpus-per-task=1</span>
+<span class=".code">#SBATCH --mem=4G</span>
 
-<span class="hljs-comment"># Load your module collection</span>
+<span class=".code"># Load your module collection</span>
 module restore my_collection
 
-<span class="hljs-comment"># Your job commands here</span>
+<span class=".code"># Your job commands here</span>
 </code></pre>
 <h3 id="6-best-practices-for-using-modules-with-slurm">6. Best Practices for Using Modules with Slurm</h3>
 <ol>

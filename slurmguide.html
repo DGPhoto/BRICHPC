@@ -1,7 +1,4 @@
-<html><head><style>body {
-   color: black;
-}
-</style></head><body><h1 id="comprehensive-guide-to-using-slurm">Comprehensive Guide to Using Slurm</h1>
+<html><head><link rel="stylesheet" href="slurm-guide-styles.css">/head><body><h1 id="comprehensive-guide-to-using-slurm">Slurm User Guide</h1>
 <p>Slurm (Simple Linux Utility for Resource Management) is a popular open-source workload manager and job scheduling system for Linux clusters. 
 This guide will walk you through the basics of using Slurm to submit, manage, and monitor jobs on a cluster.</p>
 <h2 id="table-of-contents">Table of Contents</h2>
@@ -36,7 +33,7 @@ This guide will walk you through the basics of using Slurm to submit, manage, an
 <h2 id="submitting-jobs">Submitting Jobs</h2>
 <h3 id="interactive-jobs">Interactive Jobs</h3>
 <p>To run an interactive job, use the <code>srun</code> command:</p>
-<pre><code class="lang-bash">srun <span class="hljs-comment">--pty bash</span>
+<pre><code class=".command-line">srun <span class=".code">--pty bash</span>
 </code></pre>
 <p>This will allocate resources and start an interactive bash session.</p>
 <h3 id="batch-jobs">Batch Jobs</h3>
@@ -44,54 +41,54 @@ This guide will walk you through the basics of using Slurm to submit, manage, an
 <ol>
 <li>Create a script (e.g., <code>job_script.sh</code>):</li>
 </ol>
-<pre><code class="lang-bash"><span class="hljs-meta">#!/bin/bash</span>
-<span class="hljs-comment">#SBATCH --job-name=my_job</span>
-<span class="hljs-comment">#SBATCH --output=output_%j.log</span>
-<span class="hljs-comment">#SBATCH --error=error_%j.log</span>
-<span class="hljs-comment">#SBATCH --ntasks=1</span>
-<span class="hljs-comment">#SBATCH --time=01:00:00</span>
-<span class="hljs-comment">#SBATCH --mem=1G</span>
+<pre><code class=".command-line"><span class="hljs-meta">#!/bin/bash</span>
+<span class=".code">#SBATCH --job-name=my_job</span>
+<span class=".code">#SBATCH --output=output_%j.log</span>
+<span class=".code">#SBATCH --error=error_%j.log</span>
+<span class=".code">#SBATCH --ntasks=1</span>
+<span class=".code">#SBATCH --time=01:00:00</span>
+<span class=".code">#SBATCH --mem=1G</span>
 
-<span class="hljs-comment"># Your commands here</span>
+<span class=".code"># Your commands here</span>
 <span class="hljs-built_in">echo</span> <span class="hljs-string">"Hello, Slurm!"</span>
 </code></pre>
 <ol>
 <li>Submit the job:</li>
 </ol>
-<pre><code class="lang-bash"><span class="hljs-selector-tag">sbatch</span> <span class="hljs-selector-tag">job_script</span><span class="hljs-selector-class">.sh</span>
+<pre><code class=".command-line"><span class="hljs-selector-tag">sbatch</span> <span class="hljs-selector-tag">job_script</span><span class="hljs-selector-class">.sh</span>
 </code></pre>
 <h2 id="monitoring-jobs">Monitoring Jobs</h2>
 <p>To view information about your jobs in the queue:</p>
-<pre><code class="lang-bash"><span class="hljs-attribute">squeue</span> -u <span class="hljs-variable">$USER</span>
+<pre><code class=".command-line"><span class="hljs-attribute">squeue</span> -u <span class="hljs-variable">$USER</span>
 </code></pre>
 <p>To see detailed information about a specific job:</p>
-<pre><code class="lang-bash"><span class="hljs-keyword">scontrol </span><span class="hljs-keyword">show </span><span class="hljs-keyword">job </span>&lt;<span class="hljs-keyword">job_id&gt;</span>
+<pre><code class=".command-line"><span class="hljs-keyword">scontrol </span><span class="hljs-keyword">show </span><span class="hljs-keyword">job </span>&lt;<span class="hljs-keyword">job_id&gt;</span>
 </code></pre>
 <h2 id="managing-jobs">Managing Jobs</h2>
 <p>To cancel a job:</p>
-<pre><code class="lang-bash">scancel <span class="hljs-tag">&lt;<span class="hljs-name">job_id</span>&gt;</span>
+<pre><code class=".command-line">scancel <span class="hljs-tag">&lt;<span class="hljs-name">job_id</span>&gt;</span>
 </code></pre>
 <p>To hold a job:</p>
-<pre><code class="lang-bash">scontrol hold <span class="hljs-tag">&lt;<span class="hljs-name">job_id</span>&gt;</span>
+<pre><code class=".command-line">scontrol hold <span class="hljs-tag">&lt;<span class="hljs-name">job_id</span>&gt;</span>
 </code></pre>
 <p>To release a held job:</p>
-<pre><code class="lang-bash">scontrol <span class="hljs-built_in">release</span> &lt;job_id&gt;
+<pre><code class=".command-line">scontrol <span class="hljs-built_in">release</span> &lt;job_id&gt;
 </code></pre>
 <h2 id="advanced-slurm-usage">Advanced Slurm Usage</h2>
 <h3 id="job-arrays">Job Arrays</h3>
 <p>Job arrays allow you to submit and manage collections of similar jobs:</p>
-<pre><code class="lang-bash">#SBATCH --array=<span class="hljs-number">1</span><span class="hljs-number">-10</span>
+<pre><code class=".command-line">#SBATCH --array=<span class="hljs-number">1</span><span class="hljs-number">-10</span>
 </code></pre>
 <p>This will submit 10 jobs with array indices from 1 to 10.</p>
 <h3 id="resource-constraints">Resource Constraints</h3>
 <p>Specify resource requirements in your job script:</p>
-<pre><code class="lang-bash"><span class="hljs-selector-id">#SBATCH</span> --cpus-per-task=<span class="hljs-number">4</span>
+<pre><code class=".command-line"><span class="hljs-selector-id">#SBATCH</span> --cpus-per-task=<span class="hljs-number">4</span>
 <span class="hljs-selector-id">#SBATCH</span> --mem=<span class="hljs-number">8</span>G
 <span class="hljs-selector-id">#SBATCH</span> --gres=gpu:<span class="hljs-number">2</span>
 </code></pre>
 <h3 id="job-dependencies">Job Dependencies</h3>
 <p>Create dependencies between jobs:</p>
-<pre><code class="lang-bash"><span class="hljs-keyword">sbatch </span>--dependency=afterok:&lt;<span class="hljs-keyword">job_id&gt; </span>next_job.<span class="hljs-keyword">sh</span>
+<pre><code class=".command-line"><span class="hljs-keyword">sbatch </span>--dependency=afterok:&lt;<span class="hljs-keyword">job_id&gt; </span>next_job.<span class="hljs-keyword">sh</span>
 </code></pre>
 <h2 id="best-practices">Best Practices</h2>
 <ol>
