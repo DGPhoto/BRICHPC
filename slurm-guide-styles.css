@@ -24,7 +24,7 @@ p {
 }
 
 /* Code and command line styles */
-.code, .command-line {
+code, code {
     font-family: 'Courier New', Courier, monospace;
     background-color: #f4f4f4;
     border: 1px solid #ddd;
@@ -34,16 +34,16 @@ p {
     overflow-x: auto;
 }
 
-.code {
+code {
     color: #333;
 }
 
-.command-line {
+code {
     color: #0f0;
     background-color: #000;
 }
 
-.command-line::before {
+code::before {
     content: '$ ';
     color: #0f0;
 }

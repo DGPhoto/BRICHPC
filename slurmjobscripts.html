@@ -3,10 +3,10 @@
 <p>A Slurm job script is a shell script (typically bash) that contains both Slurm directives and the commands you want to run on the cluster. Let&#39;s break down the components and syntax of a Slurm job script:</p>
 <h3 id="basic-structure">Basic Structure</h3>
 <pre><code class="lang-bash"><span class="hljs-meta">#!/bin/bash</span>
-<span class=".code">#SBATCH [options]</span>
-<span class=".code">#SBATCH [more options]</span>
+<span class="code">#SBATCH [options]</span>
+<span class="code">#SBATCH [more options]</span>
 
-<span class=".code"># Your commands here</span>
+<span class="code"># Your commands here</span>
 </code></pre>
 <h3 id="shebang">Shebang</h3>
 <p>The first line of your script should be the shebang:</p>
@@ -52,28 +52,28 @@
 <h3 id="example-job-script">Example Job Script</h3>
 <p>Here&#39;s an example of a more complex Slurm job script:</p>
 <pre><code class="lang-bash"><span class="hljs-meta">#!/bin/bash</span>
-<span class=".code">#SBATCH --job-name=complex_job</span>
-<span class=".code">#SBATCH --output=output_%A_%a.log</span>
-<span class=".code">#SBATCH --error=error_%A_%a.log</span>
-<span class=".code">#SBATCH --array=1-5</span>
-<span class=".code">#SBATCH --time=02:00:00</span>
-<span class=".code">#SBATCH --ntasks=1</span>
-<span class=".code">#SBATCH --cpus-per-task=4</span>
-<span class=".code">#SBATCH --mem=8G</span>
-<span class=".code">#SBATCH --partition=general</span>
-<span class=".code">#SBATCH --mail-type=BEGIN,END,FAIL</span>
-<span class=".code">#SBATCH --mail-user=your.email@example.com</span>
+<span class="code">#SBATCH --job-name=complex_job</span>
+<span class="code">#SBATCH --output=output_%A_%a.log</span>
+<span class="code">#SBATCH --error=error_%A_%a.log</span>
+<span class="code">#SBATCH --array=1-5</span>
+<span class="code">#SBATCH --time=02:00:00</span>
+<span class="code">#SBATCH --ntasks=1</span>
+<span class="code">#SBATCH --cpus-per-task=4</span>
+<span class="code">#SBATCH --mem=8G</span>
+<span class="code">#SBATCH --partition=general</span>
+<span class="code">#SBATCH --mail-type=BEGIN,END,FAIL</span>
+<span class="code">#SBATCH --mail-user=your.email@example.com</span>
 
-<span class=".code"># Load any necessary modules</span>
+<span class="code"># Load any necessary modules</span>
 module load python/3.8
 
-<span class=".code"># Set up the environment</span>
+<span class="code"># Set up the environment</span>
 <span class="hljs-built_in">export</span> OMP_NUM_THREADS=<span class="hljs-variable">$SLURM_CPUS_PER_TASK</span>
 
-<span class=".code"># Run the main command</span>
+<span class="code"># Run the main command</span>
 python my_script.py --input-file input_<span class="hljs-variable">${SLURM_ARRAY_TASK_ID}</span>.txt --output-file output_<span class="hljs-variable">${SLURM_ARRAY_TASK_ID}</span>.txt
 
-<span class=".code"># Optional: Run some post-processing</span>
+<span class="code"># Optional: Run some post-processing</span>
 <span class="hljs-keyword">if</span> [ $? <span class="hljs-_">-eq</span> 0 ]; <span class="hljs-keyword">then</span>
     <span class="hljs-built_in">echo</span> <span class="hljs-string">"Job completed successfully"</span>
     python post_process.py output_<span class="hljs-variable">${SLURM_ARRAY_TASK_ID}</span>.txt
