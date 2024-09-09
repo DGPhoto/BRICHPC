@@ -1,110 +1,110 @@
 <html><head><link rel="stylesheet" href="slurm-guide-styles.css"></head><body><h1 id="guide-to-using-slurm"> Slurm User Guide </h1>
 
-## Essential Linux Commands for Slurm Users
+<h2> Essential Linux Commands for Slurm Users </h2>
 
 <p> Before diving into Slurm-specific commands, it's crucial to know some  basic Linux commands. Here are some essential ones you should be familiar with when using a Slurm cluster: </p>
 
 <h3>  1. File and Directory Operations  </h3>
 
-<li>  - ls: List directory contents </li>
-<li>  - ls -l: Long format listing </li>
-<li>  - ls -a: Show hidden files</li>
-<li>- pwd: Print working directory</li>
-<li>- cd: Change directory</li>
-<li>  - cd ..: Move up one directory</li>
-<li>  - cd ~: Go to home directory</li>
-<li>- mkdir: Create a new directory</li>
-<li>- rm: Remove files or directories</li>
-<li>  - rm -r: Remove directories and their contents recursively</li>
-<li>- cp: Copy files or directories</li>
-<li>- mv: Move or rename files or directories</li>
-<li>- touch: Create an empty file or update file timestamps</li>
+<li>ls: List directory contents </li>
+<li>ls -l: Long format listing </li>
+<li>ls -a: Show hidden files</li>
+<li>pwd: Print working directory</li>
+<li>cd: Change directory</li>
+<li>cd ..: Move up one directory</li>
+<li>cd ~: Go to home directory</li>
+<li>mkdir: Create a new directory</li>
+<li>rm: Remove files or directories</li>
+<li>rm -r: Remove directories and their contents recursively</li>
+<li>cp: Copy files or directories</li>
+<li>mv: Move or rename files or directories</li>
+<li>touch: Create an empty file or update file timestamps</li>
 
 
 <h3>  2. File Viewing and Editing </h3>
 
-<li>- cat: Display file contents</li>
-<li>- less: View file contents page by page</li>
-<li>- head: Display the beginning of a file</li>
-<li>- tail: Display the end of a file</li>
-<li>  - tail -f: Follow file changes in real-time</li>
-<li>- nano or vim: Text editors</li>
+<li>cat: Display file contents</li>
+<li>less: View file contents page by page</li>
+<li>head: Display the beginning of a file</li>
+<li>tail: Display the end of a file</li>
+<li>tail -f: Follow file changes in real-time</li>
+<li>nano or vim: Text editors</li>
 
 <h3>  3. File Permissions and Ownership</h3>
 
-<li>- chmod: Change file permissions</li>
-<li>- chown: Change file ownership</li>
+<li>chmod: Change file permissions</li>
+<li>chown: Change file ownership</li>
 
 <h3>  4. Process Management</h3>
 
-<li>- ps: Display current processes</li>
-<li> - ps aux: Show all processes for all users</li>
-<li>- top or htop: Interactive process viewers</li>
-<li>- kill: Terminate processes</li>
+<li>ps: Display current processes</li>
+<li>ps aux: Show all processes for all users</li>
+<li>top or htop: Interactive process viewers</li>
+<li>kill: Terminate processes</li>
 
 <h3>  5. System Information</h3>
 
-<li>- uname: Print system information</li>
-<li>- df: Report file system disk space usage</li>
-<li>- du: Estimate file space usage</li>
-<li>- free: Display amount of free and used memory</li>
+<li>uname: Print system information</li>
+<li>df: Report file system disk space usage</li>
+<li>du: Estimate file space usage</li>
+<li>free: Display amount of free and used memory</li>
 
 <h3>  6. Text Processing</h3>
 
-<li>- grep: Search text using patterns</li>
-<li>- sed: Stream editor for filtering and transforming text</li>
-<li>- awk: Pattern scanning and processing language</li>
+<li>grep: Search text using patterns</li>
+<li>sed: Stream editor for filtering and transforming text</li>
+<li>awk: Pattern scanning and processing language</li>
 
 <h3>  7. Network Commands</h3>
 
-<li>- ssh: Secure shell for remote login</li>
-<li>- scp: Securely copy files between hosts on a network</li>
-<li>- wget or curl: Retrieve files from the web</li>
+<li>ssh: Secure shell for remote login</li>
+<li>scp: Securely copy files between hosts on a network</li>
+<li>wget or curl: Retrieve files from the web</li>
 
 <h3>  8. Job Control</h3>
 
-<li>- bg: Put a job in the background</li>
-<li>- fg: Bring a job to the foreground</li>
-<li>- jobs: List active jobs</li>
-<li>- nohup: Run a command immune to hangups</li>
+<li>bg: Put a job in the background</li>
+<li>fg: Bring a job to the foreground</li>
+<li>jobs: List active jobs</li>
+<li>nohup: Run a command immune to hangups</li>
 
 <h3>  9. Environment Variables </h3>
 
-<li>- export: Set an environment variable</li>
-<li>- echo $VARIABLE: Display the value of an environment variable</li>
-<li>- env: Display all environment variables</li>
+<li>export: Set an environment variable</li>
+<li>echo $VARIABLE: Display the value of an environment variable</li>
+<li>env: Display all environment variables</li>
 
 <h3>  10. File Compression and Archiving </h3>
 
-<li>- tar: Tape archiver, used for creating and extracting archives</li>
-<li>- gzip, gunzip: Compress or expand files</li>
-<li>- zip, unzip: Package and compress (archive) files</li>
+<li>tar: Tape archiver, used for creating and extracting archives</li>
+<li>gzip, gunzip: Compress or expand files</li>
+<li>zip, unzip: Package and compress (archive) files</li>
 
 <h3>  11. File Transfer </h3>
 
-<li>- rsync: Fast, versatile file copying tool</li>
+<li>rsync: Fast, versatile file copying tool</li>
 
 <h3>  12. Miscellaneous </h3>
 <ol>
-<li>- man: Display the manual page for a command</li>
-<li>- history: Show command history</li>
-<li>- which: Locate a command</li>
+<li>man: Display the manual page for a command</li>
+<li>history: Show command history</li>
+<li>which: Locate a command</li>
 </ol>
 <h3>  Using These Commands in Slurm Context </h3>
 <ol>
-<li>**File Management**: You'll use ls, cd, mkdir, cp, and mv to navigate and manage your files and directories on the cluster.</li>
+<li>File Management: You'll use ls, cd, mkdir, cp, and mv to navigate and manage your files and directories on the cluster.</li>
 
-<li>**Job Script Creation**: Use text editors like nano or vim to create and edit your Slurm job scripts.</li>
+<li>Job Script Creation: Use text editors like nano or vim to create and edit your Slurm job scripts.</li>
 
-<li>**File Permissions**: Use chmod to ensure your job scripts are executable.</li>
+<li>File Permissions: Use chmod to ensure your job scripts are executable.</li>
 
-<li>**Process Monitoring**: Commands like ps and top can be useful for monitoring your jobs on the compute nodes (if you have access).</li>
+<li>Process Monitoring: Commands like ps and top can be useful for monitoring your jobs on the compute nodes (if you have access).</li>
 
-<li>**Output Examination**: Use cat, less, head, and tail to view your job output files.</li>
+<li>Output Examination: Use cat, less, head, and tail to view your job output files.</li>
 
-<li>**Data Transfer**: Use scp or rsync to transfer files to and from the cluster.</li>
+<li>Data Transfer: Use scp or rsync to transfer files to and from the cluster.</li>
 
-<li>**Text Processing**: Commands like grep, sed, and awk are invaluable for parsing and analyzing job outputs.</li>
+<li>Text Processing: Commands like grep, sed, and awk are invaluable for parsing and analyzing job outputs.</li>
 </ol>
 </body>
 </html>

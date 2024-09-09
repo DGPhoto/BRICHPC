@@ -21,25 +21,25 @@ Before diving into Slurm-specific usage, let's review some basic module commands
 Here's an example of how to use modules in a Slurm job script:
 
 <code>
-#!/bin/bash 
-#SBATCH --job-name=module_job
-#SBATCH --output=output_%j.log
-#SBATCH --error=error_%j.log
-#SBATCH --time=01:00:00
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task=1
-#SBATCH --mem=4G
-
-# Purge all loaded modules
-module purge
-
-# Load required modules
-module load gcc/9.3.0
-module load python/3.8.5
-module load openmpi/4.0.4
-
-# Your job commands here
-python my_script.py
+#!/bin/bash <br>
+#SBATCH --job-name=module_job<br>
+#SBATCH --output=output_%j.log<br>
+#SBATCH --error=error_%j.log<br>
+#SBATCH --time=01:00:00<br>
+#SBATCH --ntasks=1<br>
+#SBATCH --cpus-per-task=1<br>
+#SBATCH --mem=4G<br>
+<br>
+# Purge all loaded modules<br>
+module purge<br>
+<br>
+# Load required modules<br>
+module load gcc/9.3.0<br>
+module load python/3.8.5<br>
+module load openmpi/4.0.4<br>
+<br>
+# Your job commands here<br>
+python my_script.py<br>
 </code>
 
 <h3>  3. Loading Software Stacks </h3>
@@ -47,23 +47,23 @@ python my_script.py
 Sometimes, you might need to load a complete software stack. Many HPC systems provide meta-modules for this purpose:
 
 <code>
-#!/bin/bash
-#SBATCH --job-name=stack_job
-#SBATCH --output=output_%j.log
-#SBATCH --error=error_%j.log
-#SBATCH --time=01:00:00
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task=1
-#SBATCH --mem=4G
-
-# Load a complete software stack
-module load foss/2020a
-
-# Load additional modules as needed
-module load python/3.8.5
-
-# Your job commands here
-
+#!/bin/bash<br>
+#SBATCH --job-name=stack_job<br>
+#SBATCH --output=output_%j.log<br>
+#SBATCH --error=error_%j.log<br>
+#SBATCH --time=01:00:00<br>
+#SBATCH --ntasks=1<br>
+#SBATCH --cpus-per-task=1<br>
+#SBATCH --mem=4G<br>
+<br>
+# Load a complete software stack<br>
+module load foss/2020a<br>
+<br>
+# Load additional modules as needed<br>
+module load python/3.8.5<br>
+<br>
+# Your job commands here<br>
+<br>
 </code>
 
 <h3>  4. Module Dependencies </h3>
@@ -71,22 +71,23 @@ module load python/3.8.5
 Some modules may have dependencies or conflicts. The module system often handles these automatically, but it's good to be aware of them:
 
 <code>
-#!/bin/bash
-#SBATCH --job-name=dep_job
-#SBATCH --output=output_%j.log
-#SBATCH --error=error_%j.log
-#SBATCH --time=01:00:00
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task=1
-#SBATCH --mem=4G
-
-# Load a module with dependencies
-module load tensorflow/2.4.1-cuda11.0-python3
-
-# The above might automatically load CUDA, cuDNN, and Python modules
-
-# Your job commands here
-python my_tensorflow_script.py
+#!/bin/bash<br>
+#SBATCH --job-name=dep_job<br>
+#SBATCH --output=output_%j.log<br>
+#SBATCH --error=error_%j.log<br>
+#SBATCH --time=01:00:00<br>
+#SBATCH --ntasks=1<br>
+#SBATCH --cpus-per-task=1<br>
+#SBATCH --mem=4G<br>
+<br>
+# Load a module with dependencies<br>
+module load tensorflow/2.4.1-cuda11.0-python3<br>
+<br>
+# The above might automatically load CUDA, cuDNN, and Python modules<br>
+<br>
+# Your job commands here<br>
+python my_tensorflow_script.py<br>
+<br>
 </code>
 
 <h3>  5. Using Module Collections </h3>
@@ -94,23 +95,24 @@ python my_tensorflow_script.py
 If you frequently use the same set of modules, you can create a module collection:
 
     <code>
-# Create a module collection
-module save my_collection
-
-# In your Slurm script
-#!/bin/bash
-#SBATCH --job-name=collection_job
-#SBATCH --output=output_%j.log
-#SBATCH --error=error_%j.log
-#SBATCH --time=01:00:00
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task=1
-#SBATCH --mem=4G
-
-# Load your module collection
-module restore my_collection
-
-# Your job commands here
+# Create a module collection <br>
+module save my_collection<br>
+<br>
+# In your Slurm script<br>
+#!/bin/bash<br>
+#SBATCH --job-name=collection_job<br>
+#SBATCH --output=output_%j.log<br>
+#SBATCH --error=error_%j.log<br>
+#SBATCH --time=01:00:00<br>
+#SBATCH --ntasks=1<br>
+#SBATCH --cpus-per-task=1<br>
+#SBATCH --mem=4G<br>
+<br>
+# Load your module collection<br>
+module restore my_collection<br>
+<br>
+# Your job commands here<br>
+<br>
 </code>
 
 <h3>  6. Best Practices for Using Modules with Slurm </h3>
