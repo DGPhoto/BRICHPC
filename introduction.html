@@ -62,7 +62,7 @@ echo "Hello, Slurm!"</br>
 sbatch job_script.sh
 
 </p>
-<h2> Monitoring Jobs </h2>
+<h3> Monitoring Jobs </h3>
 
 To view information about your jobs in the queue:
 
@@ -115,7 +115,7 @@ Create dependencies between jobs:
 sbatch --dependency=afterok:<job_id> next_job.sh
 </p>
 
-<h2> Best Practices </h2>
+<h3> Best Practices </h3>
 <ol>
 <li>Estimate resources accurately: Request only the resources you need to avoid long queue times.</li>
 <li>Set appropriate time limits: This helps the scheduler plan more effectively.</li>
