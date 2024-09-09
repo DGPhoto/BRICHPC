@@ -7,8 +7,8 @@ Conda is a popular package management system and environment management system. 
 
 <h3>  1. Loading Conda </h3>
 
-First, you need to ensure Conda is available in your Slurm job. This usually involves loading a module or sourcing a script to initialize Conda. The exact method can vary depending on your cluster's configuration. Common approaches include:
-
+<p>First, you need to ensure Conda is available in your Slurm job. This usually involves loading a module or sourcing a script to initialize Conda. The exact method can vary depending on your cluster's configuration. Common approaches include:
+</p>
 
 # Option 1: Loading a module
 module load anaconda3
@@ -21,7 +21,7 @@ Once Conda is loaded, you can activate your environment. Here's how you might do
 
 <code>
 
-
+<p>
 #!/bin/bash <br>
 #SBATCH --job-name=conda_job <br>
 #SBATCH --output=output_%j.log<br>
@@ -39,7 +39,7 @@ conda activate myenv<br>
 <br>
 # Run your Python script<br>
 python my_script.py<br>
-
+</p>
 </code>
 
 <h3>  3. Creating Conda Environments on the Fly </h3>
