@@ -41,24 +41,24 @@ For batch jobs, create a submission script and use `sbatch`:
 
 1. Create a script (e.g., `job_script.sh`):
 <p><code>
-```bash
-#!/bin/bash
-#SBATCH --job-name=my_job
-#SBATCH --output=output_%j.log
-#SBATCH --error=error_%j.log
-#SBATCH --ntasks=1
-#SBATCH --time=01:00:00
-#SBATCH --mem=1G
 
-# Your commands here
-echo "Hello, Slurm!"
-```
+#!/bin/bash  </n>
+#SBATCH --job-name=my_job </n>
+#SBATCH --output=output_%j.log</n>
+#SBATCH --error=error_%j.log</n>
+#SBATCH --ntasks=1</n>
+#SBATCH --time=01:00:00</n>
+#SBATCH --mem=1G</n>
+
+# Your commands here</n>
+echo "Hello, Slurm!"</n>
+
 </code></p>
 2. Submit the job:
 <p><code>
-```bash
+
 sbatch job_script.sh
-```
+
 </code></p>
 <h2> Monitoring Jobs </h2>
 
