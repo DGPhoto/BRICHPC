@@ -1,37 +1,37 @@
 <html><head><link rel="stylesheet" href="slurm-guide-styles.css"></head><body><h1 id="guide-to-using-slurm"> Slurm User Guide </h1>
 
-# Comprehensive Guide to Using Slurm
+<h1> Basic Guide to Using Slurm </h1>
 
 Slurm (Simple Linux Utility for Resource Management) is an open-source workload manager and job scheduling system for Linux clusters. This guide will walk you through the basics of using Slurm to submit, manage, and monitor jobs on a cluster.
 
 ## Table of Contents
 
-1. [Understanding Slurm Concepts](#understanding-slurm-concepts)
-2. [Basic Slurm Commands](#basic-slurm-commands)
-3. [Submitting Jobs](#submitting-jobs)
-4. [Monitoring Jobs](#monitoring-jobs)
-5. [Managing Jobs](#managing-jobs)
-6. [Advanced Slurm Usage](#advanced-slurm-usage)
-7. [Best Practices](#best-practices)
+<li>1. [Understanding Slurm Concepts](#understanding-slurm-concepts)</li>
+<li>2. [Basic Slurm Commands](#basic-slurm-commands)</li>
+<li>3. [Submitting Jobs](#submitting-jobs)</li>
+<li>4. [Monitoring Jobs](#monitoring-jobs)</li>
+<li>5. [Managing Jobs](#managing-jobs)</li>
+<li>6. [Advanced Slurm Usage](#advanced-slurm-usage)</li>
+<li>7. [Best Practices](#best-practices)</li>
 
 <h2> Understanding Slurm Concepts</h2>
 
 Before diving into Slurm usage, it's important to understand some key concepts:
 
-- **Node**: A computer in the cluster.
-- **Partition**: A group of nodes with specific characteristics.
-- **Job**: A resource allocation request for a specific program or task.
-- **Task**: An instance of a running program within a job.
-- **Job Step**: A set of tasks within a job.
+<li> Node     : A computer in the cluster. </li>
+<li> Partition: A group of nodes with specific characteristics. </li>
+<li> Job      : A resource allocation request for a specific program or task. </li>
+<li> Task     : An instance of a running program within a job. </li>
+<li> Job Step : A set of tasks within a job.</li>
 
 <h2> Basic Slurm Commands</h2>
 
 Here are some essential Slurm commands you'll use frequently:
 
-- `sbatch`: Submit a batch script
-- `scancel`: Cancel a job
-- `squeue`: View information about jobs in the queue
-- `sinfo`: View information about Slurm nodes and partitions
+<li> sbatch : Submit a batch script </li>
+<li> scancel: Cancel a job </li>
+<li> squeue : View information about jobs in the queue </li>
+<li> sinfo  : View information about Slurm nodes and partitions </li>
 
 
 
@@ -40,7 +40,7 @@ Here are some essential Slurm commands you'll use frequently:
 For batch jobs, create a submission script and use `sbatch`:
 
 1. Create a script (e.g., `job_script.sh`):
-
+<code>
 ```bash
 #!/bin/bash
 #SBATCH --job-name=my_job
@@ -53,74 +53,74 @@ For batch jobs, create a submission script and use `sbatch`:
 # Your commands here
 echo "Hello, Slurm!"
 ```
-
+</code>
 2. Submit the job:
-
+<code>
 ```bash
 sbatch job_script.sh
 ```
-
+</code>
 <h2> Monitoring Jobs </h2>
 
 To view information about your jobs in the queue:
 
-```bash
+<code>
 squeue -u $USER
-```
+</code>
 
 To see detailed information about a specific job:
 
-```bash
+<code>
 scontrol show job <job_id>
-```
+</code>
 
 ## Managing Jobs
 
 To cancel a job:
 
-```bash
+<code>
 scancel <job_id>
-```
+</code>
 
 To hold a job:
 
-```bash
+<code>
 scontrol hold <job_id>
-```
+</code>
 
 To release a held job:
 
-```bash
+<code>
 scontrol release <job_id>
-```
+</code>
 
 
 <h3>  Resource Constraints </h3>
 
 Specify resource requirements in your job script:
 
-```bash
+<code>
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=8G
 #SBATCH --gres=gpu:2
-```
+</code>
 
 <h3>  Job Dependencies </h3>
 
 Create dependencies between jobs:
 
-```bash
+<code>
 sbatch --dependency=afterok:<job_id> next_job.sh
-```
+</code>
 
 <h2> Best Practices </h2>
-
-1. **Estimate resources accurately**: Request only the resources you need to avoid long queue times.
-3. **Set appropriate time limits**: This helps the scheduler plan more effectively.
-4. **Use job names**: Give your jobs meaningful names for easier management.
-5. **Monitor your jobs**: Regularly check the status of your jobs and kill them if they're not behaving as expected.
-6. **Use appropriate partitions**: Choose the right partition based on your job's requirements.
-7. **Optimize your code**: Well-optimized code can reduce resource usage and improve job throughput.
-
+<ol>
+<li>**Estimate resources accurately**: Request only the resources you need to avoid long queue times.</li>
+<li>**Set appropriate time limits**: This helps the scheduler plan more effectively.</li>
+<li>**Use job names**: Give your jobs meaningful names for easier management.</li>
+<li>**Monitor your jobs**: Regularly check the status of your jobs and kill them if they're not behaving as expected.</li>
+<li>**Use appropriate partitions**: Choose the right partition based on your job's requirements.</li>
+<li>**Optimize your code**: Well-optimized code can reduce resource usage and improve job throughput.</li>
+</ol>
 </body>
 </html>
