@@ -1,7 +1,7 @@
 <html><head><link rel="stylesheet" href="slurm-guide-styles.css"></head><body><h1 id="guide-to-using-slurm"> Slurm User Guide </h1>
 
 
-## Using the Module System in Slurm Jobs
+<h2> Using the Module System in Slurm Jobs </h2>
 
 The module system is a software environment management tool widely used in HPC environments. It allows users to dynamically modify their shell environment to access different software packages and versions. Here's how to effectively use the module system in your Slurm jobs:
 
@@ -9,19 +9,19 @@ The module system is a software environment management tool widely used in HPC e
 
 Before diving into Slurm-specific usage, let's review some basic module commands:
 
-- `module avail`: List all available modules
-- `module list`: Show currently loaded modules
-- `module load <module_name>`: Load a specific module
-- `module unload <module_name>`: Unload a specific module
-- `module purge`: Unload all currently loaded modules
-- `module show <module_name>`: Display information about a module
+<li> `module avail`: List all available modules </li>
+<li> `module list`: Show currently loaded modules</li>
+<li> `module load <module_name>`: Load a specific module</li>
+<li> `module unload <module_name>`: Unload a specific module</li>
+<li> `module purge`: Unload all currently loaded modules</li>
+<li> `module show <module_name>`: Display information about a module</li>
 
 <h3>  2. Using Modules in Slurm Job Scripts </h3>
 
 Here's an example of how to use modules in a Slurm job script:
 
-```bash
-#!/bin/bash
+<code>
+#!/bin/bash 
 #SBATCH --job-name=module_job
 #SBATCH --output=output_%j.log
 #SBATCH --error=error_%j.log
@@ -40,13 +40,13 @@ module load openmpi/4.0.4
 
 # Your job commands here
 python my_script.py
-```
+</code>
 
 <h3>  3. Loading Software Stacks </h3>
 
 Sometimes, you might need to load a complete software stack. Many HPC systems provide meta-modules for this purpose:
 
-```bash
+<code>
 #!/bin/bash
 #SBATCH --job-name=stack_job
 #SBATCH --output=output_%j.log
@@ -63,13 +63,14 @@ module load foss/2020a
 module load python/3.8.5
 
 # Your job commands here
-```
+
+</code>
 
 <h3>  4. Module Dependencies </h3>
 
 Some modules may have dependencies or conflicts. The module system often handles these automatically, but it's good to be aware of them:
 
-```bash
+<code>
 #!/bin/bash
 #SBATCH --job-name=dep_job
 #SBATCH --output=output_%j.log
@@ -86,13 +87,13 @@ module load tensorflow/2.4.1-cuda11.0-python3
 
 # Your job commands here
 python my_tensorflow_script.py
-```
+</code>
 
 <h3>  5. Using Module Collections </h3>
 
 If you frequently use the same set of modules, you can create a module collection:
 
-```bash
+    <code>
 # Create a module collection
 module save my_collection
 
@@ -110,38 +111,39 @@ module save my_collection
 module restore my_collection
 
 # Your job commands here
-```
+</code>
 
 <h3>  6. Best Practices for Using Modules with Slurm </h3>
+<ol>
+<li>Purge before loading: Start your script with `module purge` to ensure a clean environment.</li>
 
-1. **Purge before loading**: Start your script with `module purge` to ensure a clean environment.
+<li>Be specific: Use full module names including versions to ensure reproducibility.</li>
 
-2. **Be specific**: Use full module names including versions to ensure reproducibility.
+<li>Check for conflicts: Use `module show` to check for potential conflicts before loading modules.</li>
 
-3. **Check for conflicts**: Use `module show` to check for potential conflicts before loading modules.
+<li>Use module collections: For complex environments, create and use module collections.</li>
 
-4. **Use module collections**: For complex environments, create and use module collections.
+<li>Document your modules: Comment your Slurm script to explain why each module is needed.</li>
 
-5. **Document your modules**: Comment your Slurm script to explain why each module is needed.
-
-6. **Use module load in job scripts**: Don't rely on modules loaded in your login environment; explicitly load them in your job script.
+<li>Use module load in job scripts: Don't rely on modules loaded in your login environment; explicitly load them in your job script.</li>
+</ol>
 
 <h3>  7. Troubleshooting Module Issues in Slurm Jobs </h3>
 
 If you encounter module-related issues:
 
-- Check your Slurm output and error logs for module-related errors.
-- Ensure the modules you're trying to load are available on the compute nodes (they might differ from login nodes).
-- Use `module show <module_name>` to verify module details and dependencies.
-- If a module isn't found, check if you need to load a specific compiler or MPI implementation first.
+<li> Check your Slurm output and error logs for module-related errors. </li>
+<li> Ensure the modules you're trying to load are available on the compute nodes (they might differ from login nodes).</li>
+<li> Use `module show <module_name>` to verify module details and dependencies.</li>
+<li> If a module isn't found, check if you need to load a specific compiler or MPI implementation first.</li>
 
 <h3>  8. Advanced Module Usage </h3>
 
 Some advanced module features:
 
-- **Module versioning**: `module load <software>/<version>`
-- **Swapping modules**: `module swap <old_module> <new_module>`
-- **Module aliases**: `module alias my_python python/3.8.5`
+<li> Module versioning: `module load <software>/<version>`</li>
+<li> Swapping modules : `module swap <old_module> <new_module>`</li>
+<li> Module aliases   : `module alias my_python python/3.8.5`</li>
 
 </body>
 </html>

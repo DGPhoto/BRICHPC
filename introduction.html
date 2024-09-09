@@ -6,13 +6,13 @@ Slurm (Simple Linux Utility for Resource Management) is an open-source workload 
 
 ## Table of Contents
 
-<li>1. [Understanding Slurm Concepts](#understanding-slurm-concepts)</li>
-<li>2. [Basic Slurm Commands](#basic-slurm-commands)</li>
-<li>3. [Submitting Jobs](#submitting-jobs)</li>
-<li>4. [Monitoring Jobs](#monitoring-jobs)</li>
-<li>5. [Managing Jobs](#managing-jobs)</li>
-<li>6. [Advanced Slurm Usage](#advanced-slurm-usage)</li>
-<li>7. [Best Practices](#best-practices)</li>
+<li>Understanding Slurm Concepts</li>
+<li>Basic Slurm Commands</li>
+<li>Submitting Jobs</li>
+<li>Monitoring Jobs</li>
+<li>Managing Jobs</li>
+<li>Advanced Slurm Usage</li>
+<li>Best Practices</li>
 
 <h2> Understanding Slurm Concepts</h2>
 
@@ -100,9 +100,9 @@ scontrol release <job_id>
 Specify resource requirements in your job script:
 
 <p><code>
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=8G
-#SBATCH --gres=gpu:2
+#SBATCH --cpus-per-task=4 <br>
+#SBATCH --mem=8G <br>
+#SBATCH --gres=gpu:2 <br>
 </code></p>
 
 <h3>  Job Dependencies </h3>
@@ -115,12 +115,12 @@ sbatch --dependency=afterok:<job_id> next_job.sh
 
 <h2> Best Practices </h2>
 <ol>
-<li>**Estimate resources accurately**: Request only the resources you need to avoid long queue times.</li>
-<li>**Set appropriate time limits**: This helps the scheduler plan more effectively.</li>
-<li>**Use job names**: Give your jobs meaningful names for easier management.</li>
-<li>**Monitor your jobs**: Regularly check the status of your jobs and kill them if they're not behaving as expected.</li>
-<li>**Use appropriate partitions**: Choose the right partition based on your job's requirements.</li>
-<li>**Optimize your code**: Well-optimized code can reduce resource usage and improve job throughput.</li>
+<li>Estimate resources accurately: Request only the resources you need to avoid long queue times.</li>
+<li>Set appropriate time limits: This helps the scheduler plan more effectively.</li>
+<li>Use job names: Give your jobs meaningful names for easier management.</li>
+<li>Monitor your jobs: Regularly check the status of your jobs and kill them if they're not behaving as expected.</li>
+<li>Use appropriate partitions: Choose the right partition based on your job's requirements.</li>
+<li>Optimize your code: Well-optimized code can reduce resource usage and improve job throughput.</li>
 </ol>
 </body>
 </html>
