@@ -39,19 +39,19 @@ Here are some essential Slurm commands you'll use frequently:
 
 For batch jobs, create a submission script and use `sbatch`:
 
-1. Create a script (e.g., `job_script.sh`):
+1. Create a script (e.g., `job_script.sh`): <br>
 <p><code>
 
-#!/bin/bash  </n>
-#SBATCH --job-name=my_job </n>
-#SBATCH --output=output_%j.log</n>
-#SBATCH --error=error_%j.log</n>
-#SBATCH --ntasks=1</n>
-#SBATCH --time=01:00:00</n>
-#SBATCH --mem=1G</n>
+#!/bin/bash  </br>
+#SBATCH --job-name=my_job </br>
+#SBATCH --output=output_%j.log</br>
+#SBATCH --error=error_%j.log</br>
+#SBATCH --ntasks=1</br>
+#SBATCH --time=01:00:00</br>
+#SBATCH --mem=1G</br>
 
-# Your commands here</n>
-echo "Hello, Slurm!"</n>
+# Your commands here</br>
+echo "Hello, Slurm!"</br>
 
 </code></p>
 2. Submit the job:
