@@ -2,11 +2,11 @@
 
 ## Essential Linux Commands for Slurm Users
 
-Before diving into Slurm-specific commands, it's crucial to know some  basic Linux commands. Here are some essential ones you should be familiar with when using a Slurm cluster:
+<p> Before diving into Slurm-specific commands, it's crucial to know some  basic Linux commands. Here are some essential ones you should be familiar with when using a Slurm cluster: </p>
 
 <h3>  1. File and Directory Operations  </h3>
-
-- `ls`: List directory contents
+<ol>
+  - `ls`: List directory contents
   - `ls -l`: Long format listing
   - `ls -a`: Show hidden files
 - `pwd`: Print working directory
@@ -19,78 +19,79 @@ Before diving into Slurm-specific commands, it's crucial to know some  basic Lin
 - `cp`: Copy files or directories
 - `mv`: Move or rename files or directories
 - `touch`: Create an empty file or update file timestamps
+</ol>
 
 <h3>  2. File Viewing and Editing </h3>
-
+<ol>
 - `cat`: Display file contents
 - `less`: View file contents page by page
 - `head`: Display the beginning of a file
 - `tail`: Display the end of a file
   - `tail -f`: Follow file changes in real-time
 - `nano` or `vim`: Text editors
-
+</ol>
 <h3>  3. File Permissions and Ownership</h3>
-
+<ol>
 - `chmod`: Change file permissions
 - `chown`: Change file ownership
-
+</ol>
 <h3>  4. Process Management</h3>
-
+<ol>
 - `ps`: Display current processes
   - `ps aux`: Show all processes for all users
 - `top` or `htop`: Interactive process viewers
 - `kill`: Terminate processes
-
+</ol>
 <h3>  5. System Information</h3>
-
+<ol>
 - `uname`: Print system information
 - `df`: Report file system disk space usage
 - `du`: Estimate file space usage
 - `free`: Display amount of free and used memory
-
+</ol>
 <h3>  6. Text Processing</h3>
-
+<ol>
 - `grep`: Search text using patterns
 - `sed`: Stream editor for filtering and transforming text
 - `awk`: Pattern scanning and processing language
-
+</ol>
 <h3>  7. Network Commands</h3>
-
+<ol>
 - `ssh`: Secure shell for remote login
 - `scp`: Securely copy files between hosts on a network
 - `wget` or `curl`: Retrieve files from the web
-
+</ol>
 <h3>  8. Job Control</h3>
-
+<ol>
 - `bg`: Put a job in the background
 - `fg`: Bring a job to the foreground
 - `jobs`: List active jobs
 - `nohup`: Run a command immune to hangups
-
+</ol>
 <h3>  9. Environment Variables </h3>
-
+<ol>
 - `export`: Set an environment variable
 - `echo $VARIABLE`: Display the value of an environment variable
 - `env`: Display all environment variables
-
+</ol>
 <h3>  10. File Compression and Archiving </h3>
-
+<ol>
 - `tar`: Tape archiver, used for creating and extracting archives
 - `gzip`, `gunzip`: Compress or expand files
 - `zip`, `unzip`: Package and compress (archive) files
-
+</ol>
 <h3>  11. File Transfer </h3>
 
 - `rsync`: Fast, versatile file copying tool
 
 <h3>  12. Miscellaneous </h3>
-
+<ol>
 - `man`: Display the manual page for a command
 - `history`: Show command history
 - `which`: Locate a command
-
+</ol>
 <h3>  Using These Commands in Slurm Context </h3>
-
+<ol>
 1. **File Management**: You'll use `ls`, `cd`, `mkdir`, `cp`, and `mv` to navigate and manage your files and directories on the cluster.
 
 2. **Job Script Creation**: Use text editors like `nano` or `vim` to create and edit your Slurm job scripts.
@@ -104,6 +105,6 @@ Before diving into Slurm-specific commands, it's crucial to know some  basic Lin
 6. **Data Transfer**: Use `scp` or `rsync` to transfer files to and from the cluster.
 
 7. **Text Processing**: Commands like `grep`, `sed`, and `awk` are invaluable for parsing and analyzing job outputs.
-
+</ol>
 </body>
 </html>
