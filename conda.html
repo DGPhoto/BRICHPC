@@ -1,7 +1,7 @@
 
 <html><head><link rel="stylesheet" href="slurm-guide-styles.css"></head><body><h1 id="guide-to-using-slurm"> Slurm User Guide </h1>
 
-## Using Conda in Slurm Jobs
+<h2>  Using Conda in Slurm Jobs </h2>
 
 Conda is a popular package management system and environment management system. When using Slurm on a cluster, you may need to activate and use Conda environments in your job scripts. Here's how to do it effectively:
 
@@ -9,7 +9,7 @@ Conda is a popular package management system and environment management system. 
 
 First, you need to ensure Conda is available in your Slurm job. This usually involves loading a module or sourcing a script to initialize Conda. The exact method can vary depending on your cluster's configuration. Common approaches include:
 
-```bash
+
 # Option 1: Loading a module
 module load anaconda3
 
@@ -19,75 +19,78 @@ module load anaconda3
 
 Once Conda is loaded, you can activate your environment. Here's how you might do this in a Slurm script:
 
-```bash
-#!/bin/bash
-#SBATCH --job-name=conda_job
-#SBATCH --output=output_%j.log
-#SBATCH --error=error_%j.log
-#SBATCH --time=01:00:00
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task=1
-#SBATCH --mem=4G
+<code>
 
-# Load Conda
-module load anaconda3
 
-# Activate your environment
-conda activate myenv
+#!/bin/bash <br>
+#SBATCH --job-name=conda_job <br>
+#SBATCH --output=output_%j.log<br>
+#SBATCH --error=error_%j.log<br>
+#SBATCH --time=01:00:00<br>
+#SBATCH --ntasks=1<br>
+#SBATCH --cpus-per-task=1<br>
+#SBATCH --mem=4G<br>
+<br>
+# Load Conda<br>
+module load anaconda3<br>
+<br>
+# Activate your environment<br>
+conda activate myenv<br>
+<br>
+# Run your Python script<br>
+python my_script.py<br>
 
-# Run your Python script
-python my_script.py
-```
+</code>
 
 <h3>  3. Creating Conda Environments on the Fly </h3>
 
 Sometimes, you might want to create a Conda environment as part of your job. Here's an example:
 
-```bash
-#!/bin/bash
-#SBATCH --job-name=conda_create_job
-#SBATCH --output=output_%j.log
-#SBATCH --error=error_%j.log
-#SBATCH --time=01:00:00
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task=1
-#SBATCH --mem=4G
-
-# Load Conda
-module load anaconda3
-
-# Create a new environment
-conda create -n job_env python=3.8 numpy pandas -y
-
-# Activate the new environment
-conda activate job_env
-
-# Run your Python script
-python my_script.py
-
-# Optionally, remove the environment at the end of the job
-conda deactivate
-conda env remove -n job_env -y
-```
-
+<code>
+#!/bin/bash<br>
+#SBATCH --job-name=conda_create_job<br>
+#SBATCH --output=output_%j.log<br>
+#SBATCH --error=error_%j.log<br>
+#SBATCH --time=01:00:00<br>
+#SBATCH --ntasks=1<br>
+#SBATCH --cpus-per-task=1<br>
+#SBATCH --mem=4G<br>
+<br>
+# Load Conda<br>
+module load anaconda3<br>
+<br>
+# Create a new environment<br>
+conda create -n job_env python=3.8 numpy pandas -y<br>
+<br>
+# Activate the new environment<br>
+conda activate job_env<br>
+<br>
+# Run your Python script<br>
+python my_script.py<br>
+<br>
+# Optionally, remove the environment at the end of the job<br>
+conda deactivate<br>
+conda env remove -n job_env -y<br>
+<br>
+</code>
 
 <h3>  4. Best Practices for Using Conda with Slurm </h3>
 
-1. **Specify exact versions**: When creating environments, specify exact versions of packages to ensure reproducibility.
+<li>Specify exact versions**: When creating environments, specify exact versions of packages to ensure reproducibility.</li>
 
-2. **Use environment files**: For complex environments, use a `environment.yml` file to specify dependencies.
+<li>Use environment files**: For complex environments, use a `environment.yml` file to specify dependencies.</li>
 
-3. **Clean up after your job**: If you create temporary environments, make sure to remove them to free up space.
+<li>Clean up after your job**: If you create temporary environments, make sure to remove them to free up space.</li>
 
 
 <h3>  6. Troubleshooting Conda in Slurm Jobs </h3>
 
 If you encounter issues:
 
-- Check your Slurm output and error logs for Conda-related errors.
-- Ensure Conda is properly initialized in your job script.
-- Verify that the specified Conda environment exists and contains the necessary packages.
-- Check for any conflicts between Conda and other modules loaded in your job.
+<li> Check your Slurm output and error logs for Conda-related errors.</li>
+<li> Ensure Conda is properly initialized in your job script.</li>
+<li>- Verify that the specified Conda environment exists and contains the necessary packages.</li>
+<li>- Check for any conflicts between Conda and other modules loaded in your job.</li>
 
 </body>
 </html>
