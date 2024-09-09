@@ -8,21 +8,21 @@ Let's break down the components and syntax of a Slurm job script:
 
 <h3>  Basic Structure </h3>
 
-<code>
+<p>
 #!/bin/bash<br>
 #SBATCH [options]<br>
 #SBATCH [more options]<br>
 <br>
 # Your commands here<br>
-</code>
+</p>
 
 <h3>  Shebang </h3>
 
 The first line of your script should be the shebang:
 
-<code>
+<p>
 #!/bin/bash
-</code>
+</p>
 
 This tells the system to interpret the script using the bash shell.
 
@@ -30,7 +30,7 @@ This tells the system to interpret the script using the bash shell.
 
 Slurm directives are special comments that start with `#SBATCH`. They tell Slurm how to set up and run your job. Here are some common directives:
 
-<code>
+<p>
 #SBATCH --job-name=my_job        # Name of the job <br>
 #SBATCH --output=output_%j.log   # Standard output log file (%j is replaced by the job ID)<br>
 #SBATCH --error=error_%j.log     # Standard error log file<br>
@@ -39,7 +39,7 @@ Slurm directives are special comments that start with `#SBATCH`. They tell Slurm
 #SBATCH --cpus-per-task=1        # Number of CPU cores per task<br>
 #SBATCH --mem=1G                 # Memory limit<br>
 #SBATCH --partition=general      # Partition (queue) name<br>
-</code>
+</p>
 
 <h3>  Common Slurm Directives </h3>
 
@@ -72,7 +72,7 @@ Slurm sets several environment variables that you can use in your script:
 
 Here's an example of a more complex Slurm job script:
 
-<code>
+<p>
 #!/bin/bash <br>
 #SBATCH --job-name=complex_job<br>
 #SBATCH --output=output_%A_%a.log<br>
@@ -103,7 +103,7 @@ else<br>
     echo "Job failed"<br>
 fi<br>
 <br>
-</code>
+</p>
 
 This script sets up a job array with 5 tasks, each using 4 CPU cores and 8GB of memory. It loads a Python module, sets an environment variable, runs a Python script with task-specific input and output files, and then conditionally runs a post-processing step.
 

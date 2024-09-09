@@ -20,7 +20,7 @@ Before diving into Slurm-specific usage, let's review some basic module commands
 
 Here's an example of how to use modules in a Slurm job script:
 
-<code>
+<p>
     <br>
 #!/bin/bash <br>
 #SBATCH --job-name=module_job<br>
@@ -41,13 +41,13 @@ module load openmpi/4.0.4<br>
 <br>
 # Your job commands here<br>
 python my_script.py<br>
-</code>
+</p>
 
 <h3>  3. Loading Software Stacks </h3>
 
 Sometimes, you might need to load a complete software stack. Many HPC systems provide meta-modules for this purpose:
 
-<code>
+<p>
     <br>
 #!/bin/bash<br>
 #SBATCH --job-name=stack_job<br>
@@ -66,13 +66,13 @@ module load python/3.8.5<br>
 <br>
 # Your job commands here<br>
 <br>
-</code>
+</p>
 
 <h3>  4. Module Dependencies </h3>
 
 Some modules may have dependencies or conflicts. The module system often handles these automatically, but it's good to be aware of them:
 
-<code>
+<p>
     <br>
 #!/bin/bash<br>
 #SBATCH --job-name=dep_job<br>
@@ -91,13 +91,13 @@ module load tensorflow/2.4.1-cuda11.0-python3<br>
 # Your job commands here<br>
 python my_tensorflow_script.py<br>
 <br>
-</code>
+</p>
 
 <h3>  5. Using Module Collections </h3>
 
 If you frequently use the same set of modules, you can create a module collection:
 
-    <code><br>
+    <p><br>
         
 # Create a module collection <br>
 module save my_collection<br>
@@ -117,7 +117,7 @@ module restore my_collection<br>
 <br>
 # Your job commands here<br>
 <br>
-</code>
+</p>
 
 <h3>  6. Best Practices for Using Modules with Slurm </h3>
 <ol>

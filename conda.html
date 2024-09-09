@@ -46,7 +46,7 @@ python my_script.py<br>
 
 Sometimes, you might want to create a Conda environment as part of your job. Here's an example:
 
-<code>
+<p>
 #!/bin/bash<br>
 #SBATCH --job-name=conda_create_job<br>
 #SBATCH --output=output_%j.log<br>
@@ -72,7 +72,7 @@ python my_script.py<br>
 conda deactivate<br>
 conda env remove -n job_env -y<br>
 <br>
-</code>
+</p>
 
 <h3>  4. Best Practices for Using Conda with Slurm </h3>
 
