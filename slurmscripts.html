@@ -6,7 +6,7 @@
 A Slurm job script is a shell script (typically bash) that contains both Slurm directives and the commands you want to run on the cluster. 
 Let's break down the components and syntax of a Slurm job script:
 
-### Basic Structure
+<h3>  Basic Structure </h3>
 
 ```bash
 #!/bin/bash
@@ -16,7 +16,7 @@ Let's break down the components and syntax of a Slurm job script:
 # Your commands here
 ```
 
-### Shebang
+<h3>  Shebang </h3>
 
 The first line of your script should be the shebang:
 
@@ -26,7 +26,7 @@ The first line of your script should be the shebang:
 
 This tells the system to interpret the script using the bash shell.
 
-### Slurm Directives
+<h3>  Slurm Directives </h3>
 
 Slurm directives are special comments that start with `#SBATCH`. They tell Slurm how to set up and run your job. Here are some common directives:
 
@@ -41,7 +41,7 @@ Slurm directives are special comments that start with `#SBATCH`. They tell Slurm
 #SBATCH --partition=general      # Partition (queue) name
 ```
 
-### Common Slurm Directives
+<h3>  Common Slurm Directives </h3>
 
 Here's a more comprehensive list of Slurm directives:
 
@@ -59,7 +59,7 @@ Here's a more comprehensive list of Slurm directives:
 - `--nodes=<number>`: Request a specific number of nodes
 - `--gres=<resource>`: Request generic consumable resources (e.g., GPUs)
 
-### Environment Variables
+<h3>  Environment Variables </h3>
 
 Slurm sets several environment variables that you can use in your script:
 
@@ -68,7 +68,7 @@ Slurm sets several environment variables that you can use in your script:
 - `$SLURM_CPUS_PER_TASK`: Number of CPUs allocated per task
 - `$SLURM_NTASKS`: Total number of tasks in a job
 
-### Example Job Script
+<h3>  Example Job Script </h3>
 
 Here's an example of a more complex Slurm job script:
 
@@ -106,7 +106,7 @@ fi
 
 This script sets up a job array with 5 tasks, each using 4 CPU cores and 8GB of memory. It loads a Python module, sets an environment variable, runs a Python script with task-specific input and output files, and then conditionally runs a post-processing step.
 
-### Best Practices for Job Scripts
+<h3>  Best Practices for Job Scripts </h3>
 
 1. **Use variables**: For repeated values or for clarity, use shell variables.
 2. **Comment your script**: Explain complex parts of your script for better maintainability.
