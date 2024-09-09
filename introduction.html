@@ -1,0 +1,122 @@
+# Comprehensive Guide to Using Slurm
+
+Slurm (Simple Linux Utility for Resource Management) is an open-source workload manager and job scheduling system for Linux clusters. This guide will walk you through the basics of using Slurm to submit, manage, and monitor jobs on a cluster.
+
+## Table of Contents
+
+1. [Understanding Slurm Concepts](#understanding-slurm-concepts)
+2. [Basic Slurm Commands](#basic-slurm-commands)
+3. [Submitting Jobs](#submitting-jobs)
+4. [Monitoring Jobs](#monitoring-jobs)
+5. [Managing Jobs](#managing-jobs)
+6. [Advanced Slurm Usage](#advanced-slurm-usage)
+7. [Best Practices](#best-practices)
+
+## Understanding Slurm Concepts
+
+Before diving into Slurm usage, it's important to understand some key concepts:
+
+- **Node**: A computer in the cluster.
+- **Partition**: A group of nodes with specific characteristics.
+- **Job**: A resource allocation request for a specific program or task.
+- **Task**: An instance of a running program within a job.
+- **Job Step**: A set of tasks within a job.
+
+## Basic Slurm Commands
+
+Here are some essential Slurm commands you'll use frequently:
+
+- `sbatch`: Submit a batch script
+- `scancel`: Cancel a job
+- `squeue`: View information about jobs in the queue
+- `sinfo`: View information about Slurm nodes and partitions
+
+
+
+### Batch Jobs
+
+For batch jobs, create a submission script and use `sbatch`:
+
+1. Create a script (e.g., `job_script.sh`):
+
+```bash
+#!/bin/bash
+#SBATCH --job-name=my_job
+#SBATCH --output=output_%j.log
+#SBATCH --error=error_%j.log
+#SBATCH --ntasks=1
+#SBATCH --time=01:00:00
+#SBATCH --mem=1G
+
+# Your commands here
+echo "Hello, Slurm!"
+```
+
+2. Submit the job:
+
+```bash
+sbatch job_script.sh
+```
+
+## Monitoring Jobs
+
+To view information about your jobs in the queue:
+
+```bash
+squeue -u $USER
+```
+
+To see detailed information about a specific job:
+
+```bash
+scontrol show job <job_id>
+```
+
+## Managing Jobs
+
+To cancel a job:
+
+```bash
+scancel <job_id>
+```
+
+To hold a job:
+
+```bash
+scontrol hold <job_id>
+```
+
+To release a held job:
+
+```bash
+scontrol release <job_id>
+```
+
+
+### Resource Constraints
+
+Specify resource requirements in your job script:
+
+```bash
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=8G
+#SBATCH --gres=gpu:2
+```
+
+### Job Dependencies
+
+Create dependencies between jobs:
+
+```bash
+sbatch --dependency=afterok:<job_id> next_job.sh
+```
+
+## Best Practices
+
+1. **Estimate resources accurately**: Request only the resources you need to avoid long queue times.
+3. **Set appropriate time limits**: This helps the scheduler plan more effectively.
+4. **Use job names**: Give your jobs meaningful names for easier management.
+5. **Monitor your jobs**: Regularly check the status of your jobs and kill them if they're not behaving as expected.
+6. **Use appropriate partitions**: Choose the right partition based on your job's requirements.
+7. **Optimize your code**: Well-optimized code can reduce resource usage and improve job throughput.
+

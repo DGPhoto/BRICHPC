@@ -1,0 +1,118 @@
+
+
+## Writing Slurm Job Scripts
+
+A Slurm job script is a shell script (typically bash) that contains both Slurm directives and the commands you want to run on the cluster. 
+Let's break down the components and syntax of a Slurm job script:
+
+### Basic Structure
+
+```bash
+#!/bin/bash
+#SBATCH [options]
+#SBATCH [more options]
+
+# Your commands here
+```
+
+### Shebang
+
+The first line of your script should be the shebang:
+
+```bash
+#!/bin/bash
+```
+
+This tells the system to interpret the script using the bash shell.
+
+### Slurm Directives
+
+Slurm directives are special comments that start with `#SBATCH`. They tell Slurm how to set up and run your job. Here are some common directives:
+
+```bash
+#SBATCH --job-name=my_job        # Name of the job
+#SBATCH --output=output_%j.log   # Standard output log file (%j is replaced by the job ID)
+#SBATCH --error=error_%j.log     # Standard error log file
+#SBATCH --time=01:00:00          # Time limit (HH:MM:SS)
+#SBATCH --ntasks=1               # Number of tasks (processes)
+#SBATCH --cpus-per-task=1        # Number of CPU cores per task
+#SBATCH --mem=1G                 # Memory limit
+#SBATCH --partition=general      # Partition (queue) name
+```
+
+### Common Slurm Directives
+
+Here's a more comprehensive list of Slurm directives:
+
+- `--job-name=<name>`: Set a name for the job
+- `--output=<filename>`: Specify the file for standard output
+- `--error=<filename>`: Specify the file for standard error
+- `--time=<time>`: Set a time limit for the job (format: DD-HH:MM:SS)
+- `--ntasks=<number>`: Specify the number of tasks to run
+- `--cpus-per-task=<number>`: Set the number of CPU cores per task
+- `--mem=<size[units]>`: Set the total memory required (e.g., 1G for 1 gigabyte)
+- `--partition=<partition_name>`: Specify the partition to run the job on
+- `--array=<indexes>`: Create a job array (e.g., --array=1-10 for 10 array jobs)
+- `--mail-type=<type>`: Specify email notification events (e.g., BEGIN, END, FAIL)
+- `--mail-user=<email_address>`: Set the email address for notifications
+- `--nodes=<number>`: Request a specific number of nodes
+- `--gres=<resource>`: Request generic consumable resources (e.g., GPUs)
+
+### Environment Variables
+
+Slurm sets several environment variables that you can use in your script:
+
+- `$SLURM_JOB_ID`: The ID of the job
+- `$SLURM_ARRAY_TASK_ID`: The array index for job arrays
+- `$SLURM_CPUS_PER_TASK`: Number of CPUs allocated per task
+- `$SLURM_NTASKS`: Total number of tasks in a job
+
+### Example Job Script
+
+Here's an example of a more complex Slurm job script:
+
+```bash
+#!/bin/bash
+#SBATCH --job-name=complex_job
+#SBATCH --output=output_%A_%a.log
+#SBATCH --error=error_%A_%a.log
+#SBATCH --array=1-5
+#SBATCH --time=02:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=8G
+#SBATCH --partition=general
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=your.email@example.com
+
+# Load any necessary modules
+module load python/3.8
+
+# Set up the environment
+export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
+
+# Run the main command
+python my_script.py --input-file input_${SLURM_ARRAY_TASK_ID}.txt --output-file output_${SLURM_ARRAY_TASK_ID}.txt
+
+# Optional: Run some post-processing
+if [ $? -eq 0 ]; then
+    echo "Job completed successfully"
+    python post_process.py output_${SLURM_ARRAY_TASK_ID}.txt
+else
+    echo "Job failed"
+fi
+```
+
+This script sets up a job array with 5 tasks, each using 4 CPU cores and 8GB of memory. It loads a Python module, sets an environment variable, runs a Python script with task-specific input and output files, and then conditionally runs a post-processing step.
+
+### Best Practices for Job Scripts
+
+1. **Use variables**: For repeated values or for clarity, use shell variables.
+2. **Comment your script**: Explain complex parts of your script for better maintainability.
+3. **Error handling**: Include error checking and handling in your script.
+4. **Modularity**: For complex workflows, consider breaking your job into multiple scripts.
+5. **Resource estimation**: Start with conservative resource estimates and adjust based on actual usage.
+6. **Environment setup**: Load necessary modules and set environment variables at the beginning of your script.
+7. **Output management**: Use job ID and array ID in output file names to avoid overwrites.
+
+Remember to write your commands in the LAST part of the script, after you declared all the Slurm directives!
