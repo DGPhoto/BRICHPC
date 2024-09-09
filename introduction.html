@@ -40,7 +40,7 @@ Here are some essential Slurm commands you'll use frequently:
 For batch jobs, create a submission script and use `sbatch`:
 
 1. Create a script (e.g., `job_script.sh`):
-<code>
+<p><code>
 ```bash
 #!/bin/bash
 #SBATCH --job-name=my_job
@@ -53,65 +53,65 @@ For batch jobs, create a submission script and use `sbatch`:
 # Your commands here
 echo "Hello, Slurm!"
 ```
-</code>
+</code></p>
 2. Submit the job:
-<code>
+<p><code>
 ```bash
 sbatch job_script.sh
 ```
-</code>
+</code></p>
 <h2> Monitoring Jobs </h2>
 
 To view information about your jobs in the queue:
 
-<code>
+<p><code>
 squeue -u $USER
-</code>
+</code></p>
 
 To see detailed information about a specific job:
 
-<code>
+<p><code>
 scontrol show job <job_id>
-</code>
+</code></p>
 
 ## Managing Jobs
 
 To cancel a job:
 
-<code>
+<p><code>
 scancel <job_id>
-</code>
+</code></p>
 
 To hold a job:
 
-<code>
+<p><code>
 scontrol hold <job_id>
-</code>
+</code></p>
 
 To release a held job:
 
-<code>
+<p><code>
 scontrol release <job_id>
-</code>
+</code></p>
 
 
 <h3>  Resource Constraints </h3>
 
 Specify resource requirements in your job script:
 
-<code>
+<p><code>
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=8G
 #SBATCH --gres=gpu:2
-</code>
+</code></p>
 
 <h3>  Job Dependencies </h3>
 
 Create dependencies between jobs:
 
-<code>
+<p><code>
 sbatch --dependency=afterok:<job_id> next_job.sh
-</code>
+</code></p>
 
 <h2> Best Practices </h2>
 <ol>
