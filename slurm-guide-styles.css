@@ -1,22 +1,33 @@
-
 .code {
-    background: rgb(40, 44, 52);
-    color: rgb(171, 178, 191);
-    text-shadow: rgba(0, 0, 0, 0.3) 0px 1px;
-    font-family: "Fira Code", "Fira Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
-    direction: ltr;
-    text-align: center;
-    white-space: pre;
-    word-spacing: normal;
-    word-break: normal;
+    font-family: 'Söhne Mono', Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+    font-size: 0.875em;
     line-height: 1.5;
-    tab-size: 2;
-    hyphens: none;
+    background-color: rgb(247, 247, 248);
+    border-radius: 6px;
     padding: 1em;
-    margin: 0.5em 0px;
-    overflow: auto;
-    box-sizing: border-box;
-    outline-color: hsl(var(--accent-main-100));
-    border-color: hsl(var(--border-100));
+    margin-bottom: 1em;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
 }
+
+/* Optional: Add syntax highlighting */
+.code .keyword { color: #7c3aed; }
+.code .string { color: #059669; }
+.code .comment { color: #71717a; font-style: italic; }
+.code .number { color: #0891b2; }
+.code .operator { color: #000000; }
+
+/* Dark mode styles (optional) */
+@media (prefers-color-scheme: dark) {
+    .code {
+        background-color: rgb(52, 53, 65);
+        color: rgb(236, 236, 241);
+    }
+
+    .code .keyword { color: #a78bfa; }
+    .code .string { color: #6ee7b7; }
+    .code .comment { color: #9ca3af; }
+    .code .number { color: #22d3ee; }
+    .code .operator { color: #ffffff; }
 }
