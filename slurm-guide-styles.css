@@ -1,6 +1,3 @@
-/* Dark Theme Styles for Slurm Guide */
-
-/* General styles */
 body {
     font-family: Arial, sans-serif;
     line-height: 1.6;
@@ -52,7 +49,7 @@ p {
 .command-line {
     font-family: 'Söhne Mono', Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
     background-color: #000000;
-    color: #00ff00;
+    color: #255a25;
     border-radius: 6px;
     padding: 1em;
     margin-bottom: 1em;
@@ -61,7 +58,7 @@ p {
 
 .command-line::before {
     content: '$ ';
-    color: #00ff00;
+    color: #255a25;
 }
 
 /* List styles */
@@ -117,6 +114,7 @@ em {
 
 strong {
     font-weight: bold;
+    color: #a06a19;
 }
 
 /* Horizontal rule */
