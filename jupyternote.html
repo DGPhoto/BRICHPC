@@ -1,77 +1,76 @@
-<html><head><link rel="stylesheet" href="slurm-guide-styles.css"></head><body><h1 id="guide-to-using-slurm"> Slurm User Guide </h1>
+<html><head><link rel="stylesheet" href="slurm-guide-styles.css"></head><body>
+    <h1 id="guide-to-using-slurm">Slurm User Guide</h1>
 
-
-    <h2> Jupyter Notebook on a Slurm node  </h2>
+    <h2>Jupyter Notebook on a Slurm node</h2>
     
-    The Jupyter Notebook is a web-based interactive computing platform. The notebook combines live code, equations, narrative text, visualizations etc.
-    Chances are that you would like to use it in the cluster.
+    <p>The Jupyter Notebook is a web-based interactive computing platform. The notebook combines live code, equations, narrative text, visualizations etc.
+    Chances are that you would like to use it in the cluster.</p>
     
-    To do so you have to:
+    <p>To do so you have to:</p>
     <ol>
-    <li>Create a sbatch job file</li>
-    <li>Launch the job</li>
-    <li>Create an SSH tunnel</li>
-    <li>Connect to the Notebook via browser</li>
+        <li>Create a sbatch job file</li>
+        <li>Launch the job</li>
+        <li>Create an SSH tunnel</li>
+        <li>Connect to the Notebook via browser</li>
     </ol>
+
     <h3>Create a sbatch job</h3>
 
-    You must create something like this:
+    <p>You must create something like this:</p>
 
-<p class="code">
+    <pre class="code">
+#!/bin/bash
+#SBATCH --job-name jupy
+#SBATCH --nodes 1
+#SBATCH --ntasks-per-node 1
+#SBATCH --cpus-per-task 64
+#SBATCH --mem 64G
+#SBATCH --time 1-00:00:00
+#SBATCH --output jupy.log
 
-#!/bin/bash <br>
-#SBATCH --job-name jupy<br>
-#SBATCH --nodes 1<br>
-#SBATCH --ntasks-per-node 1<br>
-#SBATCH --cpus-per-task 64<br>
-#SBATCH --mem 64G<br>
-#SBATCH --time 1-00:00:00<br>
-#SBATCH --output jupy.log<br>
- <br>
-cd /yourdir/<br>
-module purge<br>
-module load your_modules<br>
-conda activate your_env<br>
-<strong> jupyter notebook --no-browser --ip=0.0.0.0 --port=PortNumber</strong> 
-<br>
+cd /yourdir/
+module purge
+module load your_modules
+conda activate your_env
+jupyter notebook --no-browser --ip=0.0.0.0 --port=PortNumber
+    </pre>
 
-</p>
+    <p>Where PortNumber is a free port for your Notebook to run, I will use 1357 here as an example.</p>
+    <p><strong>IMPORTANT:</strong> If another process or another Jupyter Notebook is running on the port number you specified, your job will be either die or will be queued waiting for the previous job to finish.
+    Please change the port number.</p>
 
-Where PortNumber is a free port for your Notebook to run, I will use  1357 here as an example. <br>
-<strong>IMPORTANT:</strong> If another process or another Jupyter Notebook is running on the port number you specified, your job will be either die or will be queued waiting for the previous job to finish.
-Please change the port number.
+    <h3>Launch the job</h3>
 
+    <p>Then you have to launch your job with:</p>
 
-<h3>Launch the job</h3>
+    <pre class="command-line">sbatch yourjob.sh</pre>
 
-Then you have to launche your job with:<br>
-<br>
-$ sbatch yourjob.sh<br>
-<br>
-In the log file you specified in your script you will find a line with a token:<br>
-<br>
-[I 10:23:58.726 NotebookApp] http://computingnode:1357/?token=8e184c4fa1ec5d60e31fb721adc3202317aac0adca177127<br>
-<br>
-write it down. It will change everytime.<br>
+    <p>In the log file you specified in your script you will find a line with a token:</p>
 
-<h3>Create an SSH tunnel </h3>
+    <pre class="code">[I 10:23:58.726 NotebookApp] http://computingnode:1357/?token=8e184c4fa1ec5d60e31fb721adc3202317aac0adca177127</pre>
 
-Create an SSH tunnel from your local machine to the computing node via the headnode: <br>
-<br>
-$ ssh -N -L 1357:computingnode.unicph.domain:1357 youruser@headnode<br>
-<br>
-Any traffic you send to port 1357 on your local machine will be securely forwarded through the headnode  and then on to port 1357 on the computing node.<br>
+    <p>Write it down. It will change every time.</p>
 
-This is useful if you need to access a service on the computing node that you can't reach directly, but you can reach through the head node.<br>
+    <h3>Create an SSH tunnel</h3>
 
-<h3>Connect to the Notebook </h3>
+    <p>Create an SSH tunnel from your local machine to the computing node via the headnode:</p>
 
-To connect to your notebook you have just to point your browser to <br>
-<br>
-http://localhost:1357  <br>
-<br>
-and write down the token you got before (8e184c4...) in the password field. <br>
+    <pre class="command-line">ssh -N -L 1357:computingnode.unicph.domain:1357 youruser@headnode</pre>
 
+    <p>Any traffic you send to port 1357 on your local machine will be securely forwarded through the headnode and then on to port 1357 on the computing node.</p>
+
+    <p>This is useful if you need to access a service on the computing node that you can't reach directly, but you can reach through the head node.</p>
+
+    <h3>Connect to the Notebook</h3>
+
+    <p>To connect to your notebook you have just to point your browser to</p>
+
+    <pre class="code">http://localhost:1357</pre>
+
+    <p>and write down the token you got before (8e184c4...) in the password field.</p>
+
+</body>
+</html>
 
 
 
