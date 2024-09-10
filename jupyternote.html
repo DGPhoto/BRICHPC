@@ -7,37 +7,37 @@
     Chances are that you would like to use it in the cluster.
     
     To do so you have to:
-
+    <ol>
     <li>Create a sbatch job file</li>
     <li>Launch the job</li>
     <li>Create an SSH tunnel</li>
     <li>Connect to the Notebook via browser</li>
-
+    </ol>
     <h3>Create a sbatch job</h3>
 
     You must create something like this:
 
 <p>
 
-#!/bin/bash
-#SBATCH --job-name jupy
-#SBATCH --nodes 1
-#SBATCH --ntasks-per-node 1
-#SBATCH --cpus-per-task 64
-#SBATCH --mem 64G
-#SBATCH --time 1-00:00:00
-#SBATCH --output jupy.log
- 
-cd /yourdir/
-module purge
-module load your_modules
-conda activate your_env
-jupyter notebook --no-browser --ip=0.0.0.0 --port=PortNumber
+#!/bin/bash <br>
+#SBATCH --job-name jupy<br>
+#SBATCH --nodes 1<br>
+#SBATCH --ntasks-per-node 1<br>
+#SBATCH --cpus-per-task 64<br>
+#SBATCH --mem 64G<br>
+#SBATCH --time 1-00:00:00<br>
+#SBATCH --output jupy.log<br>
+ <br>
+cd /yourdir/<br>
+module purge<br>
+module load your_modules<br>
+conda activate your_env<br>
+jupyter notebook --no-browser --ip=0.0.0.0 --port=PortNumber<br>
 
 </p>
 
 Where PortNumber is a free port for your Notebook to run, I will use  1357 here as an example. <br>
-IMPORTANT: If another process or another Jupyter Notebook is running on the port number you specified, your job will be either die or will be queued waiting for the previous job to finish.
+<strong>IMPORTANT:</strong> If another process or another Jupyter Notebook is running on the port number you specified, your job will be either die or will be queued waiting for the previous job to finish.
 Please change the port number.
 
 
@@ -48,17 +48,17 @@ Then you have to launche your job with:<br>
 $ sbatch yourjob.sh<br>
 
 In the log file you specified in your script you will find a line with a token:<br>
-
+<br>
 [I 10:23:58.726 NotebookApp] http://computingnode:1357/?token=8e184c4fa1ec5d60e31fb721adc3202317aac0adca177127<br>
-
+<br>
 write it down. It will change everytime.<br>
 
 <h3>Create an SSH tunnel </h3>
 
 Create an SSH tunnel from your local machine to the computing node via the headnode: <br>
-
+<br>
 $ ssh -N -L 1357:computingnode.unicph.domain:1357 youruser@headnode<br>
-
+<br>
 Any traffic you send to port 1357 on your local machine will be securely forwarded through the headnode  and then on to port 1357 on the computing node.<br>
 
 This is useful if you need to access a service on the computing node that you can't reach directly, but you can reach through the head node.<br>
@@ -66,9 +66,9 @@ This is useful if you need to access a service on the computing node that you ca
 <h3>Connect to the Notebook </h3>
 
 To connect to your notebook you have just to point your browser to <br>
-
+<br>
 http://localhost:1357  <br>
-
+<br>
 and write down the token you got before (8e184c4...) in the password field. <br>
 
 
