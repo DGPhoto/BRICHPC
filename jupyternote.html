@@ -32,7 +32,8 @@ cd /yourdir/<br>
 module purge<br>
 module load your_modules<br>
 conda activate your_env<br>
-jupyter notebook --no-browser --ip=0.0.0.0 --port=PortNumber<br>
+<strong> jupyter notebook --no-browser --ip=0.0.0.0 --port=PortNumber</strong> 
+<br>
 
 </p>
 
@@ -44,9 +45,9 @@ Please change the port number.
 <h3>Launch the job</h3>
 
 Then you have to launche your job with:<br>
-
+<br>
 $ sbatch yourjob.sh<br>
-
+<br>
 In the log file you specified in your script you will find a line with a token:<br>
 <br>
 [I 10:23:58.726 NotebookApp] http://computingnode:1357/?token=8e184c4fa1ec5d60e31fb721adc3202317aac0adca177127<br>
