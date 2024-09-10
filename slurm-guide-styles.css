@@ -49,7 +49,7 @@ p {
 .command-line {
     font-family: 'Söhne Mono', Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
     background-color: #000000;
-    color: #255a25;
+    color: #317231;
     border-radius: 6px;
     padding: 1em;
     margin-bottom: 1em;
@@ -58,7 +58,7 @@ p {
 
 .command-line::before {
     content: '$ ';
-    color: #255a25;
+    color: #317231;
 }
 
 /* List styles */
