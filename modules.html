@@ -24,25 +24,25 @@ Here's an example of how to use modules in a Slurm job script:
     <br>
     <pre class="code">
 
-#!/bin/bash <br>
-#SBATCH --job-name=module_job<br>
-#SBATCH --output=output_%j.log<br>
-#SBATCH --error=error_%j.log<br>
-#SBATCH --time=01:00:00<br>
-#SBATCH --ntasks=1<br>
-#SBATCH --cpus-per-task=1<br>
-#SBATCH --mem=4G<br>
-<br>
-# Purge all loaded modules<br>
-module purge<br>
-<br>
-# Load required modules<br>
-module load gcc/9.3.0<br>
-module load python/3.8.5<br>
-module load openmpi/4.0.4<br>
-<br>
-# Your job commands here<br>
-python my_script.py<br>
+#!/bin/bash 
+#SBATCH --job-name=module_job
+#SBATCH --output=output_%j.log
+#SBATCH --error=error_%j.log
+#SBATCH --time=01:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=4G
+
+# Purge all loaded modules
+module purge
+
+# Load required modules
+module load gcc/9.3.0
+module load python/3.8.5
+module load openmpi/4.0.4
+
+# Your job commands here
+python my_script.py
     </pre>
 </p>
 
