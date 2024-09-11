@@ -28,6 +28,7 @@ Before diving into Slurm usage, it's important to understand some key concepts:
 
 Here are some essential Slurm commands you'll use frequently:
 
+<li>srun: Run a parallel job</li>
 <li> sbatch : Submit a batch script </li>
 <li> scancel: Cancel a job </li>
 <li> squeue : View information about jobs in the queue </li>
@@ -58,44 +59,49 @@ echo "Hello, Slurm!"</br>
     </pre>
 </p>
 2. Submit the job:
-<p>
+<pre class="command-line">        
+
 
 sbatch job_script.sh
 
-</p>
+</pre>
 <h3> Monitoring Jobs </h3>
 
 To view information about your jobs in the queue:
 
-<p>
+<pre class="command-line">        
+
 squeue -u $USER
-</p>
+</pre>
 
 To see detailed information about a specific job:
 
-<p>
+<pre class="command-line">        
+
 scontrol show job <job_id>
-</p>
+</pre>
 
 ## Managing Jobs
 
 To cancel a job:
 
-<p>
+<pre class="command-line">        
+
 scancel <job_id>
-</p>
+</pre>
 
 To hold a job:
 
-<p>
+<pre class="command-line">        
+
 scontrol hold <job_id>
-</p>
+</pre>
 
 To release a held job:
 
-<p>
-scontrol release <job_id>
-</p>
+<pre class="command-line">        
+    scontrol release <job_id>
+</pre>
 
 
 <h3>  Resource Constraints </h3>
