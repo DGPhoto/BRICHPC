@@ -60,8 +60,6 @@ echo "Hello, Slurm!"
 </p>
 2. Submit the job:
 <pre class="command-line">        
-
-
 sbatch job_script.sh
 
 </pre>
@@ -70,15 +68,13 @@ sbatch job_script.sh
 To view information about your jobs in the queue:
 
 <pre class="command-line">        
-
 squeue -u $USER
 </pre>
 
 To see detailed information about a specific job:
 
 <pre class="command-line">        
-
-scontrol show job <job_id>
+scontrol show job job_id
 </pre>
 
 ## Managing Jobs
@@ -86,21 +82,19 @@ scontrol show job <job_id>
 To cancel a job:
 
 <pre class="command-line">        
-
-scancel <job_id>
+scancel job_id
 </pre>
 
 To hold a job:
 
 <pre class="command-line">        
-
-scontrol hold <job_id>
+scontrol hold job_id
 </pre>
 
 To release a held job:
 
 <pre class="command-line">        
-    scontrol release <job_id>
+    scontrol release job_id
 </pre>
 
 
@@ -122,7 +116,7 @@ Specify resource requirements in your job script:
 Create dependencies between jobs:
 
 <p>
-sbatch --dependency=afterok:<job_id> next_job.sh
+sbatch --dependency=afterok:job_id next_job.sh
 </p>
 
 <h3> Best Practices </h3>
