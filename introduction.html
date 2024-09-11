@@ -59,43 +59,30 @@ echo "Hello, Slurm!"
     </pre>
 </p>
 2. Submit the job:
-<pre class="command-line">        
-sbatch job_script.sh
-
-</pre>
+<pre class="command-line"> sbatch job_script.sh</pre>
 <h3> Monitoring Jobs </h3>
 
 To view information about your jobs in the queue:
 
-<pre class="command-line">        
-squeue -u $USER
-</pre>
+<pre class="command-line">squeue -u $USER</pre>
 
 To see detailed information about a specific job:
 
-<pre class="command-line">        
-scontrol show job job_id
-</pre>
+<pre class="command-line">scontrol show job job_id</pre>
 
 ## Managing Jobs
 
 To cancel a job:
 
-<pre class="command-line">        
-scancel job_id
-</pre>
+<pre class="command-line">scancel job_id</pre>
 
 To hold a job:
 
-<pre class="command-line">        
-scontrol hold job_id
-</pre>
+<pre class="command-line">scontrol hold job_id</pre>
 
 To release a held job:
 
-<pre class="command-line">        
-    scontrol release job_id
-</pre>
+<pre class="command-line">scontrol release job_id</pre>
 
 
 <h3>  Resource Constraints </h3>
@@ -104,7 +91,6 @@ Specify resource requirements in your job script:
 
 <p>
     <pre class="code">
-
 #SBATCH --cpus-per-task=4 
 #SBATCH --mem=8G 
 #SBATCH --gres=gpu:2 
