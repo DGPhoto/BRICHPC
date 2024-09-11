@@ -8,13 +8,14 @@ Let's break down the components and syntax of a Slurm job script:
 
 <h3>  Basic Structure </h3>
 
-<p>
+<pre class="code">
+
 #!/bin/bash<br>
 #SBATCH [options]<br>
 #SBATCH [more options]<br>
 <br>
 # Your commands here<br>
-</p>
+</pre>
 
 <h3>  Shebang </h3>
 
@@ -72,8 +73,8 @@ Slurm sets several environment variables that you can use in your script:
 
 Here's an example of a more complex Slurm job script:
 
-<p>
-#!/bin/bash <br>
+<pre class="code">
+    #!/bin/bash <br>
 #SBATCH --job-name=complex_job<br>
 #SBATCH --output=output_%A_%a.log<br>
 #SBATCH --error=error_%A_%a.log<br>
@@ -103,7 +104,7 @@ else<br>
     echo "Job failed"<br>
 fi<br>
 <br>
-</p>
+</pre>
 
 This script sets up a job array with 5 tasks, each using 4 CPU cores and 8GB of memory. It loads a Python module, sets an environment variable, runs a Python script with task-specific input and output files, and then conditionally runs a post-processing step.
 
