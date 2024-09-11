@@ -1,0 +1,43 @@
+<html><head><link rel="stylesheet" href="slurm-guide-styles.css"></head><body>
+    <h1 id="guide-to-using-slurm"><a href="../index.html">Slurm User Guide </a></h1>
+
+    <h2> Getting Access</h2>
+
+    Of course the first step for using the cluster is having access to it.
+    For that you must be sure to have:
+
+    <ol>
+<li>Your KU credentials: user and password.</li>
+<li>Permissions on the cluster, both for the servers and the project folders. You have to ask to your Group Leader for these, he/she being the only one who knows who you are and where you do belong.</li>
+<li>Access to KU network.</li>
+<li>Access to a terminal/terminal emulator.</li>
+
+    </ol>
+
+<h3>Your KU credentials</h3>
+You need an alfanumeric user abx123 with the relative password. These are granted by KU-IT, contact your HR department if you don't have them.
+
+<h3>Permissions</h3>
+When you are in possession of KU credentials, you have to ask your Group Leader/Responsible to grant you permission on both the cluster and the shared folder where the data is stored.
+In case of the  an Example group:
+<br>
+<li>SRV-examplehead-users: the head node</li>
+<li>SRV-examplegpun-users: the computing node </li>
+<li>/project/example_lab_shared/SHARES: group shares </li>
+
+Your Group Leader/Responsible is the only person who knows who you are and which roles you should have access to. <br>
+
+<h3>Access to KU Network</h3>
+
+In order to access the cluster you have to be in the KU network either physically or virtually, as for security reasons is not possibe to access the servers from outside.
+In case you need to work from remote, you can use KU VPN downloading and installing  the VPN client from  <a href="vpn.ku.dk"> this </a> website.
+
+
+<h3>Terminal</h3>
+
+To access the cluster you need a terminal or a terminal emulator. On Linux and Apple systems you can just open a console, in Windows you can use the PowerShell.
+Once you fired up your terminal you need to use the SSH (secure shell) command to connect:
+
+<pre class="command-line">ssh kuser@examplehead01fl</pre>
+
+where kuser is  your alphanumerical KU user id and examplehead01fl is the head node of the cluster (headnode name + 01fl suffix).
