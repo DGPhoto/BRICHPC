@@ -24,23 +24,23 @@ Once Conda is loaded, you can activate your environment. Here's how you might do
 <p >
     <pre class="code">
 
-#!/bin/bash <br>
-#SBATCH --job-name=conda_job <br>
-#SBATCH --output=output_%j.log<br>
-#SBATCH --error=error_%j.log<br>
-#SBATCH --time=01:00:00<br>
-#SBATCH --ntasks=1<br>
-#SBATCH --cpus-per-task=1<br>
-#SBATCH --mem=4G<br>
-<br>
-# Load Conda<br>
-module load anaconda3<br>
-<br>
-# Activate your environment<br>
-conda activate myenv<br>
-<br>
-# Run your Python script<br>
-python my_script.py<br>
+#!/bin/bash 
+#SBATCH --job-name=conda_job 
+#SBATCH --output=output_%j.log
+#SBATCH --error=error_%j.log
+#SBATCH --time=01:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=4G
+
+# Load Conda
+module load anaconda3
+
+# Activate your environment
+conda activate myenv
+
+# Run your Python script
+python my_script.py
     </pre>
 </p>
 
@@ -52,41 +52,41 @@ Sometimes, you might want to create a Conda environment as part of your job. Her
 <p>
     <pre class="code">
 
-#!/bin/bash<br>
-#SBATCH --job-name=conda_create_job<br>
-#SBATCH --output=output_%j.log<br>
-#SBATCH --error=error_%j.log<br>
-#SBATCH --time=01:00:00<br>
-#SBATCH --ntasks=1<br>
-#SBATCH --cpus-per-task=1<br>
-#SBATCH --mem=4G<br>
-<br>
-# Load Conda<br>
-module load anaconda3<br>
-<br>
-# Create a new environment<br>
-conda create -n job_env python=3.8 numpy pandas -y<br>
-<br>
-# Activate the new environment<br>
-conda activate job_env<br>
-<br>
-# Run your Python script<br>
-python my_script.py<br>
-<br>
-# Optionally, remove the environment at the end of the job<br>
-conda deactivate<br>
-conda env remove -n job_env -y<br>
-<br>
+#!/bin/bash
+#SBATCH --job-name=conda_create_job
+#SBATCH --output=output_%j.log
+#SBATCH --error=error_%j.log
+#SBATCH --time=01:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=4G
+
+# Load Conda
+module load anaconda3
+
+# Create a new environment
+conda create -n job_env python=3.8 numpy pandas -y
+
+# Activate the new environment
+conda activate job_env
+
+# Run your Python script
+python my_script.py
+
+# Optionally, remove the environment at the end of the job
+conda deactivate
+conda env remove -n job_env -y
+
     </pre>
 </p>
 
 <h3>  4. Best Practices for Using Conda with Slurm </h3>
 
-<li>Specify exact versions**: When creating environments, specify exact versions of packages to ensure reproducibility.</li>
+<li>Specify exact versions: When creating environments, specify exact versions of packages to ensure reproducibility.</li>
 
-<li>Use environment files**: For complex environments, use a `environment.yml` file to specify dependencies.</li>
+<li>Use environment files: For complex environments, use a `environment.yml` file to specify dependencies.</li>
 
-<li>Clean up after your job**: If you create temporary environments, make sure to remove them to free up space.</li>
+<li>Clean up after your job: If you create temporary environments, make sure to remove them to free up space.</li>
 
 
 <h3>  6. Troubleshooting Conda in Slurm Jobs </h3>
@@ -95,8 +95,8 @@ If you encounter issues:
 
 <li> Check your Slurm output and error logs for Conda-related errors.</li>
 <li> Ensure Conda is properly initialized in your job script.</li>
-<li>- Verify that the specified Conda environment exists and contains the necessary packages.</li>
-<li>- Check for any conflicts between Conda and other modules loaded in your job.</li>
+<li> Verify that the specified Conda environment exists and contains the necessary packages.</li>
+<li> Check for any conflicts between Conda and other modules loaded in your job.</li>
 
 </body>
 </html>
