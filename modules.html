@@ -22,6 +22,8 @@ Here's an example of how to use modules in a Slurm job script:
 
 <p>
     <br>
+    <pre class="code">
+
 #!/bin/bash <br>
 #SBATCH --job-name=module_job<br>
 #SBATCH --output=output_%j.log<br>
@@ -41,6 +43,7 @@ module load openmpi/4.0.4<br>
 <br>
 # Your job commands here<br>
 python my_script.py<br>
+    </pre>
 </p>
 
 <h3>  3. Loading Software Stacks </h3>

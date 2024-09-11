@@ -21,7 +21,9 @@ Once Conda is loaded, you can activate your environment. Here's how you might do
 
 
 
-<p>
+<p >
+    <pre class="code">
+
 #!/bin/bash <br>
 #SBATCH --job-name=conda_job <br>
 #SBATCH --output=output_%j.log<br>
@@ -39,6 +41,7 @@ conda activate myenv<br>
 <br>
 # Run your Python script<br>
 python my_script.py<br>
+    </pre>
 </p>
 
 
@@ -47,6 +50,8 @@ python my_script.py<br>
 Sometimes, you might want to create a Conda environment as part of your job. Here's an example:
 
 <p>
+    <pre class="code">
+
 #!/bin/bash<br>
 #SBATCH --job-name=conda_create_job<br>
 #SBATCH --output=output_%j.log<br>
@@ -72,6 +77,7 @@ python my_script.py<br>
 conda deactivate<br>
 conda env remove -n job_env -y<br>
 <br>
+    </pre>
 </p>
 
 <h3>  4. Best Practices for Using Conda with Slurm </h3>

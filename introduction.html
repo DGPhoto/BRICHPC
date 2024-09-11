@@ -43,6 +43,7 @@ For batch jobs, create a submission script and use `sbatch`:
 </p>
 
 <p>
+    <pre class="code">
 
 #!/bin/bash  </br>
 #SBATCH --job-name=my_job </br>
@@ -54,7 +55,7 @@ For batch jobs, create a submission script and use `sbatch`:
 
 # Your commands here</br>
 echo "Hello, Slurm!"</br>
-
+    </pre>
 </p>
 2. Submit the job:
 <p>
@@ -102,9 +103,12 @@ scontrol release <job_id>
 Specify resource requirements in your job script:
 
 <p>
+    <pre class="code">
+
 #SBATCH --cpus-per-task=4 <br>
 #SBATCH --mem=8G <br>
 #SBATCH --gres=gpu:2 <br>
+    </pre>
 </p>
 
 <h3>  Job Dependencies </h3>
