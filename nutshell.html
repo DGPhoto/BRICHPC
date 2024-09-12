@@ -15,18 +15,18 @@
 To access the cluster you need a terminal or a terminal emulator. On Linux and Apple systems you can just open a console, in Windows you can use the PowerShell.
 Once you fired up your terminal you need to use the SSH (secure shell) command to connect:
 
-<pre class="command-line">ssh kuser@examplehead01fl</pre>
+<pre class="command-line">ssh kuser@supekhead01fl</pre>
 
-where kuser is  your alphanumerical KU user id and examplehead01fl is the head node of the cluster (headnode name + 01fl suffix).
+where kuser is  your alphanumerical KU user id and supekhead01fl is the head node of the cluster.
 
 If you have never connected to this particular server before you will encounter a message similar to this:
 
 <pre class="code">
-The authenticity of host 'examplehead01fl' can't be established.
+The authenticity of host 'supekhead01fl' can't be established.
 RSA key fingerprint is 2a:b6:f6:8d:9d:c2:f8:2b:8c:c5:03:06:a0:f8:59:12.
 Are you sure you want to continue connecting (yes/no)?
 </pre>
-This is your computer warning you that you are about to connect to another computer, type "yes" to proceed. 
+This is your computer warning you that you are about to connect to another, unknown, computer. Type "yes" to proceed. 
 This will add the HPC to your "known hosts", and you shouldn't see the message again the future.
 
 
@@ -34,6 +34,7 @@ This will add the HPC to your "known hosts", and you shouldn't see the message a
 <h3> Basic Slurm Commands</h3>
 
 Here are some essential Slurm commands you'll use frequently:
+<br>
 
 <li> srun: Run an interactive  job</li>
 <li> salloc: Allocate resource for interactive use</li>
@@ -43,7 +44,7 @@ Here are some essential Slurm commands you'll use frequently:
 <li> sinfo  : View information about Slurm nodes and partitions </li>
 
 
-<h1>Comparison of srun, sbatch, and salloc in Slurm</h1>
+<h3>Comparison of srun, sbatch, and salloc in Slurm</h3>
 
     <p>Slurm provides three main commands for job submission and resource allocation: `srun`, `sbatch`, and `salloc`. Each serves a different purpose and is used in different scenarios. Let's explore their differences:</p>
 
@@ -141,8 +142,36 @@ srun ./my_interactive_program</pre>
         <li>Use `salloc` when you need an interactive session on compute nodes, such as for development or debugging.</li>
     </ul>
 
-    <p>Understanding these differences allows you to choose the right command for your specific needs, optimizing your workflow on a Slurm-managed cluster.</p>
-
+    <pre class="code">
+        #SBATCH --job-name=my_job        # Name of the job 
+        #SBATCH --output=output_%j.log   # Standard output log file (%j is replaced by the job ID)
+        #SBATCH --error=error_%j.log     # Standard error log file
+        #SBATCH --time=01:00:00          # Time limit (HH:MM:SS)
+        #SBATCH --ntasks=1               # Number of tasks (processes)
+        #SBATCH --cpus-per-task=1        # Number of CPU cores per task
+        #SBATCH --mem=1G                 # Memory limit
+        #SBATCH --partition=general      # Partition (queue) name
+        #SBATCH --gres=gpu:2             # Request 2 GPUs
+        
+        </pre>
+        
+        <h3>  Common Slurm Directives </h3>
+        
+        Here's a more comprehensive list of Slurm directives:
+        
+        <li> `--job-name=<name>`: Set a name for the job </li>
+         <li>`--output=<filename>`: Specify the file for standard output</li>
+         <li>`--error=<filename>`: Specify the file for standard error</li>
+         <li>`--time=<time>`: Set a time limit for the job (format: DD-HH:MM:SS)</li>
+         <li>`--ntasks=<number>`: Specify the number of tasks to run</li>
+         <li>`--cpus-per-task=<number>`: Set the number of CPU cores per task</li>
+         <li>`--mem=<size[units]>`: Set the total memory required (e.g., 1G for 1 gigabyte)</li>
+         <li>`--partition=<partition_name>`: Specify the partition to run the job on</li>
+         <li>`--array=<indexes>`: Create a job array (e.g., --array=1-10 for 10 array jobs)</li>
+         <li>`--mail-type=<type>`: Specify email notification events (e.g., BEGIN, END, FAIL)</li>
+         <li>`--mail-user=<email_address>`: Set the email address for notifications</li>
+         <li>`--nodes=<number>`: Request a specific number of nodes</li>
+         <li>`--gres=<resource>`: Request generic consumable resources (e.g., GPUs)</li>
 
 
 

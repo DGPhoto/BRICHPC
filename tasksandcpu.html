@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Understanding Threads and CPUs per Task in Slurm</title>
+    <link rel="stylesheet" href="slurm-guide-styles.css">
+</head>
+<body>
+    <h1>Understanding Threads and CPUs per Task in Slurm</h1>
+
+    <p>When submitting jobs to a Slurm-managed cluster, understanding the difference between threads and CPUs per task is crucial for optimizing your job's performance and efficient use of cluster resources.</p>
+
+    <h2>Key Concepts</h2>
+
+    <h3>1. CPU (Core)</h3>
+    <p>In Slurm terminology, a CPU typically refers to a physical core on a processor. Each CPU can execute a single thread of instructions at a time (ignoring hyperthreading for simplicity).</p>
+
+    <h3>2. Task</h3>
+    <p>A task in Slurm is essentially a process. It's a running instance of a program that may use one or more CPUs.</p>
+
+    <h3>3. Thread</h3>
+    <p>A thread is the smallest unit of processing that can be scheduled by an operating system. A single task (process) can have multiple threads, which can run concurrently on different CPUs.</p>
+
+    <h2>Slurm Resource Allocation Options</h2>
+
+    <table>
+        <tr>
+            <th>Option</th>
+            <th>Description</th>
+        </tr>
+        <tr>
+            <td>--ntasks</td>
+            <td>Number of tasks (processes) to run</td>
+        </tr>
+        <tr>
+            <td>--cpus-per-task</td>
+            <td>Number of CPUs (cores) allocated to each task</td>
+        </tr>
+        <tr>
+            <td>--threads-per-core</td>
+            <td>Number of threads to use per core (relevant for hyperthreading)</td>
+        </tr>
+    </table>
+
+    <h2>Threads vs CPUs per Task</h2>
+
+    <h3>Using More Threads</h3>
+    <p>When you increase the number of threads in your program:</p>
+    <ul>
+        <li>It allows for more parallel execution within a single task (process).</li>
+        <li>Threads share the same memory space, making communication between threads faster.</li>
+        <li>Ideal for programs that are designed to use multi-threading (e.g., OpenMP programs).</li>
+        <li>The number of threads is typically controlled by the program itself or environment variables (e.g., OMP_NUM_THREADS).</li>
+    </ul>
+
+    <h3>Using More CPUs per Task</h3>
+    <p>When you increase the number of CPUs per task in Slurm:</p>
+    <ul>
+        <li>It allocates more physical cores to each task (process).</li>
+        <li>Allows for true parallel execution of threads on separate cores.</li>
+        <li>Necessary for multi-threaded programs to utilize multiple cores effectively.</li>
+        <li>Controlled by the --cpus-per-task option in Slurm.</li>
+    </ul>
+
+    <h2>Examples</h2>
+
+    <h3>1. Single-threaded Program</h3>
+    <pre class="code">
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=1
+
+./my_single_threaded_program
+    </pre>
+    <p>This allocates one CPU for a single task, suitable for a program that doesn't use threading.</p>
+
+    <h3>2. Multi-threaded Program (e.g., OpenMP)</h3>
+    <pre class="code">
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+
+export OMP_NUM_THREADS=4
+./my_openmp_program
+    </pre>
+    <p>This allocates 4 CPUs for a single task, allowing an OpenMP program to use 4 threads effectively.</p>
+
+    <h3>3. MPI Program with Threading</h3>
+    <pre class="code">
+#SBATCH --ntasks=2
+#SBATCH --cpus-per-task=4
+
+export OMP_NUM_THREADS=4
+mpirun ./my_hybrid_mpi_openmp_program
+    </pre>
+    <p>This runs 2 MPI tasks, each with 4 CPUs, suitable for a hybrid MPI/OpenMP program.</p>
+
+    <h2>Key Considerations</h2>
+    <ul>
+        <li>Match --cpus-per-task to the number of threads your program will use for optimal performance.</li>
+        <li>Be aware of the total resources you're requesting (ntasks * cpus-per-task) to ensure it doesn't exceed node capabilities.</li>
+        <li>For programs that don't control their own threading, you may need to set environment variables (like OMP_NUM_THREADS) to match --cpus-per-task.</li>
+        <li>Some programs may benefit more from multiple tasks (MPI) rather than multiple threads, depending on their design.</li>
+    </ul>
+
+    <p>Understanding these concepts allows you to efficiently allocate resources for your specific computational needs, optimizing both performance and cluster utilization.</p>
+</body>
+</html>

@@ -40,6 +40,8 @@ Slurm directives are special comments that start with `#SBATCH`. They tell Slurm
 #SBATCH --cpus-per-task=1        # Number of CPU cores per task
 #SBATCH --mem=1G                 # Memory limit
 #SBATCH --partition=general      # Partition (queue) name
+#SBATCH --gres=gpu:2             # Request 2 GPUs
+
 </pre>
 
 <h3>  Common Slurm Directives </h3>
@@ -90,24 +92,92 @@ Here's an example of a more complex Slurm job script:
 # Load any necessary modules
 module load python/3.8
 
-# Set up the environment
-export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 
 # Run the main command
-python my_script.py --input-file input_${SLURM_ARRAY_TASK_ID}.txt --output-file output_${SLURM_ARRAY_TASK_ID}.txt
+python my_script.py --input-file input.txt --output-file output.txt
 
 # Optional: Run some post-processing
 if [ $? -eq 0 ]; then
     echo "Job completed successfully"
-    python post_process.py output_${SLURM_ARRAY_TASK_ID}.txt
+    python post_process.py output.txt
 else
     echo "Job failed"
 fi
 
 </pre>
 
-This script sets up a job array with 5 tasks, each using 4 CPU cores and 8GB of memory. It loads a Python module, sets an environment variable, runs a Python script with task-specific input and output files, and then conditionally runs a post-processing step.
+<h3>Understanding --ntasks in Slurm</h3>
 
+    <p>When you use the `--ntasks` option in Slurm without other specifications, it's important to understand how Slurm interprets and applies this setting. 
+
+    <p>When you specify `--ntasks=4` without other options:</p>
+
+    <ul>
+        <li>Slurm will allocate resources for 4 tasks.</li>
+        <li>By default, each task is allocated 1 CPU (core).</li>
+        <li>The tasks may be distributed across multiple nodes, depending on the cluster's configuration and available resources.</li>
+    </ul>
+
+    <pre class="code">
+#SBATCH --ntasks=4
+
+# This will run your command with 4 tasks
+srun ./my_program
+    </pre>
+
+    <p>In this scenario:</p>
+    <ul>
+        <li>Your job will be allocated 4 CPUs in total.</li>
+        <li>These 4 CPUs could be on a single node or spread across multiple nodes, depending on availability and the cluster's configuration.</li>
+        <li>Each task will have access to 1 CPU by default.</li>
+    </ul>
+
+    <h2>Important Considerations</h2>
+
+    <ol>
+        <li><strong>CPU Allocation:</strong> Without specifying `--cpus-per-task`, each task gets 1 CPU by default.</li>
+        <li><strong>Memory Allocation:</strong> The default memory allocation per task depends on the cluster's configuration. It's often a good practice to specify memory requirements explicitly.</li>
+        <li><strong>Node Distribution:</strong> Tasks may be distributed across nodes unless you specify `--nodes` or use the `--ntasks-per-node` option.</li>
+        <li><strong>Parallel Execution:</strong> This setting is particularly useful for MPI jobs where you want to run multiple parallel processes.</li>
+    </ol>
+
+    <h2>Examples with Additional Specifications</h2>
+
+    <h3>1. Specifying CPUs per Task</h3>
+    <pre class="code">
+#SBATCH --ntasks=4
+#SBATCH --cpus-per-task=2
+
+srun ./my_multi_threaded_program
+    </pre>
+    <p>This allocates 4 tasks, each with 2 CPUs, totaling 8 CPUs for the job.</p>
+
+    <h3>2. Constraining to a Single Node</h3>
+    <pre class="code">
+#SBATCH --ntasks=4
+#SBATCH --nodes=1
+
+srun ./my_program
+    </pre>
+    <p>This ensures all 4 tasks run on the same node.</p>
+
+    <h3>3. Specifying Tasks per Node</h3>
+    <pre class="code">
+#SBATCH --ntasks=4
+#SBATCH --ntasks-per-node=2
+
+srun ./my_program
+    </pre>
+    <p>This distributes the 4 tasks across 2 nodes, with 2 tasks per node.</p>
+
+    
+
+    <h2>Best Practices</h2>
+    <ul>
+        <li>Be explicit about your resource requirements when possible (CPUs, memory, etc.).</li>
+        <li>Consider the nature of your program (MPI, multi-threaded, etc.) when deciding how to allocate tasks and CPUs.</li>
+        <li>Use `--ntasks` in combination with other options like `--cpus-per-task` or `--nodes` for more precise control over resource allocation.</li>
+        <li>Test your job submissions with smaller task counts before scaling up to ensure proper resource utilization.</li>
 <h3>  Best Practices for Job Scripts </h3>
 <ol>
 <li>Use variables: For repeated values or for clarity, use shell variables.</li>
