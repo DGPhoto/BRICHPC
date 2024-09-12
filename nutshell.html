@@ -1,0 +1,154 @@
+<html><head><link rel="stylesheet" href="slurm-guide-styles.css"></head><body>
+    <h1 id="guide-to-using-slurm"><a href="../index.html">Slurm User Guide </a></h1>
+
+    <h3> Understanding Slurm Concepts</h3>
+
+    Before diving into Slurm usage, it's important to understand some key concepts:
+    
+    <li> Node     : A computer in the cluster. </li>
+    <li> Partition: A group of nodes with specific characteristics. </li>
+    <li> Job      : A resource allocation request for a specific program or task. </li>
+    <li> Task     : An instance of a running program within a job. </li>
+
+    <h3> Access the cluster </h3>
+
+To access the cluster you need a terminal or a terminal emulator. On Linux and Apple systems you can just open a console, in Windows you can use the PowerShell.
+Once you fired up your terminal you need to use the SSH (secure shell) command to connect:
+
+<pre class="command-line">ssh kuser@examplehead01fl</pre>
+
+where kuser is  your alphanumerical KU user id and examplehead01fl is the head node of the cluster (headnode name + 01fl suffix).
+
+If you have never connected to this particular server before you will encounter a message similar to this:
+
+<pre class="code">
+The authenticity of host 'examplehead01fl' can't be established.
+RSA key fingerprint is 2a:b6:f6:8d:9d:c2:f8:2b:8c:c5:03:06:a0:f8:59:12.
+Are you sure you want to continue connecting (yes/no)?
+</pre>
+This is your computer warning you that you are about to connect to another computer, type "yes" to proceed. 
+This will add the HPC to your "known hosts", and you shouldn't see the message again the future.
+
+
+
+<h3> Basic Slurm Commands</h3>
+
+Here are some essential Slurm commands you'll use frequently:
+
+<li> srun: Run an interactive  job</li>
+<li> salloc: Allocate resource for interactive use</li>
+<li> sbatch : Submit a batch script </li>
+<li> scancel: Cancel a job </li>
+<li> squeue : View information about jobs in the queue </li>
+<li> sinfo  : View information about Slurm nodes and partitions </li>
+
+
+<h1>Comparison of srun, sbatch, and salloc in Slurm</h1>
+
+    <p>Slurm provides three main commands for job submission and resource allocation: `srun`, `sbatch`, and `salloc`. Each serves a different purpose and is used in different scenarios. Let's explore their differences:</p>
+
+    <h2>Overview</h2>
+
+    <table>
+        <tr>
+            <th>Command</th>
+            <th>Purpose</th>
+            <th>Usage</th>
+        </tr>
+        <tr>
+            <td>srun</td>
+            <td>Run a parallel job</td>
+            <td>Interactive or batch jobs</td>
+        </tr>
+        <tr>
+            <td>sbatch</td>
+            <td>Submit a batch script</td>
+            <td>Non-interactive batch jobs</td>
+        </tr>
+        <tr>
+            <td>salloc</td>
+            <td>Allocate resources for interactive use</td>
+            <td>Interactive sessions</td>
+        </tr>
+    </table>
+
+    <h2>Detailed Comparison</h2>
+
+    <h3>1. srun</h3>
+    <p>`srun` is used to submit a parallel job for execution or to launch parallel tasks within a job script.</p>
+    <ul>
+        <li>Can be used both interactively and within batch scripts</li>
+        <li>Allocates resources and launches tasks in a single step</li>
+        <li>Useful for running MPI jobs or any parallel task</li>
+        <li>Can be used to launch multiple tasks with a single command</li>
+    </ul>
+    <p>Example usage:</p>
+    <pre class="code">srun --ntasks=4 ./my_parallel_program</pre>
+
+    <h3>2. sbatch</h3>
+    <p>`sbatch` is used to submit a batch script for later execution.</p>
+    <ul>
+        <li>Non-interactive: jobs are queued and executed when resources are available</li>
+        <li>Ideal for long-running jobs or jobs that don't require user interaction</li>
+        <li>Job specifications are typically included in the batch script</li>
+        <li>Output is typically written to files rather than displayed in real-time</li>
+    </ul>
+    <p>Example usage:</p>
+    <pre class="code">sbatch my_job_script.sh</pre>
+
+    <h3>3. salloc</h3>
+    <p>`salloc` is used to allocate resources for interactive use.</p>
+    <ul>
+        <li>Typically used to start an interactive session on compute nodes</li>
+        <li>Allocates resources but doesn't launch tasks automatically</li>
+        <li>Useful for development, debugging, or running interactive applications</li>
+        <li>Often used in conjunction with `srun` for launching tasks within the allocation</li>
+    </ul>
+    <p>Example usage:</p>
+    <pre class="code">salloc --ntasks=4 --time=01:00:00
+# Once allocation is granted:
+srun ./my_interactive_program</pre>
+
+    <h2>Key Differences</h2>
+    <ul>
+        <li><strong>Interactivity:</strong> 
+            <ul>
+                <li>`srun` can be both interactive and non-interactive</li>
+                <li>`sbatch` is non-interactive</li>
+                <li>`salloc` is designed for interactive use</li>
+            </ul>
+        </li>
+        <li><strong>Resource Allocation:</strong>
+            <ul>
+                <li>`srun` allocates resources and launches tasks in one step</li>
+                <li>`sbatch` allocates resources based on the script's specifications</li>
+                <li>`salloc` allocates resources but doesn't launch tasks automatically</li>
+            </ul>
+        </li>
+        <li><strong>Job Control:</strong>
+            <ul>
+                <li>`srun` provides immediate execution and output</li>
+                <li>`sbatch` allows for scheduling and delayed execution</li>
+                <li>`salloc` provides an interactive environment for multiple commands</li>
+            </ul>
+        </li>
+    </ul>
+
+    <h2>When to Use Each Command</h2>
+    <ul>
+        <li>Use `srun` for testing, when you want to quickly run a parallel command or within a batch script for task launching.</li>
+        <li>Use `sbatch` for submitting non-interactive batch jobs, especially long-running tasks.</li>
+        <li>Use `salloc` when you need an interactive session on compute nodes, such as for development or debugging.</li>
+    </ul>
+
+    <p>Understanding these differences allows you to choose the right command for your specific needs, optimizing your workflow on a Slurm-managed cluster.</p>
+
+
+
+
+
+
+
+
+</body>
+</html>
