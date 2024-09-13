@@ -12,23 +12,10 @@
 
     <h3> Access the cluster </h3>
 
-To access the cluster you need a terminal or a terminal emulator. On Linux and Apple systems you can just open a console, in Windows you can use the PowerShell.
-Once you fired up your terminal you need to use the SSH (secure shell) command to connect:
-
+To access the cluster you need a terminal or a terminal emulator.
 <pre class="command-line">ssh kuser@supekhead01fl</pre>
 
 where kuser is  your alphanumerical KU user id and supekhead01fl is the head node of the cluster.
-
-If you have never connected to this particular server before you will encounter a message similar to this:
-
-<pre class="code">
-The authenticity of host 'supekhead01fl' can't be established.
-RSA key fingerprint is 2a:b6:f6:8d:9d:c2:f8:2b:8c:c5:03:06:a0:f8:59:12.
-Are you sure you want to continue connecting (yes/no)?
-</pre>
-This is your computer warning you that you are about to connect to another, unknown, computer. Type "yes" to proceed. 
-This will add the HPC to your "known hosts", and you shouldn't see the message again the future.
-
 
 
 <h3> Basic Slurm Commands</h3>
@@ -71,8 +58,30 @@ Here are some essential Slurm commands you'll use frequently:
         </pre>
         
 
-<h3></h3>
+<h3>  Using Conda in Slurm Jobs </h3>
 
+
+<p>First, you need to ensure Conda is available in your Slurm job. 
+Once Conda is loaded, you can activate your environment. Here's how you might do this in a Slurm script:
+</p>
+
+
+<p >
+    <pre class="code">
+
+#!/bin/bash 
+#SBATCH  [...]
+
+# Load Conda
+module load anaconda3
+
+# Activate your environment
+conda activate myenv
+
+# Run your Python script
+python my_script.py
+    </pre>
+</p>
 
 
 
