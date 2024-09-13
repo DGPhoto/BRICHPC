@@ -44,10 +44,19 @@ Here are some essential Slurm commands you'll use frequently:
 <li> squeue : View information about jobs in the queue </li>
 <li> sinfo  : View information about Slurm nodes and partitions </li>
 
+<h3>Loading Modules</h3>
+<br>
+<li> module avail: List all available modules </li>
+<li> module list: Show currently loaded modules</li>
+<li> module load module_name: Load a specific module</li>
+<li> module unload module_name: Unload a specific module</li>
+<li> module purge: Unload all currently loaded modules</li>
+<li> module show module_name: Display information about a module</li>
 
 <h3> Sbatch scripts</h3>
 
     <pre class="code">
+        #!/bin/bash
         #SBATCH --job-name=my_job        # Name of the job 
         #SBATCH --output=output_%j.log   # Standard output log file (%j is replaced by the job ID)
         #SBATCH --error=error_%j.log     # Standard error log file
@@ -58,22 +67,9 @@ Here are some essential Slurm commands you'll use frequently:
         #SBATCH --partition=general      # Partition (queue) name
         #SBATCH --gres=gpu:2             # Request 2 GPUs
         
+        Your commands here
         </pre>
         
-        <h3>  Common Slurm Directives </h3>
-        
-        Here's a more comprehensive list of Slurm directives:
-        
-        <li> `--job-name=<name>`: Set a name for the job </li>
-         <li>`--output=<filename>`: Specify the file for standard output</li>
-         <li>`--error=<filename>`: Specify the file for standard error</li>
-         <li>`--time=<time>`: Set a time limit for the job (format: DD-HH:MM:SS)</li>
-         <li>`--ntasks=<number>`: Specify the number of tasks to run</li>
-         <li>`--cpus-per-task=<number>`: Set the number of CPU cores per task</li>
-         <li>`--mem=<size[units]>`: Set the total memory required (e.g., 1G for 1 gigabyte)</li>
-         <li>`--partition=<partition_name>`: Specify the partition to run the job on</li>
-         <li>`--nodes=<number>`: Request a specific number of nodes</li>
-         <li>`--gres=<resource>`: Request generic consumable resources (e.g., GPUs)</li>
 
 <h3></h3>
 
