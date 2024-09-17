@@ -1,0 +1,91 @@
+# Medium-Length Slurm FAQ for Mathematics Users
+
+## What is Slurm?
+Slurm (Simple Linux Utility for Resource Management) is a job scheduler that manages computational resources in a cluster. It allocates resources to jobs, dispatches them, monitors their execution, and cleans up after job completion.
+
+## Why use Slurm?
+1. Resource allocation: Once resources are allocated to your job, they're exclusively yours for the duration of execution, regardless of system load.
+2. Detached execution: No need to keep an open terminal session or use "survive disconnection" tricks.
+3. Efficient resource use: Jobs start as soon as requested resources are available, even outside working hours.
+4. Fair scheduling: Jobs are prioritized based on requested resources, user's system share, and queue time.
+
+## Basic Usage
+
+### Simple Job Submission
+Prefix your command with `srun`:
+```
+srun myprogram
+```
+Note: This uses default settings, which may not always be suitable.
+
+### Specifying a Partition
+Use the `-p` option with `srun`:
+```
+srun -p partition_name myprogram
+```
+
+### Running Detached Jobs (Batch Mode)
+1. Create a shell script (batch script) containing:
+   - Slurm directives (lines starting with `#SBATCH`)
+   - Any necessary preparatory steps (e.g., loading modules)
+   - Your `srun` command
+2. Submit the script using `sbatch`:
+   ```
+   sbatch myscript.sh
+   ```
+
+## Monitoring Jobs
+
+### Checking Job Status
+Use `squeue` to see which jobs are running or queued:
+```
+squeue
+```
+To see only your jobs:
+```
+squeue -u yourusername
+```
+
+### Viewing Job Details
+Use `scontrol`:
+```
+scontrol show job <jobid>
+```
+
+### Checking Job Output
+Slurm captures console output to a file named `slurm-<jobid>.out` in the submission directory. You can examine this file while the job is running or after it finishes.
+
+## Resource Requests
+
+### CPUs
+To request multiple CPU threads:
+```
+#SBATCH --cpus-per-task=X
+srun --cpus-per-task=X myprogram
+```
+Note: This argument must be given to both `sbatch` (via `#SBATCH`) and `srun`.
+
+### Other Resources
+Specify in your batch script using `#SBATCH` directives:
+```
+#SBATCH --mem=8G
+#SBATCH --time=02:00:00
+```
+
+## MPI Jobs
+- Use `srun` instead of `mpiexec` or `mpirun`
+- You may need to use the `--mpi` option to select the right integration mode:
+  ```
+  srun --mpi=pmi2 mpi_program
+  ```
+
+## Useful Slurm Commands
+- `squeue`: Show job queue information
+- `sinfo`: Display node and partition information
+- `scancel <jobid>`: Delete a job
+- `sacct`: View accounting data for jobs
+- `scontrol`: View or modify Slurm configuration
+
+Remember to consult your cluster's specific documentation, as available features and best practices may vary between Slurm installations.
+
+For more advanced usage and detailed explanations, refer to the official Slurm documentation or your institution's user guide.

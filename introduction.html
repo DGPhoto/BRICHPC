@@ -1,118 +1,128 @@
-<html><head><link rel="stylesheet" href="slurm-guide-styles.css"></head><body><h1 id="guide-to-using-slurm"> <a href="../index.html">Slurm User Guide </a> </h1>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medium-Length Slurm FAQ for Mathematics Users</title>
+    <link rel="stylesheet" href="slurm-guide-styles.css">
+</head>
+<body>
+    <header>
+        <h1>Medium-Length Slurm FAQ for Mathematics Users</h1>
+    </header>
 
-<h1> Basic Guide to Using Slurm </h1>
+    <nav>
+        <ul>
+            <li><a href="#what-is-slurm">What is Slurm?</a></li>
+            <li><a href="#why-use-slurm">Why use Slurm?</a></li>
+            <li><a href="#basic-usage">Basic Usage</a></li>
+            <li><a href="#monitoring-jobs">Monitoring Jobs</a></li>
+            <li><a href="#resource-requests">Resource Requests</a></li>
+            <li><a href="#mpi-jobs">MPI Jobs</a></li>
+            <li><a href="#useful-commands">Useful Slurm Commands</a></li>
+        </ul>
+    </nav>
 
-Slurm (Simple Linux Utility for Resource Management) is an open-source workload manager and job scheduling system for Linux clusters. This guide will walk you through the basics of using Slurm to submit, manage, and monitor jobs on a cluster.
+    <main>
+        <section id="what-is-slurm">
+            <h2>What is Slurm?</h2>
+            <p>Slurm (Simple Linux Utility for Resource Management) is a job scheduler that manages computational resources in a cluster. It allocates resources to jobs, dispatches them, monitors their execution, and cleans up after job completion.</p>
+        </section>
 
-<h3> Table of Contents </h3>
+        <section id="why-use-slurm">
+            <h2>Why use Slurm?</h2>
+            <ol>
+                <li><strong>Resource allocation:</strong> Once resources are allocated to your job, they're exclusively yours for the duration of execution, regardless of system load.</li>
+                <li><strong>Detached execution:</strong> No need to keep an open terminal session or use "survive disconnection" tricks.</li>
+                <li><strong>Efficient resource use:</strong> Jobs start as soon as requested resources are available, even outside working hours.</li>
+                <li><strong>Fair scheduling:</strong> Jobs are prioritized based on requested resources, user's system share, and queue time.</li>
+            </ol>
+        </section>
 
-<li>Understanding Slurm Concepts</li>
-<li>Basic Slurm Commands</li>
-<li>Submitting Jobs</li>
-<li>Monitoring Jobs</li>
-<li>Managing Jobs</li>
-<li>Advanced Slurm Usage</li>
-<li>Best Practices</li>
+        <section id="basic-usage">
+            <h2>Basic Usage</h2>
+            
+            <h3>Simple Job Submission</h3>
+            <p>Prefix your command with <code>srun</code>:</p>
+            <pre><code>srun myprogram</code></pre>
+            <p>Note: This uses default settings, which may not always be suitable.</p>
 
-<h3> Understanding Slurm Concepts</h3>
+            <h3>Specifying a Partition</h3>
+            <p>Use the <code>-p</code> option with <code>srun</code>:</p>
+            <pre><code>srun -p partition_name myprogram</code></pre>
 
-Before diving into Slurm usage, it's important to understand some key concepts:
+            <h3>Running Detached Jobs (Batch Mode)</h3>
+            <ol>
+                <li>Create a shell script (batch script) containing:
+                    <ul>
+                        <li>Slurm directives (lines starting with <code>#SBATCH</code>)</li>
+                        <li>Any necessary preparatory steps (e.g., loading modules)</li>
+                        <li>Your <code>srun</code> command</li>
+                    </ul>
+                </li>
+                <li>Submit the script using <code>sbatch</code>:
+                    <pre><code>sbatch myscript.sh</code></pre>
+                </li>
+            </ol>
+        </section>
 
-<li> Node     : A computer in the cluster. </li>
-<li> Partition: A group of nodes with specific characteristics. </li>
-<li> Job      : A resource allocation request for a specific program or task. </li>
-<li> Task     : An instance of a running program within a job. </li>
-<li> Job Step : A set of tasks within a job.</li>
+        <section id="monitoring-jobs">
+            <h2>Monitoring Jobs</h2>
 
-<h3> Basic Slurm Commands</h3>
+            <h3>Checking Job Status</h3>
+            <p>Use <code>squeue</code> to see which jobs are running or queued:</p>
+            <pre><code>squeue</code></pre>
+            <p>To see only your jobs:</p>
+            <pre><code>squeue -u yourusername</code></pre>
 
-Here are some essential Slurm commands you'll use frequently:
+            <h3>Viewing Job Details</h3>
+            <p>Use <code>scontrol</code>:</p>
+            <pre><code>scontrol show job &lt;jobid&gt;</code></pre>
 
-<li>srun: Run a parallel job</li>
-<li> sbatch : Submit a batch script </li>
-<li> scancel: Cancel a job </li>
-<li> squeue : View information about jobs in the queue </li>
-<li> sinfo  : View information about Slurm nodes and partitions </li>
+            <h3>Checking Job Output</h3>
+            <p>Slurm captures console output to a file named <code>slurm-&lt;jobid&gt;.out</code> in the submission directory. You can examine this file while the job is running or after it finishes.</p>
+        </section>
 
+        <section id="resource-requests">
+            <h2>Resource Requests</h2>
 
+            <h3>CPUs</h3>
+            <p>To request multiple CPU threads:</p>
+            <pre><code>#SBATCH --cpus-per-task=X
+srun --cpus-per-task=X myprogram</code></pre>
+            <p>Note: This argument must be given to both <code>sbatch</code> (via <code>#SBATCH</code>) and <code>srun</code>.</p>
 
-<h3>  Batch Jobs </h3>
+            <h3>Other Resources</h3>
+            <p>Specify in your batch script using <code>#SBATCH</code> directives:</p>
+            <pre><code>#SBATCH --mem=8G
+#SBATCH --time=02:00:00</code></pre>
+        </section>
 
-For batch jobs, create a submission script and use `sbatch`:
-<p>
-1. Create a script (e.g., `job_script.sh`): 
-</p>
+        <section id="mpi-jobs">
+            <h2>MPI Jobs</h2>
+            <ul>
+                <li>Use <code>srun</code> instead of <code>mpiexec</code> or <code>mpirun</code></li>
+                <li>You may need to use the <code>--mpi</code> option to select the right integration mode:
+                    <pre><code>srun --mpi=pmi2 mpi_program</code></pre>
+                </li>
+            </ul>
+        </section>
 
-<p>
-    <pre class="code">
+        <section id="useful-commands">
+            <h2>Useful Slurm Commands</h2>
+            <ul>
+                <li><code>squeue</code>: Show job queue information</li>
+                <li><code>sinfo</code>: Display node and partition information</li>
+                <li><code>scancel &lt;jobid&gt;</code>: Delete a job</li>
+                <li><code>sacct</code>: View accounting data for jobs</li>
+                <li><code>scontrol</code>: View or modify Slurm configuration</li>
+            </ul>
+        </section>
+    </main>
 
-#!/bin/bash  
-#SBATCH --job-name=my_job 
-#SBATCH --output=output_%j.log
-#SBATCH --error=error_%j.log
-#SBATCH --ntasks=1
-#SBATCH --time=01:00:00
-#SBATCH --mem=1G
-
-# Your commands here
-echo "Hello, Slurm!"
-    </pre>
-</p>
-2. Submit the job:
-<pre class="command-line"> sbatch job_script.sh</pre>
-<h3> Monitoring Jobs </h3>
-
-To view information about your jobs in the queue:
-
-<pre class="command-line">squeue -u $USER</pre>
-
-To see detailed information about a specific job:
-
-<pre class="command-line">scontrol show job job_id</pre>
-
-## Managing Jobs
-
-To cancel a job:
-
-<pre class="command-line">scancel job_id</pre>
-
-To hold a job:
-
-<pre class="command-line">scontrol hold job_id</pre>
-
-To release a held job:
-
-<pre class="command-line">scontrol release job_id</pre>
-
-
-<h3>  Resource Constraints </h3>
-
-Specify resource requirements in your job script:
-
-<p>
-    <pre class="code">
-#SBATCH --cpus-per-task=4 
-#SBATCH --mem=8G 
-#SBATCH --gres=gpu:2 
-    </pre>
-</p>
-
-<h3>  Job Dependencies </h3>
-
-Create dependencies between jobs:
-
-<p>
-sbatch --dependency=afterok:job_id next_job.sh
-</p>
-
-<h3> Best Practices </h3>
-<ol>
-<li>Estimate resources accurately: Request only the resources you need to avoid long queue times.</li>
-<li>Set appropriate time limits: This helps the scheduler plan more effectively.</li>
-<li>Use job names: Give your jobs meaningful names for easier management.</li>
-<li>Monitor your jobs: Regularly check the status of your jobs and kill them if they're not behaving as expected.</li>
-<li>Use appropriate partitions: Choose the right partition based on your job's requirements.</li>
-<li>Optimize your code: Well-optimized code can reduce resource usage and improve job throughput.</li>
-</ol>
+    <footer>
+        <p>Remember to consult your cluster's specific documentation, as available features and best practices may vary between Slurm installations.</p>
+        <p>For more advanced usage and detailed explanations, refer to the official Slurm documentation or your institution's user guide.</p>
+    </footer>
 </body>
 </html>
