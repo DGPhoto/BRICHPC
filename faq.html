@@ -1,91 +1,128 @@
-# Medium-Length Slurm FAQ for Mathematics Users
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medium-Length Slurm FAQ for Mathematics Users</title>
+    <link rel="stylesheet" href="slurm-guide-styles.css">
+</head>
+<body>
+    <header>
+        <h1>Medium-Length Slurm FAQ for Mathematics Users</h1>
+    </header>
 
-## What is Slurm?
-Slurm (Simple Linux Utility for Resource Management) is a job scheduler that manages computational resources in a cluster. It allocates resources to jobs, dispatches them, monitors their execution, and cleans up after job completion.
+    <nav>
+        <ul>
+            <li><a href="#what-is-slurm">What is Slurm?</a></li>
+            <li><a href="#why-use-slurm">Why use Slurm?</a></li>
+            <li><a href="#basic-usage">Basic Usage</a></li>
+            <li><a href="#monitoring-jobs">Monitoring Jobs</a></li>
+            <li><a href="#resource-requests">Resource Requests</a></li>
+            <li><a href="#mpi-jobs">MPI Jobs</a></li>
+            <li><a href="#useful-commands">Useful Slurm Commands</a></li>
+        </ul>
+    </nav>
 
-## Why use Slurm?
-1. Resource allocation: Once resources are allocated to your job, they're exclusively yours for the duration of execution, regardless of system load.
-2. Detached execution: No need to keep an open terminal session or use "survive disconnection" tricks.
-3. Efficient resource use: Jobs start as soon as requested resources are available, even outside working hours.
-4. Fair scheduling: Jobs are prioritized based on requested resources, user's system share, and queue time.
+    <main>
+        <section id="what-is-slurm">
+            <h2>What is Slurm?</h2>
+            <p>Slurm (Simple Linux Utility for Resource Management) is a job scheduler that manages computational resources in a cluster. It allocates resources to jobs, dispatches them, monitors their execution, and cleans up after job completion.</p>
+        </section>
 
-## Basic Usage
+        <section id="why-use-slurm">
+            <h2>Why use Slurm?</h2>
+            <ol>
+                <li><strong>Resource allocation:</strong> Once resources are allocated to your job, they're exclusively yours for the duration of execution, regardless of system load.</li>
+                <li><strong>Detached execution:</strong> No need to keep an open terminal session or use "survive disconnection" tricks.</li>
+                <li><strong>Efficient resource use:</strong> Jobs start as soon as requested resources are available, even outside working hours.</li>
+                <li><strong>Fair scheduling:</strong> Jobs are prioritized based on requested resources, user's system share, and queue time.</li>
+            </ol>
+        </section>
 
-### Simple Job Submission
-Prefix your command with `srun`:
-```
-srun myprogram
-```
-Note: This uses default settings, which may not always be suitable.
+        <section id="basic-usage">
+            <h2>Basic Usage</h2>
+            
+            <h3>Simple Job Submission</h3>
+            <p>Prefix your command with <code>srun</code>:</p>
+            <pre><code>srun myprogram</code></pre>
+            <p>Note: This uses default settings, which may not always be suitable.</p>
 
-### Specifying a Partition
-Use the `-p` option with `srun`:
-```
-srun -p partition_name myprogram
-```
+            <h3>Specifying a Partition</h3>
+            <p>Use the <code>-p</code> option with <code>srun</code>:</p>
+            <pre><code>srun -p partition_name myprogram</code></pre>
 
-### Running Detached Jobs (Batch Mode)
-1. Create a shell script (batch script) containing:
-   - Slurm directives (lines starting with `#SBATCH`)
-   - Any necessary preparatory steps (e.g., loading modules)
-   - Your `srun` command
-2. Submit the script using `sbatch`:
-   ```
-   sbatch myscript.sh
-   ```
+            <h3>Running Detached Jobs (Batch Mode)</h3>
+            <ol>
+                <li>Create a shell script (batch script) containing:
+                    <ul>
+                        <li>Slurm directives (lines starting with <code>#SBATCH</code>)</li>
+                        <li>Any necessary preparatory steps (e.g., loading modules)</li>
+                        <li>Your <code>srun</code> command</li>
+                    </ul>
+                </li>
+                <li>Submit the script using <code>sbatch</code>:
+                    <pre><code>sbatch myscript.sh</code></pre>
+                </li>
+            </ol>
+        </section>
 
-## Monitoring Jobs
+        <section id="monitoring-jobs">
+            <h2>Monitoring Jobs</h2>
 
-### Checking Job Status
-Use `squeue` to see which jobs are running or queued:
-```
-squeue
-```
-To see only your jobs:
-```
-squeue -u yourusername
-```
+            <h3>Checking Job Status</h3>
+            <p>Use <code>squeue</code> to see which jobs are running or queued:</p>
+            <pre><code>squeue</code></pre>
+            <p>To see only your jobs:</p>
+            <pre><code>squeue -u yourusername</code></pre>
 
-### Viewing Job Details
-Use `scontrol`:
-```
-scontrol show job <jobid>
-```
+            <h3>Viewing Job Details</h3>
+            <p>Use <code>scontrol</code>:</p>
+            <pre><code>scontrol show job &lt;jobid&gt;</code></pre>
 
-### Checking Job Output
-Slurm captures console output to a file named `slurm-<jobid>.out` in the submission directory. You can examine this file while the job is running or after it finishes.
+            <h3>Checking Job Output</h3>
+            <p>Slurm captures console output to a file named <code>slurm-&lt;jobid&gt;.out</code> in the submission directory. You can examine this file while the job is running or after it finishes.</p>
+        </section>
 
-## Resource Requests
+        <section id="resource-requests">
+            <h2>Resource Requests</h2>
 
-### CPUs
-To request multiple CPU threads:
-```
-#SBATCH --cpus-per-task=X
-srun --cpus-per-task=X myprogram
-```
-Note: This argument must be given to both `sbatch` (via `#SBATCH`) and `srun`.
+            <h3>CPUs</h3>
+            <p>To request multiple CPU threads:</p>
+            <pre><code>#SBATCH --cpus-per-task=X
+srun --cpus-per-task=X myprogram</code></pre>
+            <p>Note: This argument must be given to both <code>sbatch</code> (via <code>#SBATCH</code>) and <code>srun</code>.</p>
 
-### Other Resources
-Specify in your batch script using `#SBATCH` directives:
-```
-#SBATCH --mem=8G
-#SBATCH --time=02:00:00
-```
+            <h3>Other Resources</h3>
+            <p>Specify in your batch script using <code>#SBATCH</code> directives:</p>
+            <pre><code>#SBATCH --mem=8G
+#SBATCH --time=02:00:00</code></pre>
+        </section>
 
-## MPI Jobs
-- Use `srun` instead of `mpiexec` or `mpirun`
-- You may need to use the `--mpi` option to select the right integration mode:
-  ```
-  srun --mpi=pmi2 mpi_program
-  ```
+        <section id="mpi-jobs">
+            <h2>MPI Jobs</h2>
+            <ul>
+                <li>Use <code>srun</code> instead of <code>mpiexec</code> or <code>mpirun</code></li>
+                <li>You may need to use the <code>--mpi</code> option to select the right integration mode:
+                    <pre><code>srun --mpi=pmi2 mpi_program</code></pre>
+                </li>
+            </ul>
+        </section>
 
-## Useful Slurm Commands
-- `squeue`: Show job queue information
-- `sinfo`: Display node and partition information
-- `scancel <jobid>`: Delete a job
-- `sacct`: View accounting data for jobs
-- `scontrol`: View or modify Slurm configuration
+        <section id="useful-commands">
+            <h2>Useful Slurm Commands</h2>
+            <ul>
+                <li><code>squeue</code>: Show job queue information</li>
+                <li><code>sinfo</code>: Display node and partition information</li>
+                <li><code>scancel &lt;jobid&gt;</code>: Delete a job</li>
+                <li><code>sacct</code>: View accounting data for jobs</li>
+                <li><code>scontrol</code>: View or modify Slurm configuration</li>
+            </ul>
+        </section>
+    </main>
 
-Remember to consult your cluster's specific documentation, as available features and best practices may vary between Slurm installations.
-
-For more advanced usage and detailed explanations, refer to the official Slurm documentation or your institution's user guide.
+    <footer>
+        <p>Remember to consult your cluster's specific documentation, as available features and best practices may vary between Slurm installations.</p>
+        <p>For more advanced usage and detailed explanations, refer to the official Slurm documentation or your institution's user guide.</p>
+    </footer>
+</body>
+</html>
