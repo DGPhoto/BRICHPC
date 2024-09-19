@@ -15,6 +15,7 @@
         <ul>
             <li><a href="#what-is-slurm">What is Slurm?</a></li>
             <li><a href="#why-use-slurm">Why use Slurm?</a></li>
+            <li><a href="#slurm-concepts">Slurm Concepts</a></li>
             <li><a href="#basic-usage">Basic Usage</a></li>
             <li><a href="#monitoring-jobs">Monitoring Jobs</a></li>
             <li><a href="#resource-requests">Resource Requests</a></li>
@@ -38,8 +39,21 @@
                 <li><strong>Fair scheduling:</strong> Jobs are prioritized based on requested resources, user's system share, and queue time.</li>
             </ol>
         </section>
+        <section id="slurm-concepts">
+
+        <h2> Slurm Concepts</h2>
+
+        Before diving into Slurm usage, it's important to understand some key concepts:
+        
+        <li> Node     : A computer in the cluster. </li>
+        <li> Partition: A group of nodes with specific characteristics. </li>
+        <li> Job      : A resource allocation request for a specific program or task. </li>
+        <li> Task     : An instance of a running program within a job. </li>
+        </section>
 
         <section id="basic-usage">
+
+
             <h2>Basic Usage</h2>
             
             <h3>Simple Job Submission</h3>
