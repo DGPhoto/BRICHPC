@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Running Nextflow on SLURM: A Comprehensive Guide</title>
+    <link rel="stylesheet" href="slurm-guide-styles.css">
+
+</head>
+<body>
+    <h1 id="guide-to-using-slurm"> <a href="../index.html">Slurm User Guide </a> </h1>
+    <header>
+        <h2>Running Nextflow on SLURM: A Comprehensive Guide</h2>
+    </header>
+    <main>
+        <section id="introduction">
+            <h2>Introduction</h2>
+            <p>Nextflow is a powerful workflow management system that can be seamlessly integrated with SLURM (Simple Linux Utility for Resource Management) to efficiently run complex computational pipelines on high-performance computing clusters.</p>
+        </section>
+        
+        <section id="prerequisites">
+            <h2>Prerequisites</h2>
+            <ul>
+                <li>Nextflow installed on your system</li>
+                <li>Access to a SLURM-managed cluster</li>
+                <li>Basic understanding of Nextflow syntax and SLURM commands</li>
+            </ul>
+        </section>
+        
+        <section id="configuration">
+            <h2>Configuring Nextflow for SLURM</h2>
+            <p>To run Nextflow on SLURM, you need to create a configuration file (nextflow.config) in your project directory:</p>
+            <pre><code>
+process {
+    executor = 'slurm'
+    queue = 'your_queue_name'
+    clusterOptions = '--account=your_account'
+}
+            </code></pre>
+            <p>This configuration tells Nextflow to use SLURM as the executor and specifies the queue to use. Adjust the 'queue' and 'clusterOptions' as needed for your specific SLURM setup.</p>
+        </section>
+        
+        <section id="process-executor-explanation">
+            <h2>Understanding Process Configuration and SLURM Integration</h2>
+            
+            <h3>Process Configuration</h3>
+            <p>The 'process' block in the configuration file defines settings that apply to all processes in your Nextflow script:</p>
+            <ul>
+                <li><strong>executor = 'slurm'</strong>: This tells Nextflow to use SLURM for job submission and management.</li>
+                <li><strong>queue = 'your_queue_name'</strong>: Specifies the SLURM partition (queue) to which jobs will be submitted. Replace 'your_queue_name' with the appropriate partition name for your cluster.</li>
+                <li><strong>clusterOptions = '--account=your_account'</strong>: Allows you to specify additional SLURM options. In this example, it sets the account to be charged for the job. Modify this according to your cluster's requirements.</li>
+            </ul>
+            <p>You can also define process-specific settings in your Nextflow script:</p>
+            <pre><code>
+process example_task {
+    cpus 4
+    memory '8 GB'
+    time '2h'
+
+    script:
+    """
+    your_command_here
+    """
+}
+            </code></pre>
+            <p>These settings (cpus, memory, time) will be translated into appropriate SLURM resource requests when the job is submitted.</p>
+
+            <h3>SLURM and Executor Management</h3>
+            <p>It's important to understand that when using SLURM with Nextflow, SLURM itself handles most of the job execution and resource management tasks. The 'executor' settings in Nextflow are primarily used for local execution or when using other executors. When using SLURM:</p>
+            <ul>
+                <li>SLURM manages job queuing, scheduling, and resource allocation.</li>
+                <li>SLURM's own configurations and limits (set by cluster administrators) control aspects like maximum concurrent jobs, job priorities, and resource limits.</li>
+                <li>Nextflow's role is to submit jobs to SLURM and monitor their progress, rather than directly managing execution details.</li>
+            </ul>
+            <p>Therefore, many of the 'executor' settings in Nextflow (like queueSize or submitRateLimit) are not typically necessary or used when working with SLURM. Instead, you would rely on SLURM's own configurations and use SLURM-specific options in your Nextflow process definitions.</p>
+        </section>
+        
+        <section id="slurm-specific-options">
+            <h2>SLURM-Specific Options</h2>
+            <p>When using Nextflow with SLURM, you can take advantage of SLURM-specific options in your process definitions:</p>
+            <pre><code>
+process resource_intensive_task {
+    cpus 16
+    memory '64 GB'
+    time '12h'
+    clusterOptions '--qos=high --exclude=node01,node02'
+
+    script:
+    """
+    your_command_here
+    """
+}
+            </code></pre>
+            <p>In this example:</p>
+            <ul>
+                <li><strong>cpus, memory, time</strong>: These are translated into SLURM resource requests.</li>
+                <li><strong>clusterOptions</strong>: This allows you to pass SLURM-specific options directly to the sbatch command, such as quality of service (--qos) or node exclusions.</li>
+            </ul>
+        </section>
+        
+        <section id="running">
+            <h2>Running Your Pipeline</h2>
+            <p>To run your Nextflow pipeline on SLURM, use the following command:</p>
+            <pre><code>nextflow run your_script.nf</code></pre>
+            <p>Nextflow will automatically submit jobs to SLURM based on your configuration and script directives.</p>
+        </section>
+        
+        
+    </main>
+    
+</body>
+</html>
