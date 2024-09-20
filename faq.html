@@ -139,12 +139,38 @@ srun --cpus-per-task=X myprogram</code></pre>
 
             <h3>Other Resources</h3>
             <p>Specify in your batch script using <code>#SBATCH</code> directives:</p>
-            <pre><code>#SBATCH --mem=8G
-                        #SBATCH --time=02:00:00 
-                        #SBATCH --gres=gpu:1 </code></pre>
+            <pre><code>
+            #SBATCH --mem=8G
+            #SBATCH --time=02:00:00 
+            #SBATCH --gres=gpu:1 
+            </code></pre>
 <p> Here you have the options for Memory, Time Limit and GPUs</p>
         </section>
+<section id="example_batch">
+<h2>Example batch script</h2>
+<p><p class="code">
+#!/bin/bash 
+#SBATCH --job-name=conda_job 
+#SBATCH --output=output_%j.log
+#SBATCH --error=error_%j.log
+#SBATCH --time=01:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=4G
 
+# Load Conda
+module load anaconda3
+
+# Activate your environment
+conda activate myenv
+
+# Run your Python script
+python my_script.py</p></p>
+<p>An example script with conda, launch it with:</p>
+<p class="command-line">sbatch conda_job.sh</p>
+
+
+</section>
         
 
         <section id="useful-commands">
