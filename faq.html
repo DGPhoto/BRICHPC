@@ -19,7 +19,6 @@
             <li><a href="#basic-usage">Basic Usage</a></li>
             <li><a href="#monitoring-jobs">Monitoring Jobs</a></li>
             <li><a href="#resource-requests">Resource Requests</a></li>
-            <li><a href="#mpi-jobs">MPI Jobs</a></li>
             <li><a href="#useful-commands">Useful Slurm Commands</a></li>
         </ul>
     </nav>
@@ -34,7 +33,7 @@
             <h2>Why use Slurm?</h2>
             <ol>
                 <li><strong>Resource allocation:</strong> Once resources are allocated to your job, they're exclusively yours for the duration of execution, regardless of system load.</li>
-                <li><strong>Detached execution:</strong> No need to keep an open terminal session or use "survive disconnection" tricks.</li>
+                <li><strong>Detached execution:</strong> No need to keep an open terminal session.</li>
                 <li><strong>Efficient resource use:</strong> Jobs start as soon as requested resources are available, even outside working hours.</li>
                 <li><strong>Fair scheduling:</strong> Jobs are prioritized based on requested resources, user's system share, and queue time.</li>
             </ol>
@@ -44,7 +43,7 @@
         <h2> Slurm Concepts</h2>
 
         Before diving into Slurm usage, it's important to understand some key concepts:
-        
+        <br>
         <li> Node     : A computer in the cluster. </li>
         <li> Partition: A group of nodes with specific characteristics. </li>
         <li> Job      : A resource allocation request for a specific program or task. </li>
@@ -52,6 +51,7 @@
         </section>
         
         <h3> Which Partition can I use?</h3>
+        <br>
         You have 3 partitions on the Cluster
 
         <li>normal_prio: 1 day max runnig time, priority 100 </li>
@@ -74,11 +74,12 @@
             unload loaded module module_name
             <p class="command-line">module purge</p>
             unload all loaded modules
-            
+
 
             <h3>Simple Job Submission</h3>
-            <p>Prefix your command with <code>srun</code>:</p>
-            <pre><code>srun myprogram</code></pre>
+            <p>Prefix your command with <p class="command-line">
+            srun myprogram</p></p>
+            <p>Run an interactive bash session <p class="command-line">srun --pty bash </p></p>
             <p>Note: This uses default settings, which may not always be suitable.</p>
 
             <h3>Specifying a Partition</h3>
