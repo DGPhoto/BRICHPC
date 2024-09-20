@@ -62,7 +62,20 @@
 
 
             <h2>Basic Usage</h2>
+            <h3>Loading Software as modules</h3>            
+            <p> To use a software that's not part of the system you can load it as a module</p>
+            <p class="command-line">module avail</p>
+            list all available modules
+            <p class="command-line">module load R/4.4.0</p>
+            load R version 4.40
+            <p class="command-line">module list</p>
+            list loaded modules
+            <p class="command-line">module unload module_name</p>
+            unload loaded module module_name
+            <p class="command-line">module purge</p>
+            unload all loaded modules
             
+
             <h3>Simple Job Submission</h3>
             <p>Prefix your command with <code>srun</code>:</p>
             <pre><code>srun myprogram</code></pre>
@@ -126,7 +139,8 @@ srun --cpus-per-task=X myprogram</code></pre>
             <h3>Other Resources</h3>
             <p>Specify in your batch script using <code>#SBATCH</code> directives:</p>
             <pre><code>#SBATCH --mem=8G
-#SBATCH --time=02:00:00 #SBATCH --gres=gpu:1 </code></pre>
+                        #SBATCH --time=02:00:00 
+                        #SBATCH --gres=gpu:1 </code></pre>
 <p> Here you have the options for Memory, Time Limit and GPUs</p>
         </section>
 
