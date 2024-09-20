@@ -126,7 +126,8 @@ srun --cpus-per-task=X myprogram</code></pre>
             <h3>Other Resources</h3>
             <p>Specify in your batch script using <code>#SBATCH</code> directives:</p>
             <pre><code>#SBATCH --mem=8G
-#SBATCH --time=02:00:00</code></pre>
+#SBATCH --time=02:00:00 #SBATCH --gres=gpu:1 </code></pre>
+<p> Here you have the options for Memory, Time Limit and GPUs</p>
         </section>
 
         
@@ -138,7 +139,7 @@ srun --cpus-per-task=X myprogram</code></pre>
                 <li><code>sinfo</code>: Display node and partition information</li>
                 <li><code>scancel &lt;jobid&gt;</code>: Delete a job</li>
                 <li><code>sacct</code>: View accounting data for jobs</li>
-                <li><code>scontrol</code>: View or modify Slurm configuration</li>
+                <li><code>scontrol</code>: Detailed info </li>
             </ul>
         </section>
     </main>
