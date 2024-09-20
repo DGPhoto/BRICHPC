@@ -20,6 +20,7 @@
             <li><a href="#monitoring-jobs">Monitoring Jobs</a></li>
             <li><a href="#resource-requests">Resource Requests</a></li>
             <li><a href="#useful-commands">Useful Slurm Commands</a></li>
+            <li><a href="#best-practices">Best Practices</a></li>
         </ul>
     </nav>
 
@@ -184,7 +185,13 @@ python my_script.py</p></p>
             </ul>
         </section>
     </main>
-
- 
+    <section id="best-practices">
+        <h2>Best Practice</h2>
+    <p> Please:</p>
+    <li> Use resources carefully. Test your requirements with an interactive session with srun before launching sbatch scripts </li>
+    <li> Don't launch a lot of jobs together. Respect the other users.</li>
+    <li> Use the appropriate queue for your job.</li>
+    <li> Send a mail to the sysadmin if you have any doubts.</li>
+    </section>
 </body>
 </html>
