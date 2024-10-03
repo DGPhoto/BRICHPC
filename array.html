@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Understanding and Using Slurm Job Arrays</title>
+    <link rel="stylesheet" href="slurm-guide-styles.css">
+</head>
+<body>
+    <h1 id="guide-to-using-slurm"> <a href="../index.html">Slurm User Guide </a> </h1>
+    <h2>Slurm Job Arrays</h2>
+
+    <h3>What are Slurm Job Arrays?</h3>
+    <p>Slurm job arrays are a mechanism for submitting and managing collections of similar jobs quickly and easily. Instead of submitting hundreds or thousands of individual jobs, you can use a job array to submit a single job script that will spawn multiple job tasks.</p>
+
+    <h3>How to Use Job Arrays</h3>
+    <p>To create a job array, you use the <code>--array</code> option in your Slurm batch script:</p>
+
+    <pre><code>#SBATCH --array=1-100</code></pre>
+
+    <p>This will create 100 job array tasks, numbered from 1 to 100.</p>
+
+    <h3>More Complex Array Specifications:</h3>
+    <ul>
+        <li>Range with step: <code>#SBATCH --array=1-100:10</code> (1, 11, 21, ..., 91)</li>
+        <li>Comma-separated list: <code>#SBATCH --array=1,5,7,9</code></li>
+        <li>Combination: <code>#SBATCH --array=1-5,10,20-25</code></li>
+    </ul>
+
+    <h3>Using the Array Task ID</h3>
+    <p>Within your job script, you can use the <code>$SLURM_ARRAY_TASK_ID</code> environment variable to distinguish between tasks:</p>
+
+    <pre><code>#!/bin/bash
+#SBATCH --array=1-100
+
+echo "Processing file_${SLURM_ARRAY_TASK_ID}.txt"
+./my_program input_${SLURM_ARRAY_TASK_ID}.dat output_${SLURM_ARRAY_TASK_ID}.result</code></pre>
+
+    <h3>Why Use Job Arrays?</h3>
+    <ol>
+        <li><strong>Efficiency in Job Submission:</strong> Submit many similar jobs with a single script.</li>
+        <li><strong>Easier Management:</strong> Manage a group of related jobs as a single unit.</li>
+        <li><strong>Improved Scheduling:</strong> Slurm can schedule array tasks more efficiently than individual jobs.</li>
+        <li><strong>Reduced System Overhead:</strong> Less load on the scheduling system compared to submitting many individual jobs.</li>
+        <li><strong>Simplified Dependency Management:</strong> You can make other jobs depend on the entire array or specific tasks.</li>
+    </ol>
+
+    <h3>Best Practices and Tips</h3>
+    <ul>
+        <li><strong>Limit Concurrent Tasks:</strong> Use <code>#SBATCH --array=1-1000%20</code> to limit to 20 concurrently running tasks.</li>
+        <li><strong>Output Files:</strong> Use <code>%A</code> for array job ID and <code>%a</code> for task ID in output file names:
+            <pre><code>#SBATCH --output=output_%A_%a.log</code></pre>
+        </li>
+        <li><strong>Resource Allocation:</strong> Ensure each task has appropriate resources. Arrays are good for many small, similar jobs.</li>
+        <li><strong>Task Independence:</strong> Array tasks should be independent of each other to run efficiently.</li>
+    </ul>
+
+    <h3>Example: Processing Multiple Datasets</h3>
+    <pre><code>#!/bin/bash
+#SBATCH --job-name=data_process
+#SBATCH --output=output_%A_%a.log
+#SBATCH --error=error_%A_%a.log
+#SBATCH --array=1-100
+#SBATCH --time=01:00:00
+#SBATCH --mem=4G
+
+# List of datasets
+datasets=(dataset1.csv dataset2.csv dataset3.csv ... dataset100.csv)
+
+# Get the dataset for this task
+dataset=${datasets[$SLURM_ARRAY_TASK_ID - 1]}
+
+# Run the processing script
+python process_data.py $dataset</code></pre>
+
+    <h3>Managing Job Arrays</h3>
+    <ul>
+        <li>View array jobs: <code>squeue -a</code></li>
+        <li>Cancel entire array: <code>scancel [array_job_id]</code></li>
+        <li>Cancel specific task: <code>scancel [array_job_id]_[task_id]</code></li>
+    </ul>
+
+    <h3>When to Use Job Arrays</h3>
+    <p>Job arrays are ideal for:</p>
+    <ul>
+        <li>Parameter sweeps in simulations or analyses</li>
+        <li>Processing multiple input files with the same program</li>
+        <li>Running the same analysis on different datasets</li>
+        <li>Embarrassingly parallel problems where tasks are independent</li>
+    </ul>
+
+    <p>By using job arrays effectively, you can significantly streamline your workflow, especially when dealing with large numbers of similar computational tasks.</p>
+</body>
+</html>

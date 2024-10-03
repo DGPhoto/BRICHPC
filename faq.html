@@ -147,8 +147,8 @@ HPC systems are crucial for tasks like weather forecasting, molecular modeling, 
             <p>To request multiple CPU threads:</p>
             <pre><code>#SBATCH --cpus-per-task=X
 srun --cpus-per-task=X myprogram</code></pre>
-            <p>Note: This argument must be given to both <code>sbatch</code> (via <code>#SBATCH</code>) and <code>srun</code>.</p>
-
+            <p>Note: This argument must be given to both <code>sbatch</code> (via <code>#SBATCH</code>) and <code>srun</code>. The first one for the job allocation, the second for the task e</p>
+          
             <h3>Other Resources</h3>
             <p>Specify in your batch script using <code>#SBATCH</code> directives:</p>
             <pre><code>
