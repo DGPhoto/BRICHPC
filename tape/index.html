@@ -299,7 +299,7 @@
     <div class="executive-summary">
         <div class="container">
             <h2 style="color: var(--ku-red-dark); border-bottom: none; padding-bottom: 0;">Executive Summary</h2>
-            <p style="font-size: 1.1em; margin-top: 20px;">BRIC currently stores 2.3 PB on KU-IT at 2.3M DKK/year. With new 2026 pricing (980 DKK/TB/year), archiving 400-800 TB cold data on tape saves 392,000-784,000 DKK annually. An LTO-9 tape system costs 393,000 DKK initially, pays for itself in 6-12 months, and saves 2.6-5.2M DKK in eight years.</p>
+            <p style="font-size: 1.1em; margin-top: 20px;">BRIC currently stores 2.3 PB on KU-IT at 2.3M DKK/year. With new 2026 pricing (980 DKK/TB/year), archiving 400-600 TB cold data on tape saves 392,000-588,000 DKK annually. An LTO-9 tape system costs 393,000 DKK initially, pays for itself in 8-12 months, and saves 2.6-4.2M DKK in eight years.</p>
             
             <div class="stats-grid">
                 <div class="stat-card">
@@ -307,11 +307,11 @@
                     <div class="stat-label">Initial Investment (DKK)</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">6-12</div>
+                    <div class="stat-number">8-12</div>
                     <div class="stat-label">Months to Break-Even</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">2.6-5.2M</div>
+                    <div class="stat-number">2.6-4.2M</div>
                     <div class="stat-label">8-Year Savings (DKK)</div>
                 </div>
                 <div class="stat-card">
@@ -363,7 +363,7 @@
                 </div>
             </div>
 
-            <p><strong>Conservative estimate:</strong> 400-800 TB of BRIC's data is "cold" (rarely accessed but must be retained for compliance, reproducibility, and future analysis). This cold data is ideal for tape archiving.</p>
+            <p><strong>Conservative estimate:</strong> 400-600 TB of BRIC's data is "cold" (rarely accessed but must be retained for compliance, reproducibility, and future analysis). This cold data is ideal for tape archiving.</p>
         </section>
 
         <section class="section">
@@ -374,7 +374,7 @@
                     <h4>Current: KU-IT Storage</h4>
                     <p><strong>2026 Cost:</strong> 980 DKK/TB/year</p>
                     <p><strong>400 TB:</strong> 392,000 DKK/year</p>
-                    <p><strong>800 TB:</strong> 784,000 DKK/year</p>
+                    <p><strong>600 TB:</strong> 588,000 DKK/year</p>
                     <div class="pros-cons">
                         <ul class="pros">
                             <li>Already in use</li>
@@ -382,7 +382,7 @@
                         </ul>
                         <ul class="cons">
                             <li>Very expensive for cold data</li>
-                            <li>8-year cost: 3.1-6.3M DKK</li>
+                            <li>8-year cost: 3.1-4.7M DKK</li>
                             <li>Must budget in grants</li>
                         </ul>
                     </div>
@@ -390,16 +390,16 @@
 
                 <div class="comparison-card">
                     <h4>Cloud: Amazon Glacier</h4>
-                    <p><strong>Cost:</strong> 181-362k DKK/year storage + retrieval</p>
+                    <p><strong>Cost:</strong> 181-272k DKK/year storage + retrieval</p>
                     <div class="pros-cons">
                         <ul class="pros">
                             <li>Scalable</li>
                         </ul>
                         <ul class="cons">
-                            <li>Retrieval: 6.5-13M+ DKK over 8 years</li>
-                            <li>Bandwidth limits (47-93+ days upload)</li>
+                            <li>Retrieval: 6.5-10M+ DKK over 8 years</li>
+                            <li>Bandwidth limits (47-70+ days upload)</li>
                             <li>Data sovereignty issues</li>
-                            <li>Total 8-year: 10-16M+ DKK</li>
+                            <li>Total 8-year: 10-13M+ DKK</li>
                         </ul>
                     </div>
                 </div>
@@ -409,12 +409,12 @@
                     <p><strong>Cost:</strong> 393k DKK + 65k/year</p>
                     <div class="pros-cons">
                         <ul class="pros">
-                            <li>8-year cost: ~1M DKK (vs 3.1-6.3M)</li>
+                            <li>8-year cost: ~1M DKK (vs 3.1-4.7M)</li>
                             <li>Unlimited free retrievals</li>
                             <li>Data sovereignty</li>
                             <li>No vendor lock-in</li>
-                            <li>Saves 2.6-5.2M DKK over 8 years</li>
-                            <li><strong>ROI: 6-12 months</strong></li>
+                            <li>Saves 2.6-4.2M DKK over 8 years</li>
+                            <li><strong>ROI: 8-12 months</strong></li>
                         </ul>
                         <ul class="cons">
                             <li>24-48h restore time</li>
@@ -424,14 +424,14 @@
             </div>
 
             <div class="chart-container">
-                <h3 style="margin-top: 0;">8-Year Cost Comparison (400-800 TB scenarios)</h3>
+                <h3 style="margin-top: 0;">8-Year Cost Comparison (400-600 TB scenarios)</h3>
                 <div class="chart-wrapper">
                     <canvas id="costComparisonChart"></canvas>
                 </div>
             </div>
 
             <div class="chart-container">
-                <h3 style="margin-top: 0;">Return on Investment Timeline (400-800 TB scenarios)</h3>
+                <h3 style="margin-top: 0;">Return on Investment Timeline (400-600 TB scenarios)</h3>
                 <div class="chart-wrapper">
                     <canvas id="roiChart"></canvas>
                 </div>
@@ -909,11 +909,11 @@
                     <li><strong>Current:</strong> 2.3 PB at 2.3M DKK/year</li>
                     <li><strong>New 2026 pricing:</strong> 980 DKK/TB/year</li>
                     <li><strong>2026 cost:</strong> 1.2M DKK → 1.5M in 2027</li>
-                    <li><strong>Cold data estimate:</strong> 400-800 TB archivable</li>
+                    <li><strong>Cold data estimate:</strong> 400-600 TB archivable</li>
                     <li><strong>Tape system:</strong> 393k DKK + 65k/year</li>
-                    <li><strong>Annual savings:</strong> 392k-784k DKK/year</li>
-                    <li><strong>ROI:</strong> 6-12 months</li>
-                    <li><strong>8-year savings:</strong> 2.6-5.2M DKK</li>
+                    <li><strong>Annual savings:</strong> 392k-588k DKK/year</li>
+                    <li><strong>ROI:</strong> 8-12 months</li>
+                    <li><strong>8-year savings:</strong> 2.6-4.2M DKK</li>
                 </ul>
             </div>
 
@@ -927,7 +927,7 @@
             <div class="info-box">
                 <h4 style="margin-top: 0;">Recommendation</h4>
                 <p style="font-size: 1.1em;"><strong>Implement tape archive solution for cold data storage.</strong></p>
-                <p>Conservative estimate: 400-800 TB of cold data can be archived, saving 392,000-784,000 DKK annually (33,000-65,000 DKK monthly). System pays for itself in 6-12 months and saves 2.6-5.2 million DKK over eight years. Technology is proven, operationally manageable by BRIC HPC team (4-8 hours/week).</p>
+                <p>Conservative estimate: 400-600 TB of cold data can be archived, saving 392,000-588,000 DKK annually (33,000-49,000 DKK monthly). System pays for itself in 8-12 months and saves 2.6-4.2 million DKK over eight years. Technology is proven, operationally manageable by BRIC HPC team (4-8 hours/week).</p>
             </div>
         </section>
 
@@ -967,16 +967,16 @@
             data: {
                 labels: ['Current', 'Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5'],
                 datasets: [{
-                    label: 'Cold Data Low Estimate (TB)',
-                    data: [400, 550, 700, 850, 1000, 1150],
+                    label: 'Low Growth (400 TB + 100 TB/year)',
+                    data: [400, 500, 600, 700, 800, 900],
                     borderColor: '#8B1A1F',
                     backgroundColor: 'rgba(139, 26, 31, 0.05)',
                     fill: true,
                     tension: 0.4,
                     borderDash: [5, 5]
                 }, {
-                    label: 'Cold Data High Estimate (TB)',
-                    data: [800, 950, 1100, 1250, 1400, 1550],
+                    label: 'High Growth (600 TB + 200 TB/year)',
+                    data: [600, 800, 1000, 1200, 1400, 1600],
                     borderColor: '#8B1A1F',
                     backgroundColor: 'rgba(139, 26, 31, 0.15)',
                     fill: true,
@@ -994,10 +994,10 @@
         new Chart(document.getElementById('costComparisonChart'), {
             type: 'bar',
             data: {
-                labels: ['KU-IT (400 TB)', 'KU-IT (800 TB)', 'Glacier (400 TB)', 'Glacier (800 TB)', 'Tape (400-800 TB)'],
+                labels: ['KU-IT (400 TB)', 'KU-IT (600 TB)', 'Glacier (400 TB)', 'Glacier (600 TB)', 'Tape (400-600 TB)'],
                 datasets: [{
                     label: '8-Year Cost (M DKK)',
-                    data: [3.1, 6.3, 10.0, 16.0, 1.0],
+                    data: [3.1, 4.7, 10.0, 13.0, 1.0],
                     backgroundColor: ['rgba(198, 40, 40, 0.6)', 'rgba(198, 40, 40, 0.8)', 'rgba(51, 51, 51, 0.5)', 'rgba(51, 51, 51, 0.7)', 'rgba(46, 125, 50, 0.75)'],
                     borderColor: ['#c62828', '#c62828', '#333', '#333', '#2e7d32'],
                     borderWidth: 2
@@ -1025,8 +1025,8 @@
                     tension: 0.4,
                     borderDash: [5, 5]
                 }, {
-                    label: 'High Scenario (800 TB) - Cumulative Savings',
-                    data: [-0.39, -0.2, 0.0, 0.20, 0.39, 1.17, 1.96, 2.74, 3.53, 4.31, 5.10, 5.88],
+                    label: 'High Scenario (600 TB) - Cumulative Savings',
+                    data: [-0.39, -0.24, -0.10, 0.05, 0.20, 0.98, 1.76, 2.55, 3.33, 4.11, 4.90, 5.68],
                     borderColor: '#2e7d32',
                     backgroundColor: 'rgba(46, 125, 50, 0.1)',
                     fill: true,
@@ -1051,10 +1051,10 @@
         new Chart(document.getElementById('monthlySavingsChart'), {
             type: 'bar',
             data: {
-                labels: ['KU-IT (400 TB)', 'KU-IT (800 TB)', 'Tape Monthly', 'Savings (400 TB)', 'Savings (800 TB)'],
+                labels: ['KU-IT (400 TB)', 'KU-IT (600 TB)', 'Tape Monthly', 'Savings (400 TB)', 'Savings (600 TB)'],
                 datasets: [{
                     label: 'DKK/Month',
-                    data: [32667, 65333, 5417, 27250, 59916],
+                    data: [32667, 49000, 5417, 27250, 43583],
                     backgroundColor: ['rgba(198, 40, 40, 0.6)', 'rgba(198, 40, 40, 0.8)', 'rgba(139, 26, 31, 0.75)', 'rgba(46, 125, 50, 0.6)', 'rgba(46, 125, 50, 0.8)'],
                     borderColor: ['#c62828', '#c62828', '#8B1A1F', '#2e7d32', '#2e7d32'],
                     borderWidth: 2
