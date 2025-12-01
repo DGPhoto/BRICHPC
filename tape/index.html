@@ -1,460 +1,1057 @@
-<!DOCTYPE HTML>
-<html>
-	<head>
-	<!-- Hotjar Tracking Code for https://kaktuspeople.com -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BRIC Data Archiving Solution</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --ku-red: #8B1A1F;
+            --ku-red-light: #A6282C;
+            --ku-red-dark: #6B1416;
+            --gray-light: #f5f5f5;
+            --gray-mid: #e0e0e0;
+            --gray-dark: #333;
+            --white: #ffffff;
+            --blue-light: #e3f2fd;
+            --blue-dark: #1976d2;
+            --green: #2e7d32;
+            --red-warning: #c62828;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: var(--gray-dark);
+            background-color: var(--white);
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--ku-red) 0%, var(--ku-red-dark) 100%);
+            color: var(--white);
+            padding: 60px 20px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 20px;
+            font-weight: 300;
+        }
+
+        .header .subtitle {
+            font-size: 1.2em;
+            opacity: 0.9;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .executive-summary {
+            background-color: var(--gray-light);
+            padding: 40px 20px;
+            border-left: 5px solid var(--ku-red);
+        }
+
+        .executive-summary .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+            margin-top: 30px;
+        }
+
+        .stat-card {
+            background: var(--white);
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: var(--ku-red);
+            margin-bottom: 10px;
+        }
+
+        .stat-label {
+            font-size: 1em;
+            color: var(--gray-dark);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 60px 20px;
+        }
+
+        .section {
+            margin-bottom: 80px;
+        }
+
+        h2 {
+            color: var(--ku-red);
+            font-size: 2em;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 3px solid var(--ku-red);
+        }
+
+        h3 {
+            color: var(--ku-red-light);
+            font-size: 1.5em;
+            margin-top: 40px;
+            margin-bottom: 20px;
+        }
+
+        h4 {
+            color: var(--ku-red-dark);
+            font-size: 1.2em;
+            margin-top: 25px;
+            margin-bottom: 15px;
+        }
+
+        p {
+            margin-bottom: 20px;
+            line-height: 1.8;
+            font-size: 1.05em;
+        }
+
+        ul {
+            margin: 15px 0 15px 40px;
+        }
+
+        li {
+            margin-bottom: 10px;
+        }
+
+        .chart-container {
+            background: var(--white);
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin: 40px 0;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 400px;
+            margin-top: 20px;
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin: 40px 0;
+        }
+
+        .comparison-card {
+            background: var(--white);
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-top: 4px solid var(--ku-red);
+        }
+
+        .comparison-card h4 {
+            margin-top: 0;
+            color: var(--ku-red);
+        }
+
+        .comparison-card.recommended {
+            border-top-color: var(--green);
+            box-shadow: 0 4px 12px rgba(46, 125, 50, 0.2);
+        }
+
+        .comparison-card.recommended::before {
+            content: "✓ RECOMMENDED";
+            display: block;
+            background: var(--green);
+            color: white;
+            padding: 8px 15px;
+            margin: -30px -30px 20px -30px;
+            border-radius: 8px 8px 0 0;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        .pros-cons ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .pros-cons li {
+            padding: 8px 0 8px 30px;
+            position: relative;
+        }
+
+        .pros-cons li::before {
+            position: absolute;
+            left: 0;
+            font-weight: bold;
+        }
+
+        .pros li::before {
+            content: "✓";
+            color: var(--green);
+        }
+
+        .cons li::before {
+            content: "✗";
+            color: var(--red-warning);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 30px 0;
+            background: var(--white);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        th {
+            background: var(--ku-red);
+            color: var(--white);
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--gray-mid);
+        }
+
+        tr:hover {
+            background-color: var(--gray-light);
+        }
+
+        .highlight-box {
+            background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
+            border-left: 5px solid var(--ku-red);
+            padding: 25px;
+            margin: 30px 0;
+            border-radius: 4px;
+        }
+
+        .warning-box {
+            background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
+            border-left: 5px solid var(--red-warning);
+            padding: 25px;
+            margin: 30px 0;
+            border-radius: 4px;
+        }
+
+        .info-box {
+            background: linear-gradient(135deg, var(--blue-light) 0%, #bbdefb 100%);
+            border-left: 5px solid var(--blue-dark);
+            padding: 25px;
+            margin: 30px 0;
+            border-radius: 4px;
+        }
+
+        .footer {
+            background: var(--gray-dark);
+            color: var(--white);
+            padding: 40px 20px;
+            text-align: center;
+            margin-top: 80px;
+        }
+
+        @media print {
+            .chart-wrapper {
+                height: 300px;
+                page-break-inside: avoid;
+            }
+            .section {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Data Archiving Solution for BRIC</h1>
+        <p class="subtitle">Long-term storage strategy for bioinformatics research data</p>
+    </div>
+
+    <div class="executive-summary">
+        <div class="container">
+            <h2 style="color: var(--ku-red-dark); border-bottom: none; padding-bottom: 0;">Executive Summary</h2>
+            <p style="font-size: 1.1em; margin-top: 20px;">BRIC currently stores 2.3 PB on KU-IT at 2.3M DKK/year. With new 2026 pricing (980 DKK/TB/year), archiving 800 TB cold data on tape saves 784,000 DKK annually. An LTO-9 tape system costs 393,000 DKK initially, pays for itself in 6 months, and saves over 5 million DKK in eight years.</p>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number">393k</div>
+                    <div class="stat-label">Initial Investment (DKK)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">6</div>
+                    <div class="stat-label">Months to Break-Even</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">5.2M</div>
+                    <div class="stat-label">8-Year Savings (DKK)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">2.3 PB</div>
+                    <div class="stat-label">Current BRIC Storage</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+
+        <section class="section">
+            <h2>The Problem</h2>
+            <p>We're facing a significant challenge with the growing volume of research data at the institute. KU-IT has introduced a new pricing model that will dramatically increase our storage costs.</p>
+            
+            <div class="highlight-box">
+                <strong>Current Situation (Q3 2025 actual billing):</strong>
+                <ul style="margin: 15px 0 0 20px;">
+                    <li>Total BRIC storage: <strong>2,344 TB (2.3 PB)</strong></li>
+                    <li>Current quarterly cost: <strong>574,511 DKK</strong></li>
+                    <li>Annual cost: <strong>2,298,044 DKK (~2.3M DKK)</strong></li>
+                    <li>Price per TB per quarter: <strong>245 DKK</strong></li>
+                </ul>
+            </div>
+
+            <div class="warning-box">
+                <h4 style="margin-top: 0;">New 2026 Pricing Model</h4>
+                <ul style="margin: 10px 0 0 20px;">
+                    <li><strong>2026:</strong> 50 TB free per faculty VIP, then 980 DKK/TB/year</li>
+                    <li><strong>Expected BRIC cost 2026:</strong> 1,200,000 DKK</li>
+                    <li><strong>Expected BRIC cost 2027:</strong> 1,500,000 DKK</li>
+                    <li><strong>2028:</strong> Only 20 TB free per faculty VIP, then faculty pays directly</li>
+                </ul>
+                <p style="margin-top: 15px; font-weight: bold; color: var(--ku-red-dark);">Storage costs must be budgeted in grant applications</p>
+            </div>
+
+            <div class="chart-container">
+                <h3 style="margin-top: 0;">BRIC Storage Breakdown (Q3 2025)</h3>
+                <div class="chart-wrapper">
+                    <canvas id="storageBreakdownChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <h3 style="margin-top: 0;">Cold Data Growth Projection</h3>
+                <div class="chart-wrapper">
+                    <canvas id="dataGrowthChart"></canvas>
+                </div>
+            </div>
+
+            <p><strong>Conservative estimate:</strong> 800-1,200 TB of BRIC's data is "cold" (rarely accessed but must be retained). This cold data is perfect for tape archiving.</p>
+        </section>
+
+        <section class="section">
+            <h2>Solution Comparison</h2>
+            
+            <div class="comparison-grid">
+                <div class="comparison-card">
+                    <h4>Current: KU-IT Storage</h4>
+                    <p><strong>2026 Cost:</strong> 980 DKK/TB/year</p>
+                    <p><strong>800 TB:</strong> 784,000 DKK/year</p>
+                    <div class="pros-cons">
+                        <ul class="pros">
+                            <li>Already in use</li>
+                            <li>Fast access</li>
+                        </ul>
+                        <ul class="cons">
+                            <li>Very expensive for cold data</li>
+                            <li>8-year cost: 6.3M DKK</li>
+                            <li>Must budget in grants</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="comparison-card">
+                    <h4>Cloud: Amazon Glacier</h4>
+                    <p><strong>Cost:</strong> 362k DKK/year + retrieval</p>
+                    <div class="pros-cons">
+                        <ul class="pros">
+                            <li>Scalable</li>
+                        </ul>
+                        <ul class="cons">
+                            <li>Retrieval: 13M+ DKK over 8 years</li>
+                            <li>Bandwidth limits (93+ days upload)</li>
+                            <li>Data sovereignty issues</li>
+                            <li>Total 8-year: 16M+ DKK</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="comparison-card recommended">
+                    <h4>LTO-9 Tape Archive</h4>
+                    <p><strong>Cost:</strong> 393k DKK + 65k/year</p>
+                    <div class="pros-cons">
+                        <ul class="pros">
+                            <li>8-year cost: ~1M DKK (vs 6.3M)</li>
+                            <li>Unlimited free retrievals</li>
+                            <li>Data sovereignty</li>
+                            <li>No vendor lock-in</li>
+                            <li>Saves 5.2M DKK over 8 years</li>
+                            <li><strong>ROI: 6 months</strong></li>
+                        </ul>
+                        <ul class="cons">
+                            <li>24-48h restore time</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <h3 style="margin-top: 0;">8-Year Cost Comparison (800 TB)</h3>
+                <div class="chart-wrapper">
+                    <canvas id="costComparisonChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <h3 style="margin-top: 0;">Return on Investment Timeline</h3>
+                <div class="chart-wrapper">
+                    <canvas id="roiChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <section class="section">
+            <h2>The Proposed System</h2>
+            
+            <div class="info-box">
+                <h3 style="margin-top: 0; color: var(--ku-red-dark);">Core Components</h3>
+                <ul style="margin-left: 20px;">
+                    <li><strong>Single tape library with 80 slots</strong> (40 base + 40 expansion module)</li>
+                    <li><strong>Two LTO-9 drives</strong> for performance and redundancy (~800 MB/s combined)</li>
+                    <li><strong>100 TB staging disk storage</strong> (RAID6 for reliability)</li>
+                    <li><strong>HPE server</strong> (AMD EPYC 16-core, 64GB RAM) to manage everything</li>
+                    <li><strong>10Gb network connectivity</strong> to cluster infrastructure</li>
+                </ul>
+            </div>
+
+            <div class="highlight-box">
+                <h4 style="margin-top: 0;">System Capacity & Performance</h4>
+                <table style="margin: 15px 0; box-shadow: none;">
+                    <tr>
+                        <td style="border: none; background: transparent;"><strong>Total tapes:</strong></td>
+                        <td style="border: none; background: transparent;">166 (20 + 6 + 140 from packs)</td>
+                    </tr>
+                    <tr>
+                        <td style="border: none; background: transparent;"><strong>Native capacity:</strong></td>
+                        <td style="border: none; background: transparent;">166 × 18 TB = 2,988 TB (~3 PB)</td>
+                    </tr>
+                    <tr>
+                        <td style="border: none; background: transparent;"><strong>Performance:</strong></td>
+                        <td style="border: none; background: transparent;">Two drives = 800 MB/s combined</td>
+                    </tr>
+                    <tr>
+                        <td style="border: none; background: transparent;"><strong>250 TB backup:</strong></td>
+                        <td style="border: none; background: transparent;">~4 days continuous (8 days at 12h/day)</td>
+                    </tr>
+                    <tr>
+                        <td style="border: none; background: transparent;"><strong>1 PB backup:</strong></td>
+                        <td style="border: none; background: transparent;">~15 days continuous (30 days at 12h/day)</td>
+                    </tr>
+                    <tr>
+                        <td style="border: none; background: transparent;"><strong>Typical restore:</strong></td>
+                        <td style="border: none; background: transparent;">24-48 hours for most requests</td>
+                    </tr>
+                </table>
+            </div>
+
+            <h3>Workflow Architecture</h3>
+            <div style="background: var(--gray-light); padding: 40px; border-radius: 8px; margin: 30px 0;">
+                <div style="display: flex; align-items: center; justify-content: space-around; flex-wrap: wrap;">
+                    <div style="text-align: center; flex: 1; min-width: 200px; padding: 20px;">
+                        <div style="font-size: 3em; margin-bottom: 15px; color: var(--ku-red);">🖴</div>
+                        <strong>Network Filesystem</strong>
+                        <p style="margin: 10px 0 0 0; font-size: 0.9em;">Active research data</p>
+                    </div>
+                    <div style="font-size: 2em; color: var(--gray-dark); opacity: 0.3;">→</div>
+                    <div style="text-align: center; flex: 1; min-width: 200px; padding: 20px;">
+                        <div style="font-size: 3em; margin-bottom: 15px; color: var(--ku-red);">🖥️</div>
+                        <strong>Staging Server</strong>
+                        <p style="margin: 10px 0 0 0; font-size: 0.9em;">100 TB cache</p>
+                    </div>
+                    <div style="font-size: 2em; color: var(--gray-dark); opacity: 0.3;">→</div>
+                    <div style="text-align: center; flex: 1; min-width: 200px; padding: 20px;">
+                        <div style="font-size: 2.5em; margin-bottom: 15px; color: var(--ku-red); line-height: 1;">
+                            <div>📼📼</div>
+                            <div>📼📼</div>
+                        </div>
+                        <strong>Tape Library</strong>
+                        <p style="margin: 10px 0 0 0; font-size: 0.9em;">Long-term archive</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="section">
+            <h2>Software Approach: Long-term Data Portability</h2>
+            
+            <div class="warning-box">
+                <h4 style="margin-top: 0;">The 5-Year Problem</h4>
+                <p>Standard backup systems (like Bacula) store encryption keys on the backup server. If that server is gone, or the database is corrupted, or the software has moved on to incompatible versions - you've got tapes full of data you can't easily access.</p>
+                <p style="margin-top: 15px; font-weight: bold; color: var(--ku-red-dark);">That's not acceptable for research data.</p>
+            </div>
+
+            <h3>Our Custom Solution: Simple & Portable</h3>
+            
+            <div class="comparison-grid">
+                <div class="comparison-card">
+                    <h4>❌ Standard Approach</h4>
+                    <ul style="margin-left: 20px; font-size: 0.95em;">
+                        <li>Complex backup software (Bacula, etc.)</li>
+                        <li>Proprietary encryption formats</li>
+                        <li>Keys tied to backup server</li>
+                        <li>Vendor dependency for restores</li>
+                        <li>Need full infrastructure to access data</li>
+                        <li>Risk: lose access after 5-10 years</li>
+                    </ul>
+                </div>
+
+                <div class="comparison-card" style="border-top-color: #2e7d32;">
+                    <h4>✓ BRIC Custom Approach</h4>
+                    <ul style="margin-left: 20px; font-size: 0.95em;">
+                        <li><strong>tar</strong> (unchanged since 1979)</li>
+                        <li>Standard OpenSSL encryption</li>
+                        <li>Each research group has own key</li>
+                        <li>Zero vendor lock-in</li>
+                        <li>Works on any LTO-9 drive worldwide</li>
+                        <li>Data accessible for 30+ years</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="info-box">
+                <h4 style="margin-top: 0;">Technical Implementation</h4>
+                <p><strong>What we'll build:</strong></p>
+                <ul style="margin-left: 20px;">
+                    <li>Shell scripts to handle the archiving workflow</li>
+                    <li>Database (SQLite or PostgreSQL) tracking:
+                        <ul style="margin-left: 20px;">
+                            <li>Which files are on which tapes</li>
+                            <li>Tape slot inventory</li>
+                            <li>Encryption keys per research group</li>
+                            <li>SHA256 checksums for data integrity</li>
+                        </ul>
+                    </li>
+                    <li>Simple restore interface for user requests</li>
+                </ul>
+                <p style="margin-top: 15px;"><strong>Complexity:</strong> This is not complex programming. Anyone comfortable with shell scripting can write and maintain this. Future maintainers can understand and modify it easily.</p>
+            </div>
+
+            <div class="highlight-box">
+                <h4 style="margin-top: 0;">Researcher Data Ownership</h4>
+                <p><strong>When leaving the university, researchers receive:</strong></p>
+                <ul style="margin-left: 20px; margin-top: 10px;">
+                    <li>Physical tapes (or copies)</li>
+                    <li>Their encryption key</li>
+                    <li>Simple README with extraction instructions</li>
+                </ul>
+                <p style="margin-top: 15px;">They can read their data on <strong>any LTO-9 compatible system worldwide</strong> using basic commands:</p>
+                <div style="background: #f5f5f5; padding: 15px; border-radius: 4px; font-family: monospace; margin-top: 10px;">
+                    Load tape → Decrypt with key → Extract with tar
+                </div>
+                <p style="margin-top: 15px; font-weight: bold;">No dependency on BRIC infrastructure existing.</p>
+            </div>
+
+            <h3>Data Security & Access Control</h3>
+            <ul style="margin-left: 40px;">
+                <li><strong>Per-group encryption:</strong> Each research group gets unique encryption key</li>
+                <li><strong>Group isolation:</strong> Groups cannot access each other's archived data</li>
+                <li><strong>Contained breaches:</strong> If a key is compromised, only that group's archives affected</li>
+                <li><strong>Master key database:</strong> HPC admin maintains secure backup for recovery purposes only</li>
+                <li><strong>Off-site option:</strong> Tapes can be stored at Iron Mountain or equivalent (35-45k DKK/year)</li>
+            </ul>
+        </section>
+
+        <section class="section">
+            <h2>System Operations & Management</h2>
+            
+            <h3>Day-to-Day Management</h3>
+            <div class="info-box">
+                <p><strong>Operator:</strong> HPC team (David or designated technical staff)</p>
+                <p style="margin-top: 15px;"><strong>Time commitment:</strong> 4-8 hours per week once operational</p>
+                <p style="margin-top: 15px;"><strong>Required skills:</strong> Linux shell scripting, basic database management</p>
+            </div>
+
+            <h3>Operational Responsibilities</h3>
+            <div class="comparison-grid">
+                <div class="comparison-card">
+                    <h4>Archive Requests</h4>
+                    <p style="font-size: 0.95em;">Process 1-2 requests per week</p>
+                    <ul style="margin-left: 20px; font-size: 0.9em; margin-top: 10px;">
+                        <li>Stage data to disk cache</li>
+                        <li>Calculate SHA256 checksums</li>
+                        <li>Write to tape with encryption</li>
+                        <li>Update database inventory</li>
+                        <li>Send confirmation to researcher</li>
+                    </ul>
+                </div>
+
+                <div class="comparison-card">
+                    <h4>Restore Requests</h4>
+                    <p style="font-size: 0.95em;">Handle 1-2 requests per month</p>
+                    <ul style="margin-left: 20px; font-size: 0.9em; margin-top: 10px;">
+                        <li>Locate tapes in library</li>
+                        <li>Restore to staging area</li>
+                        <li>Verify checksums</li>
+                        <li>Copy to user workspace</li>
+                        <li>24-48h typical turnaround</li>
+                    </ul>
+                </div>
+
+                <div class="comparison-card">
+                    <h4>System Maintenance</h4>
+                    <p style="font-size: 0.95em;">Ongoing monitoring</p>
+                    <ul style="margin-left: 20px; font-size: 0.9em; margin-top: 10px;">
+                        <li>Monitor library status</li>
+                        <li>Manage tape rotation</li>
+                        <li>Periodic integrity checks</li>
+                        <li>Database backups</li>
+                        <li>Documentation updates</li>
+                    </ul>
+                </div>
+            </div>
+
+            <h3>Researcher Workflow</h3>
+            
+            <div style="background: var(--gray-light); padding: 30px; border-radius: 8px; margin: 30px 0;">
+                <h4 style="color: var(--ku-red-dark); margin-top: 0;">Archiving Data</h4>
+                <p><strong>Simple email request specifying:</strong></p>
+                <ul style="margin-left: 20px;">
+                    <li>Which project directories to archive</li>
+                    <li>Any special organization preferences</li>
+                    <li>Confirmation email address</li>
+                </ul>
+                <p style="margin-top: 15px;"><strong>Timeline:</strong> 1-3 weeks depending on data size and queue</p>
+            </div>
+
+            <div style="background: var(--gray-light); padding: 30px; border-radius: 8px; margin: 30px 0;">
+                <h4 style="color: var(--ku-red-dark); margin-top: 0;">Retrieving Data</h4>
+                <p><strong>Email request with:</strong></p>
+                <ul style="margin-left: 20px;">
+                    <li>What data needed (project name, dates, specific files)</li>
+                    <li>Where to restore it (your project directory)</li>
+                </ul>
+                <p style="margin-top: 15px;"><strong>Timeline:</strong> 24-48 hours for most requests, several days for large multi-TB restores</p>
+                <p style="margin-top: 10px;"><em>Alternative:</em> We can train one person from each group to perform restores independently</p>
+            </div>
+
+            <div style="background: var(--gray-light); padding: 30px; border-radius: 8px; margin: 30px 0;">
+                <h4 style="color: var(--ku-red-dark); margin-top: 0;">Taking Data When Leaving</h4>
+                <p><strong>Request your tapes via email, receive:</strong></p>
+                <ul style="margin-left: 20px;">
+                    <li>Your encryption key</li>
+                    <li>Extraction instructions</li>
+                    <li>Option to provide your own tapes for copy</li>
+                </ul>
+                <p style="margin-top: 15px;"><strong>Result:</strong> Full ownership of your research data permanently</p>
+            </div>
+
+            <h3>Risk Management & Data Protection</h3>
+            
+            <div class="comparison-grid">
+                <div class="comparison-card">
+                    <h4>Data Integrity</h4>
+                    <ul style="margin-left: 20px; font-size: 0.95em;">
+                        <li>SHA256 checksums for every file</li>
+                        <li>Verified at: staging, tape write, periodic audits</li>
+                        <li>Database tracks all checksums</li>
+                        <li>Dual copies: on-site + off-site (optional)</li>
+                    </ul>
+                </div>
+
+                <div class="comparison-card">
+                    <h4>Hardware Failure</h4>
+                    <ul style="margin-left: 20px; font-size: 0.95em;">
+                        <li>LTO-9 tapes: 30+ year shelf life</li>
+                        <li>Two drives: operations continue if one fails</li>
+                        <li>Backward compatible: reads LTO-7, LTO-8</li>
+                        <li>Tapes readable in any LTO-9 drive worldwide</li>
+                    </ul>
+                </div>
+
+                <div class="comparison-card">
+                    <h4>System Obsolescence</h4>
+                    <ul style="margin-left: 20px; font-size: 0.95em;">
+                        <li>tar format: unchanged since 1979</li>
+                        <li>Standard OpenSSL encryption</li>
+                        <li>No proprietary formats</li>
+                        <li>Simple codebase: easily maintainable</li>
+                    </ul>
+                </div>
+
+                <div class="comparison-card">
+                    <h4>Institutional Changes</h4>
+                    <ul style="margin-left: 20px; font-size: 0.95em;">
+                        <li>System operates independently of KU-IT</li>
+                        <li>Minimal training for new operators</li>
+                        <li>Researchers can take encrypted tapes</li>
+                        <li>Full documentation provided</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="info-box">
+                <h4 style="margin-top: 0;">System Longevity</h4>
+                <ul style="margin-left: 20px;">
+                    <li><strong>Expected operational life:</strong> 7-8 years (typical for enterprise tape systems)</li>
+                    <li><strong>Warranty period:</strong> 5 years standard</li>
+                    <li><strong>LTO-9 tapes:</strong> Rated for 30+ year shelf life</li>
+                    <li><strong>Backward compatibility:</strong> LTO-9 drives read LTO-7, LTO-8 tapes</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="section">
+            <h2>Hardware Specifications & Costs</h2>
+            
+            <h3>Single Library Configuration (Recommended)</h3>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Component</th>
+                        <th>Specification</th>
+                        <th>Qty</th>
+                        <th>Unit Price (DKK)</th>
+                        <th>Total (DKK)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>HPE MSL3040 Bundle</td>
+                        <td>Library (40 slot) + drive + 20 tapes</td>
+                        <td>1</td>
+                        <td>73,995</td>
+                        <td>73,995</td>
+                    </tr>
+                    <tr>
+                        <td>HPE MSL3040 Expansion</td>
+                        <td>+40 slots</td>
+                        <td>1</td>
+                        <td>25,349</td>
+                        <td>25,349</td>
+                    </tr>
+                    <tr>
+                        <td>HPE LTO-9 Drive Bundle</td>
+                        <td>Additional drive + 6 tapes</td>
+                        <td>1</td>
+                        <td>42,495</td>
+                        <td>42,495</td>
+                    </tr>
+                    <tr>
+                        <td>HPE LTO-9 Tape Packs</td>
+                        <td>20 tapes per pack</td>
+                        <td>7</td>
+                        <td>13,995</td>
+                        <td>97,965</td>
+                    </tr>
+                    <tr>
+                        <td>HPE DL145 Gen11 Server</td>
+                        <td>AMD EPYC 16-core, 64GB RAM</td>
+                        <td>1</td>
+                        <td>27,995</td>
+                        <td>27,995</td>
+                    </tr>
+                    <tr>
+                        <td>QNAP TL-R1620Sep-RP</td>
+                        <td>16-bay SAS rack storage</td>
+                        <td>1</td>
+                        <td>22,823</td>
+                        <td>22,823</td>
+                    </tr>
+                    <tr>
+                        <td>Seagate Exos 8TB SAS</td>
+                        <td>Enterprise 24/7 drives</td>
+                        <td>16</td>
+                        <td>2,600</td>
+                        <td>41,600</td>
+                    </tr>
+                    <tr>
+                        <td>Broadcom HBA 9500-16e</td>
+                        <td>SAS controller</td>
+                        <td>1</td>
+                        <td>5,499</td>
+                        <td>5,499</td>
+                    </tr>
+                    <tr>
+                        <td>Synology 10Gb NIC</td>
+                        <td>Dual-port network card</td>
+                        <td>1</td>
+                        <td>2,045</td>
+                        <td>2,045</td>
+                    </tr>
+                    <tr>
+                        <td>APC SMT2200IC UPS</td>
+                        <td>2200VA rack/tower UPS</td>
+                        <td>1</td>
+                        <td>9,148</td>
+                        <td>9,148</td>
+                    </tr>
+                    <tr>
+                        <td>Cables & Accessories</td>
+                        <td>SAS cables, power, rack kits</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>4,000</td>
+                    </tr>
+                    <tr style="background-color: var(--gray-light); font-weight: bold;">
+                        <td colspan="4">SUBTOTAL HARDWARE</td>
+                        <td>352,914</td>
+                    </tr>
+                    <tr>
+                        <td>Installation & Setup</td>
+                        <td>Professional services</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>40,000</td>
+                    </tr>
+                    <tr style="background-color: var(--ku-red); color: white; font-weight: bold; font-size: 1.1em;">
+                        <td colspan="4">TOTAL INVESTMENT</td>
+                        <td>392,914 DKK</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Annual Operating Costs</h3>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Years 1-3 (DKK/year)</th>
+                        <th>Years 4-8 (DKK/year)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>New tapes for rotation (15-20/year)</td>
+                        <td>14,000-20,000</td>
+                        <td>14,000-20,000</td>
+                    </tr>
+                    <tr>
+                        <td>Off-site storage (optional)</td>
+                        <td>35,000-45,000</td>
+                        <td>35,000-45,000</td>
+                    </tr>
+                    <tr>
+                        <td>Electricity (~500W 24/7)</td>
+                        <td>8,750</td>
+                        <td>8,750</td>
+                    </tr>
+                    <tr>
+                        <td>Preventive maintenance</td>
+                        <td>2,500</td>
+                        <td>2,500</td>
+                    </tr>
+                    <tr>
+                        <td>Hardware support renewal</td>
+                        <td>Included</td>
+                        <td>20,000</td>
+                    </tr>
+                    <tr style="background-color: var(--gray-light); font-weight: bold;">
+                        <td>TOTAL (without off-site)</td>
+                        <td>~45,000</td>
+                        <td>~65,000</td>
+                    </tr>
+                    <tr style="background-color: var(--gray-light); font-weight: bold;">
+                        <td>TOTAL (with off-site)</td>
+                        <td>~80,000</td>
+                        <td>~100,000</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="info-box">
+                <h4 style="margin-top: 0;">Vendor Information</h4>
+                <ul style="margin-left: 20px;">
+                    <li><strong>Dustin Danmark</strong> (dustin.dk) - Tape hardware, servers, UPS, network cards</li>
+                    <li><strong>Atea Danmark</strong> (atea.dk) - MSL3040 expansion module</li>
+                    <li><strong>Proshop</strong> (proshop.dk) - QNAP storage, Seagate drives</li>
+                    <li><strong>Iron Mountain Denmark</strong> (+45 43 48 60 00) - Off-site tape storage (optional)</li>
+                </ul>
+                <p style="margin-top: 15px; font-size: 0.95em;"><em>Note: Confirmed prices from vendor catalogs as of November 2025. Items marked "estimate" require formal quotes.</em></p>
+            </div>
+        </section>
+
+        <section class="section">
+            <h2>Summary & Recommendation</h2>
+            
+            <div class="highlight-box">
+                <h3 style="margin-top: 0; color: var(--ku-red-dark);">Key Points</h3>
+                <ul>
+                    <li><strong>Current:</strong> 2.3 PB at 2.3M DKK/year</li>
+                    <li><strong>New 2026 pricing:</strong> 980 DKK/TB/year</li>
+                    <li><strong>2026 cost:</strong> 1.2M DKK → 1.5M in 2027</li>
+                    <li><strong>Cold data:</strong> 800-1,200 TB archivable</li>
+                    <li><strong>Tape system:</strong> 393k DKK + 65k/year</li>
+                    <li><strong>Annual savings (800 TB):</strong> 784k DKK</li>
+                    <li><strong>ROI:</strong> 6 months</li>
+                    <li><strong>8-year savings:</strong> 5.2M DKK</li>
+                </ul>
+            </div>
+
+            <div class="chart-container">
+                <h3 style="margin-top: 0;">Monthly Savings</h3>
+                <div class="chart-wrapper">
+                    <canvas id="monthlySavingsChart"></canvas>
+                </div>
+            </div>
+
+            <div class="info-box">
+                <h4 style="margin-top: 0;">Recommendation</h4>
+                <p style="font-size: 1.1em;"><strong>Implement tape archive solution for cold data storage.</strong></p>
+                <p>With 800 TB archived, BRIC saves 65,000 DKK monthly (784,000 DKK annually). The system pays for itself in 6 months and saves over 5 million DKK in eight years. Technology is proven, operationally manageable by BRIC HPC team (4-8 hours/week).</p>
+            </div>
+        </section>
+
+    </div>
+
+    <div class="footer">
+        <p><strong>Document prepared by:</strong> David Galligani, HPC Administrator</p>
+        <p>BRIC - Biomedical Research Institute of Copenhagen</p>
+        <p>November 2025</p>
+    </div>
+
     <script>
-    (function(h,o,t,j,a,r){
-        h.hj=h.hj||function(){(h.hj.q=h.hj.q||[]).push(arguments)};
-        h._hjSettings={hjid:3782592,hjsv:6};
-        a=o.getElementsByTagName('head')[0];
-        r=o.createElement('script');r.async=1;
-        r.src=t+h._hjSettings.hjid+j+h._hjSettings.hjsv;
-        a.appendChild(r);
-    })(window,document,'https://static.hotjar.com/c/hotjar-','.js?sv=');
+        // Storage Breakdown
+        new Chart(document.getElementById('storageBreakdownChart'), {
+            type: 'doughnut',
+            data: {
+                labels: ['N-Drive (1,202 TB)', 'Compute Projects (516 TB)', 'Compute Dataset (536 TB)', 'S-Drive (90 TB)'],
+                datasets: [{
+                    data: [1202, 516, 536, 90],
+                    backgroundColor: ['rgba(139, 26, 31, 0.85)', 'rgba(139, 26, 31, 0.65)', 'rgba(139, 26, 31, 0.45)', 'rgba(139, 26, 31, 0.25)'],
+                    borderColor: '#8B1A1F',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'right' },
+                    title: { display: true, text: 'Total: 2,344 TB (Q3 2025)' }
+                }
+            }
+        });
+
+        // Cold Data Growth
+        new Chart(document.getElementById('dataGrowthChart'), {
+            type: 'line',
+            data: {
+                labels: ['Current', 'Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5'],
+                datasets: [{
+                    label: 'Cold Data (TB)',
+                    data: [800, 950, 1100, 1250, 1400, 1550],
+                    borderColor: '#8B1A1F',
+                    backgroundColor: 'rgba(139, 26, 31, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { y: { beginAtZero: true, title: { display: true, text: 'Terabytes (TB)' } } }
+            }
+        });
+
+        // Cost Comparison
+        new Chart(document.getElementById('costComparisonChart'), {
+            type: 'bar',
+            data: {
+                labels: ['KU-IT (800 TB)', 'Glacier (800 TB)', 'Tape (800 TB)'],
+                datasets: [{
+                    label: '8-Year Cost (M DKK)',
+                    data: [6.3, 16.0, 1.0],
+                    backgroundColor: ['rgba(198, 40, 40, 0.75)', 'rgba(51, 51, 51, 0.6)', 'rgba(46, 125, 50, 0.75)'],
+                    borderColor: ['#c62828', '#333', '#2e7d32'],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true, title: { display: true, text: 'Million DKK' } } }
+            }
+        });
+
+        // ROI Chart
+        new Chart(document.getElementById('roiChart'), {
+            type: 'line',
+            data: {
+                labels: ['Start', '3m', '6m', 'Y1', 'Y2', 'Y3', 'Y4', 'Y5', 'Y6', 'Y7', 'Y8'],
+                datasets: [{
+                    label: 'Cumulative Savings (M DKK)',
+                    data: [-0.39, -0.2, 0.0, 0.39, 1.17, 1.96, 2.74, 3.53, 4.31, 5.10, 5.88],
+                    borderColor: '#2e7d32',
+                    backgroundColor: 'rgba(46, 125, 50, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }, {
+                    label: 'Break-Even',
+                    data: Array(11).fill(0),
+                    borderColor: '#8B1A1F',
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    pointRadius: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { y: { title: { display: true, text: 'Million DKK' } } }
+            }
+        });
+
+        // Monthly Savings
+        new Chart(document.getElementById('monthlySavingsChart'), {
+            type: 'bar',
+            data: {
+                labels: ['KU-IT Monthly', 'Tape Monthly', 'Savings'],
+                datasets: [{
+                    label: 'DKK/Month',
+                    data: [65333, 5417, 59916],
+                    backgroundColor: ['rgba(198, 40, 40, 0.75)', 'rgba(139, 26, 31, 0.75)', 'rgba(46, 125, 50, 0.75)'],
+                    borderColor: ['#c62828', '#8B1A1F', '#2e7d32'],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true, title: { display: true, text: 'DKK per Month' } } }
+            }
+        });
     </script>
-	<!-- Piwik Tracking Code for https://kaktuspeople.com -->
-	<script type="text/javascript">
-		(function(window, document, dataLayerName, id) {
-		window[dataLayerName]=window[dataLayerName]||[],window[dataLayerName].push({start:(new Date).getTime(),event:"stg.start"});var scripts=document.getElementsByTagName('script')[0],tags=document.createElement('script');
-		function stgCreateCookie(a,b,c){var d="";if(c){var e=new Date;e.setTime(e.getTime()+24*c*60*60*1e3),d="; expires="+e.toUTCString();f="; SameSite=Strict"}document.cookie=a+"="+b+d+f+"; path=/"}
-		var isStgDebug=(window.location.href.match("stg_debug")||document.cookie.match("stg_debug"))&&!window.location.href.match("stg_disable_debug");stgCreateCookie("stg_debug",isStgDebug?1:"",isStgDebug?14:-1);
-		var qP=[];dataLayerName!=="dataLayer"&&qP.push("data_layer_name="+dataLayerName),isStgDebug&&qP.push("stg_debug");var qPString=qP.length>0?("?"+qP.join("&")):"";
-		tags.async=!0,tags.src="https://davidgalligani.containers.piwik.pro/"+id+".js"+qPString,scripts.parentNode.insertBefore(tags,scripts);
-		!function(a,n,i){a[n]=a[n]||{};for(var c=0;c<i.length;c++)!function(i){a[n][i]=a[n][i]||{},a[n][i].api=a[n][i].api||function(){var a=[].slice.call(arguments,0);"string"==typeof a[0]&&window[dataLayerName].push({event:n+"."+i+":"+a[0],parameters:[].slice.call(arguments,1)})}}(i[c])}(window,"ppms",["tm","cm"]);
-		})(window, document, 'dataLayer', 'f3e453ba-241d-4015-b17c-a4a3892da6b5');
-		</script>
-		
-	<meta charset="utf-8">
-	<meta http-equiv="X-UA-Compatible" content="IE=edge">
-	<title>People from the Kaktus Towers</title>
-	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<meta name="description" content="People from the Kaktus Towers" />
-	<meta name="keywords" content="David Galligani,Kaktus Towers, Copenhagen, photography, arquitecture" />
-	<meta name="author" content="davidgalligani.com" />
 
-  	<!-- Facebook and Twitter integration -->
-	<meta property="og:title" content=""/>
-	<meta property="og:image" content=""/>
-	<meta property="og:url" content=""/>
-	<meta property="og:site_name" content=""/>
-	<meta property="og:description" content=""/>
-	<meta name="twitter:title" content="" />
-	<meta name="twitter:image" content="" />
-	<meta name="twitter:url" content="" />
-	<meta name="twitter:card" content="" />
-
-	<!-- Place favicon.ico and apple-touch-icon.png in the root directory -->
-	<link rel="shortcut icon" href="favicon.ico">
-	<link href='https://fonts.googleapis.com/css?family=Varela+Round' rel='stylesheet' type='text/css'>
-	<!-- <link href="https://fonts.googleapis.com/css?family=Bungee+Shade" rel="stylesheet"> -->
-	
-	<!-- Animate.css -->
-	<link rel="stylesheet" href="css/animate.css">
-	<!-- Icomoon Icon Fonts-->
-	<link rel="stylesheet" href="css/icomoon.css">
-	<!-- Bootstrap  -->
-	<link rel="stylesheet" href="css/bootstrap.css">
-	<!-- Theme style  -->
-	<link rel="stylesheet" href="css/style.css">
-	<!-- Magnific Popup -->
-	<link rel="stylesheet" href="css/magnific-popup.css">
-	<!-- Pages style  -->
-	<link rel="stylesheet" href="css/pages.css">
-	
-	
-
-	<!-- Modernizr JS -->
-	<script src="js/modernizr-2.6.2.min.js"></script>
-	<!-- FOR IE9 below -->
-	<!--[if lt IE 9]>
-	<script src="js/respond.min.js"></script>
-	<![endif]-->
-
-	</head>
-	<body>
-	
-		
-	<div id="fh5co-page">
-		
-		<h1> People from the Kaktus Towers </h1>
-		
-	<div class="aside-toggle btn-circle">
-		<a href="#"><span></span><em>About</em></a>
-	</div>
-
-	
-
-	<div id="fh5co-aside">
-		<div class="image-bg"></div>
-		<div class="overlay"></div> 
-		<div class="row">
-			<div class="col-md-12">
-				<div id="fh5co-aside-inner">
-					<div class="row" id="fh5co-bio">
-						<div class="col-md-12">
-							<h2>About</h2>
-						</div>
-						<div class="col-md-6">
-							<h3>The Kaktus People project</h3>
-							<p> This project delves into the lives of individuals residing in the Kaktus Towers in central Copenhagen.
-								Despite living in a similar, unchangeable spaces, each home uniquely mirrors the personality of its occupant.
-								Every morning, they wake up to almost identical apartments and views from their windows.
-								Like the buildings, which appear so different depending on the light and the perspective, so too are the tenants,
-							    very different people who live very different lives.
-								My goal is to capture the distinct personality of each tenant, showing the beauty in their individuality. 
-								The project began in November 2022 and is an ongoing exploration of the varied lives within the Kaktus Towers.
-								
-								.</p>
-						</div>
-						<div class="col-md-6">
-							<h3>About me</h3><p>  My name is David Galligani. I'm an Italian photographer living in Copenhagen. <br>
-								You can check my other works at https://davidgalligani.com and on my instagram @davidgalligani.
-
-							</p>
-						</div>
-						<div class="col-md-12 fh5co-social">
-							<a href="mailto:davidgalliganiphotography@gmail.com"><i class="icon-envelope"></i></a>
-							<!-- <a href="#"><i class="icon-twitter"></i></a> -->
-							<a href="https://instagram.com/davidgalligani"><i class="icon-instagram"></i></a>
-						</div>
-						<div class="col-md-12" style="margin-top: 40px;">
-							<p>&copy; Copyright 2022 @ David Galligani. All Rights Reserved. </p>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
-	</div>
-	<div class="container-fluid" id="fh5co-image-grid">
-		
-
-		<div class="grid">
-		  <div class="grid-sizer"></div>
-		 
-		  <div class="grid-item item animate-box" data-animate-effect="fadeIn">
-		  		<a href="ruta.html">
-					<div class="img-wrap">
-						<img src="images/ruta/ruta_1.jpg" alt="" class="img-responsive">
-					</div>
-					<div class="text-wrap">
-						<div class="text-inner">
-							<div>
-								<h2>Rūta</h2>
-								<span></span>
-							</div>
-						</div>
-					</div>
-				</a>
-		  </div>
-		
-		  <div class="grid-item item animate-box" data-animate-effect="fadeIn">
-		    <a href="ana.html">
-					<div class="img-wrap">
-						<img src="images/ana/ana_2.jpg" alt="" class="img-responsive">
-					</div>
-					<div class="text-wrap">
-						<div class="text-inner">
-							<div>
-								<h2>Ana</h2>
-								<span>2 photos</span>
-							</div>
-						</div>
-					</div>
-				</a>
-		  </div>
-		  <div class="grid-item item animate-box" data-animate-effect="fadeIn">
-		    <a href="michael_e.html">
-					<div class="img-wrap">
-						<img src="images/michael_e/michael_e_2.jpg" alt="" class="img-responsive">
-					</div>
-					<div class="text-wrap">
-						<div class="text-inner">
-							<div>
-								<h2>Michael E</h2>
-								<span>7 photos</span>
-							</div>
-						</div>
-					</div>
-				</a>
-		  </div>
-		  <div class="grid-item item animate-box" data-animate-effect="fadeIn">
-		    <a href="hector.html">
-					<div class="img-wrap">
-						<img src="images/hector/hector_5.jpg" alt="" class="img-responsive">
-					</div>
-					<div class="text-wrap">
-						<div class="text-inner">
-							<div>
-								<h2>Hector </h2>
-								<span>7 photos</span>
-							</div>
-						</div>
-					</div>
-				</a>
-		  </div>
-		
-		  <div class="grid-item item animate-box" data-animate-effect="fadeIn">
-		    <a href="bruno_mariana.html">
-					<div class="img-wrap">
-						<img src="images/bruno_mariana/bruno_mariana_1.jpg" alt="" class="img-responsive">
-					</div>
-					<div class="text-wrap">
-						<div class="text-inner">
-							<div>
-								<h2>Bruno and Mariana</h2>
-								<span>8 photos</span>
-							</div>
-						</div>
-					</div>
-				</a>
-		  </div>
-		  <div class="grid-item item animate-box" data-animate-effect="fadeIn">
-		    <a href="david_r.html">
-					<div class="img-wrap">
-						<img src="images/david_r/david_r_1.jpg" alt="" class="img-responsive">
-					</div>
-					<div class="text-wrap">
-						<div class="text-inner">
-							<div>
-								<h2>David RL</h2>
-								<span>10 photos</span>
-							</div>
-						</div>
-					</div>
-				</a>
-		  </div>
-		  
-		  <div class="grid-item item animate-box" data-animate-effect="fadeIn">
-		    <a href="dmitry.html">
-					<div class="img-wrap">
-						<img src="images/dmitry/dmitry_2.jpg" alt="" class="img-responsive">
-					</div>
-					<div class="text-wrap">
-						<div class="text-inner">
-							<div>
-								<h2>Dmitry</h2>
-								<span>11 photos</span>
-							</div>
-						</div>
-					</div>
-				</a>
-		  </div>
-		
-		  <div class="grid-item item animate-box" data-animate-effect="fadeIn">
-		    <a href="abdullah.html">
-					<div class="img-wrap">
-						<img src="images/abdullah/abdullah_1.jpg" alt="" class="img-responsive">
-					</div>
-					<div class="text-wrap">
-						<div class="text-inner">
-							<div>
-								<h2>Abdullah</h2>
-								<span>13 photos</span>
-							</div>
-						</div>
-					</div>
-				</a>
-		  </div>
-		  <div class="grid-item item animate-box" data-animate-effect="fadeIn">
-		    <a href="susanne.html">
-					<div class="img-wrap">
-						<img src="images/susanne/susanne_2.jpg" alt="" class="img-responsive">
-					</div>
-					<div class="text-wrap">
-						<div class="text-inner">
-							<div>
-								<h2>Susanne</h2>
-								<span>12 photos</span>
-							</div>
-						</div>
-					</div>
-				</a>
-		  </div>
-		  <div class="grid-item item animate-box" data-animate-effect="fadeIn">
-		    <a href="helena.html">
-					<div class="img-wrap">
-						<img src="images/helena/helena_15.jpg" alt="" class="img-responsive">
-					</div>
-					<div class="text-wrap">
-						<div class="text-inner">
-							<div>
-								<h2>Helena</h2>
-								<span>15 photos</span>
-							</div>
-						</div>
-					</div>
-				</a>
-		  </div>
-		  <div class="grid-item item animate-box" data-animate-effect="fadeIn">
-		  
-			<a href="carlos.html">
-			  <div class="img-wrap">
-				  <img src="images/carlos/carlos_1.jpg" alt="" class="img-responsive">
-			  </div>
-			  <div class="text-wrap">
-				  <div class="text-inner">
-					  <div>
-						  <h2>Carlos</h2>
-						  <span>10 photos</span>
-					  </div>
-				  </div>
-			  </div>
-		  </a>
-		</div>
-		
-		  <div class="grid-item item animate-box" data-animate-effect="fadeIn">
-		    <a href="michael_o.html">
-					<div class="img-wrap">
-						<img src="images/michael_o/michael_o_5.jpg" alt="" class="img-responsive">
-					</div>
-					<div class="text-wrap">
-						<div class="text-inner">
-							<div>
-								<h2>Michael O</h2>
-								<span>12 photos</span>
-							</div>
-						</div>
-					</div>
-				</a>
-		  </div>
-		  <div class="grid-item item animate-box" data-animate-effect="fadeIn">
-		    <a href="jarh.html">
-					<div class="img-wrap">
-						<img src="images/jarh/jarh_1.jpg" alt="" class="img-responsive">
-					</div>
-					<div class="text-wrap">
-						<div class="text-inner">
-							<div>
-								<h2>Jarh</h2>
-								<span>17 photos</span>
-							</div>
-						</div>
-					</div>
-				</a>
-		  </div>
-
-		  <div class="grid-item item animate-box" data-animate-effect="fadeIn">
-		    <a href="magdalena.html">
-					<div class="img-wrap">
-						<img src="images/magdalena/magdalena_3.jpg" alt="" class="img-responsive">
-					</div>
-					<div class="text-wrap">
-						<div class="text-inner">
-							<div>
-								<h2>Magdalena</h2>
-								<span>11 photos</span>
-							</div>
-						</div>
-					</div>
-				</a>
-		  </div>
-		  <div class="grid-item item animate-box" data-animate-effect="fadeIn">
-		    <a href="damian.html">
-					<div class="img-wrap">
-						<img src="images/damian/damian_3.jpg" alt="" class="img-responsive">
-					</div>
-					<div class="text-wrap">
-						<div class="text-inner">
-							<div>
-								<h2>Damian</h2>
-								<span>16 photos</span>
-							</div>
-						</div>
-					</div>
-				</a>
-		  </div>
-		 
-		  <div class="grid-item item animate-box" data-animate-effect="fadeIn">
-		    <a href="khalifah.html">
-					<div class="img-wrap">
-						<img src="images/khalifah/khalifah_3.jpg" alt="" class="img-responsive">
-					</div>
-					<div class="text-wrap">
-						<div class="text-inner">
-							<div>
-								<h2>Khalifah</h2>
-								<span>15 photos</span>
-							</div>
-						</div>
-					</div>
-				</a>
-		  </div>
-
-
-		  <div class="grid-item item animate-box" data-animate-effect="fadeIn">
-		    <a href="jiaming.html">
-					<div class="img-wrap">
-						<img src="images/jiaming/jiaming_7.jpg" alt="" class="img-responsive">
-					</div>
-					<div class="text-wrap">
-						<div class="text-inner">
-							<div>
-								<h2>Jiaming</h2>
-								<span>12 photos</span>
-							</div>
-						</div>
-					</div>
-				</a>
-		  </div>
-		  <div class="grid-item item animate-box" data-animate-effect="fadeIn">
-            <a href="claes.html">
-              <div class="img-wrap">
-                <img src="images/claes/claes_7.jpg" alt="" class="img-responsive">
-              </div>
-              <div class="text-wrap">
-                <div class="text-inner">
-                  <div>
-                    <h2>Claes</h2>
-                    <span>8 photos</span>
-                  </div>
-                </div>
-              </div>
-            </a>
-          </div>
-
-		  <div class="grid-item item animate-box" data-animate-effect="fadeIn">
-            <a href="ira.html">
-              <div class="img-wrap">
-                <img src="images/ira/index.jpg" alt="" class="img-responsive">
-              </div>
-              <div class="text-wrap">
-                <div class="text-inner">
-                  <div>
-                    <h2>Ira</h2>
-                    <span>13 photos</span>
-                  </div>
-                </div>
-              </div>
-            </a>
-          </div>
-		
-	</div>
-
-	</div>
-	
-	<!-- jQuery -->
-	<script src="js/jquery.min.js"></script>
-	<!-- jQuery Easing -->
-	<script src="js/jquery.easing.1.3.js"></script>
-	<!-- Bootstrap -->
-	<script src="js/bootstrap.min.js"></script>
-	<!-- Waypoints -->
-	<script src="js/jquery.waypoints.min.js"></script>
-
-	<!-- Magnific -->
-	<script src="js/jquery.magnific-popup.min.js"></script>
-	<script src="js/magnific-popup-options.js"></script>
-	<!-- Isotope & imagesLoaded -->
-	<script src="js/isotope.pkgd.min.js"></script>
-	<script src="js/imagesloaded.pkgd.min.js"></script>
-	<!-- GSAP  -->
-	<script src="js/TweenLite.min.js"></script>
-	<script src="js/CSSPlugin.min.js"></script>
-	<script src="js/EasePack.min.js"></script>
-
-	<!-- MAIN JS -->
-	<script src="js/main.js"></script>
-
-	</body>
+</body>
 </html>
-
