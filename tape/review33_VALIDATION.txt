@@ -1,0 +1,30 @@
+BRIC Archive 2.0 — Review 33 development validation
+Date: 2026-10-08
+Status: CANDIDATE — native gate required
+
+BASELINE
+--------
+Final 32B5R2 tarball SHA-256:
+46874ddae77cd32fa1a9fee0ecae26b0e136b413c4f78bdd56bddbdfeda3748b
+
+BUILD-CONTAINER RESULTS
+-----------------------
+PASS  bash -n on changed runtime/test scripts
+PASS  test/run_33_restore_txn.sh using test-only sqlite compatibility shim
+      - mode-000 cross-chunk model
+      - newline-safe journal key
+      - stale APPLYING crash recovery
+      - journal outside DEST
+      - metadata drift fail-closed
+SKIP  ACL round-trip: acl tools absent in build container
+SKIP  xattr round-trip: attr tools absent in build container
+PASS  test/run_cli_help_man.sh
+PASS  test/run_32b5_dr_verify_semantics.sh
+PASS  test/run_32b5_slurm_cli.sh
+
+NOT CLAIMED
+-----------
+The complete native suite has not been run on this Review 33 candidate.
+The 32B5 logical-restore E2E was attempted with the compatibility sqlite wrapper but exceeded the
+build-container timing envelope; that run is neither PASS nor FAIL evidence.
+A native gate with real sqlite3 + acl + attr is mandatory before installation.

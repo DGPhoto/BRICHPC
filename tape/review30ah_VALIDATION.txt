@@ -1,0 +1,32 @@
+BRIC Archive 2.0 Review 30AH validation
+build_date=2026-09-03
+baseline=Review 30AG
+scope=sparse TAR_PART batching for LTO throughput; BRIC-FORMAT-V1 unchanged
+
+Local build/validation environment:
+- Go 1.23.2 linux/amd64
+- sqlite3 CLI unavailable in this environment; sqlite-native full suite deferred to supekgate04fl
+
+Passed locally:
+- gofmt + go vet cluster/libexec/bric-tar-stream.go
+- bric-tar-stream rebuilt with CGO_ENABLED=0; static stripped ELF x86-64; no NEEDED entries
+- test/run_tar_stream.sh
+  * existing TAR_PART/LARGE_FILE_CHUNK/OpenSSL compatibility
+  * two materially sparse files -> one batched V1 TAR_PART
+  * full restore preserves content/logical size/sparse allocation
+  * single-file extraction from that same batched sparse TAR_PART
+  * scale regression: 100 sparse files -> 7 TAR_PARTs with a 1 MiB test batch target
+  * lightly sparse Review 30AA normalization unchanged
+- test/run_helper_portability.sh
+- test/run_update.sh
+- shell syntax: 97 scripts checked, 0 failed
+- systemd-analyze verify tape/systemd/bric-tape-daemon.service rc=0
+- MANIFEST.sha256 clean
+
+Not run locally because sqlite3 CLI is absent:
+- full test/run_all_tests.sh
+- sqlite-dependent tests including run_stream_gate_race.sh
+
+Full sqlite-native suite must pass on supekgate04fl before installation/real-media use.
+No database migration. Existing catalogs use the built-in 64 GiB sparse-batch fallback; fresh catalogs
+also receive sparse_batch_target_bytes=68719476736.

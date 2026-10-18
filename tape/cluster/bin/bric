@@ -1,0 +1,642 @@
+#!/bin/bash
+# bric - user entry point on the cluster. Submits/*drives* archive & restore work.
+#   bric backup  --project NAME --source DIR [--as LOGICAL_ROOT] [--exclude RELPATH ...] [--source-change-policy strict|record] [--force] [--wait]
+#   bric status  [--project NAME]
+#   bric jobs | bric log [JOB_ID|PID] | bric cancel JOB_ID|PID
+#   bric list    [--long] [--all]
+#   bric contents PROJECT [--run RUN_ID]
+#   bric find     PROJECT QUERY [--run RUN_ID]
+#   bric restore --project NAME [--file REL] --dest DIR
+#   bric register-user --user NAME [--key-file FILE]   (admin: escrow a user key with the master key)
+#
+# BRIC_RUN_MODE=local  : run the full pipeline inline on the cluster/login host (default temporary mode).
+# BRIC_RUN_MODE=slurm  : submit a planning job, a chunk array, and a dependent finalize/close job.
+set -euo pipefail
+IFS=$'\n\t'
+HERE="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+RELEASE_FILE="$HERE/../../RELEASE"
+if [ "${1:-}" = version ] || [ "${1:-}" = --version ]; then
+    if [ -r "$RELEASE_FILE" ]; then cat "$RELEASE_FILE"; else printf 'BRIC Archive 2.0\nreview=unknown\nbuild_state=legacy-or-mixed\n'; fi
+    exit 0
+fi
+USER_ENV="${BRIC_USER_ENV_FILE:-$HOME/.bric/env.sh}"
+[ -r "$USER_ENV" ] && . "$USER_ENV"
+SCRIPTS="$HERE/../scripts"
+. "$SCRIPTS/lib_common.sh"
+bric_log_process_start "bric" "$@"
+require_role slurm
+require_cmds sqlite3 openssl tar find stat flock awk sha256sum
+: "${BRIC_RUN_MODE:=local}"
+
+usage() {
+    cat <<'EOF_HELP'
+BRIC Archive user commands
+
+Usage:
+  bric backup  PROJECT SOURCE [--as LOGICAL_ROOT] [--exclude RELPATH ...] [--source-change-policy strict|record] [--force] [--wait]
+  bric restore PROJECT DEST [--file REL] [--run RUN_ID] [--require-destination-verify] [--allow-metadata-degradation] [--wait]
+  bric status   [--project PROJECT]
+  bric list     [--long] [--all]
+  bric contents PROJECT [--run RUN_ID] [--history] [--type TYPE] [--long] [--limit N] [--offset N]
+  bric find     PROJECT QUERY [--run RUN_ID] [--history] [--type TYPE] [--long] [--limit N] [--offset N]
+  bric exclusions PROJECT [--run RUN_ID]
+  bric source-changes PROJECT [--run RUN_ID]
+  bric jobs
+  bric log     [JOB_ID|PID]
+  bric cancel  JOB_ID|PID
+  bric version
+  bric help    [COMMAND]
+
+Advanced long forms:
+  bric backup  --project NAME --source DIR [--as LOGICAL_ROOT] [--exclude RELPATH ...] [--source-change-policy strict|record] [--force] [--wait]
+  bric restore --project NAME --dest DIR [--file REL] [--run RUN_ID] [--require-destination-verify] [--allow-metadata-degradation] [--wait]
+
+Use "bric help COMMAND" for command-specific help or "man bric" for the full manual.
+EOF_HELP
+}
+
+command_usage() {
+    case "${1:-}" in
+        backup) cat <<'EOF'
+Usage: bric backup PROJECT SOURCE [--as LOGICAL_ROOT] [--exclude RELPATH ...] [--source-change-policy strict|record] [--force] [--wait]
+       bric backup --project NAME --source DIR [--as LOGICAL_ROOT] [--exclude RELPATH ...] [--source-change-policy strict|record] [--force] [--wait]
+
+Create an encrypted archive backup. --as sets the stable logical root shown by contents/find/restore; default is the declared source basename. --exclude is an exact relative path/subtree,
+may be repeated, and is recorded in the encrypted project catalog. The source
+scope is checked before tape reservation. Without --force, every unreadable or
+untraversable included path is logged and the backup fails. With --force, only precisely
+identified unreadable paths are skipped; every omission is logged and recorded in the
+encrypted catalog. --exclude is different: it declares an intentional subtree exclusion
+before the preflight and is recorded as user-declared scope. Source changes during
+GNU tar reads are fatal by default (strict); explicit record mode closes the run but
+catalogs every FILE_CHANGED_DURING_READ diagnostic. In local mode the command is
+detached by default; --wait keeps it in the foreground.
+EOF
+            ;;
+        restore) cat <<'EOF'
+Usage: bric restore PROJECT DEST [--file REL] [--run RUN_ID] [--require-destination-verify] [--allow-metadata-degradation] [--wait]
+       bric restore --project NAME --dest DIR [--file REL] [--run RUN_ID] [--require-destination-verify] [--allow-metadata-degradation] [--wait]
+
+Restore a complete project or one relative path. --run selects a specific run.
+EOF
+            ;;
+        status) cat <<'EOF'
+Usage: bric status [--project PROJECT]
+
+Show recent archive runs and live progress for active runs.
+EOF
+            ;;
+        list) cat <<'EOF'
+Usage: bric list [--long] [--all]
+
+List projects. --long includes run count and assigned tapes; --all includes
+projects owned by other users when catalog permissions allow it.
+EOF
+            ;;
+        contents) cat <<'EOF'
+Usage: bric contents PROJECT [--run RUN_ID] [--history] [--type TYPE] [--long]
+                     [--limit N] [--offset N]
+       bric contents --project NAME [--run RUN_ID] [--history] [--type TYPE] [--long]
+                     [--limit N] [--offset N]
+
+List the logical namespace across all CLOSED backups; latest version wins per logical path. --history shows every version; --run selects one immutable CLOSED run.
+TYPE is all, file, dir or link. The default limit is 1000; --limit 0 lists all.
+--long also shows entry type, byte size and UTC modification time. No tape is read.
+EOF
+            ;;
+        find) cat <<'EOF'
+Usage: bric find PROJECT QUERY [--run RUN_ID] [--history] [--type TYPE] [--long]
+                 [--limit N] [--offset N]
+       bric find --project NAME --query TEXT [--run RUN_ID] [--history] [--type TYPE]
+                 [--long] [--limit N] [--offset N]
+
+Search case-insensitively for QUERY anywhere in an archived relative path. The
+logical namespace across CLOSED runs is searched; latest version wins unless --history is supplied. --run selects one CLOSED run. TYPE is all, file, dir or
+link. The default limit is 200; --limit 0 returns all matches. No tape is read.
+EOF
+            ;;
+        exclusions) cat <<'EOF'
+Usage: bric exclusions PROJECT [--run RUN_ID]
+       bric exclusions --project NAME [--run RUN_ID]
+
+Show relative paths/subtrees omitted from a CLOSED backup. Records include both
+user-declared exclusions and --force unreadable omissions, with a reason for each.
+They live in the encrypted project catalog. No tape is read.
+EOF
+            ;;
+        source-changes) cat <<'EOF'
+Usage: bric source-changes PROJECT [--run RUN_ID]
+       bric source-changes --project NAME [--run RUN_ID]
+
+Show source-consistency semantics and any FILE_CHANGED_DURING_READ diagnostics
+recorded for a CLOSED backup. Paths use GNU tar escape quoting when needed.
+EOF
+            ;;
+        jobs) cat <<'EOF'
+Usage: bric jobs
+
+List local background jobs, PIDs, states, actions, projects and timestamps.
+EOF
+            ;;
+        log) cat <<'EOF'
+Usage: bric log [JOB_ID|PID]
+
+Follow the last 80 lines of a local background job log. With no argument, use
+the newest recorded job. Press Ctrl-C to stop following the log.
+EOF
+            ;;
+        cancel) cat <<'EOF'
+Usage: bric cancel JOB_ID|PID
+
+Request cancellation of a running local background job and its process group.
+EOF
+            ;;
+        version) cat <<'EOF'
+Usage: bric version
+
+Show the authoritative installed release marker from /opt/bric2/RELEASE.
+EOF
+            ;;
+        help|"") usage ;;
+        *) printf 'Unknown help topic: %s\n\n' "$1" >&2; usage >&2; return 2 ;;
+    esac
+}
+
+cmd_backup() {
+    local PROJECT="" SOURCE="" LOGICAL_ROOT="" WAIT="no" SOURCE_CHANGE_POLICY="" FORCE="no" ex
+    local -a EXCLUDES=()
+    while [ "$#" -gt 0 ]; do case "$1" in
+        --project) PROJECT="${2:-}"; shift 2;; --source) SOURCE="${2:-}"; shift 2;;
+        --as) [ "$#" -ge 2 ] || die "backup: --as requires a value"; LOGICAL_ROOT="$(bric_validate_logical_root "$2" || true)"; [ -n "$LOGICAL_ROOT" ] || die "backup: invalid --as '$2' (one NFC path component, max 255 bytes, no slash/comma/control/. or ..)"; shift 2;;
+        --exclude)
+            [ "$#" -ge 2 ] || die "backup: --exclude requires a relative path"
+            ex="$(bric_normalize_exclude_rel "$2" || true)"; [ -n "$ex" ] || die "backup: invalid exclusion '$2'"
+            EXCLUDES+=("$ex"); shift 2;;
+        --source-change-policy)
+            [ "$#" -ge 2 ] || die "backup: --source-change-policy requires strict or record"
+            SOURCE_CHANGE_POLICY="$2"; case "$SOURCE_CHANGE_POLICY" in strict|record) :;; *) die "backup: invalid source change policy '$SOURCE_CHANGE_POLICY'";; esac; shift 2;;
+        --force) FORCE="yes"; shift;;
+        --wait) WAIT="yes"; shift;; help|-h|--help) command_usage backup; return 0;;
+        *) die "backup: unknown option $1";; esac; done
+    [ -n "$PROJECT" ] && [ -n "$SOURCE" ] || die "usage: bric backup --project NAME --source DIR [--as LOGICAL_ROOT] [--exclude RELPATH ...] [--source-change-policy strict|record]"
+    [ -n "$LOGICAL_ROOT" ] || LOGICAL_ROOT="$(bric_default_logical_root "$SOURCE" || true)"
+    [ -n "$LOGICAL_ROOT" ] || die "backup: source basename is not a valid logical root; use --as NAME"
+    bric_require_nfs_bus
+
+    if [ "$BRIC_RUN_MODE" = local ]; then
+        local args=(--project "$PROJECT" --source "$SOURCE")
+        for ex in "${EXCLUDES[@]}"; do args+=(--exclude "$ex"); done
+        [ -z "$SOURCE_CHANGE_POLICY" ] || args+=(--source-change-policy "$SOURCE_CHANGE_POLICY")
+        [ "$FORCE" = no ] || args+=(--force)
+        BRIC_SOURCE_DECLARED="$SOURCE" BRIC_LOGICAL_ROOT="$LOGICAL_ROOT" "$SCRIPTS/bric-stream-backup.sh" "${args[@]}"
+        return 0
+    fi
+    [ "${#EXCLUDES[@]}" -eq 0 ] || die "backup: --exclude is currently supported only by the tar-stream/local producer; refusing to ignore declared scope in Slurm planner mode"
+    [ -z "$SOURCE_CHANGE_POLICY" ] || [ "$SOURCE_CHANGE_POLICY" = strict ] || die "backup: --source-change-policy record is currently supported only by the tar-stream/local producer"
+    [ "$FORCE" = no ] || die "backup: --force is currently supported only by the tar-stream/local producer; refusing to silently omit paths in Slurm planner mode"
+
+    # SLURM mode: do NOT plan inline on the login node (the reservation handshake can block). Submit a
+    # short orchestrator JOB that plans + submits the array and the dependent finalize/close, then exits.
+    # The login node only sbatches the orchestrator and returns; the pipeline survives an SSH drop.
+    command -v sbatch >/dev/null 2>&1 || die "sbatch not found (set BRIC_RUN_MODE=local to run inline)"
+    # Review 32B5R2: never serialize values into Slurm's comma-delimited --export grammar, and
+    # never use blanket --export=ALL. Exact values travel in sbatch's process environment while
+    # --export contains only the allow-listed variable names. This preserves '=' and other bytes
+    # without leaking the submitter's login-shell environment into the orchestrator job.
+    local EXPORTS="BRIC_PROJECT,BRIC_SOURCE,BRIC_SOURCE_DECLARED,BRIC_LOGICAL_ROOT"
+    local -a SBATCH_ENV=(
+        "BRIC_PROJECT=$PROJECT"
+        "BRIC_SOURCE=$SOURCE"
+        "BRIC_SOURCE_DECLARED=$SOURCE"
+        "BRIC_LOGICAL_ROOT=$LOGICAL_ROOT"
+    )
+    local v
+    for v in BRIC_ROLE BRIC_HOME BRIC_DB BRIC_QNAP BRIC_QNAP_MNT BRIC_REQUIRE_NFS_BUS BRIC_KEYS BRIC_USER_KEYS_DIR BRIC_USER_KEY_FILE BRIC_RUNSTATE BRIC_LOCAL_LOCK_DIR \
+             BRIC_BUS_SIGN_KEY BRIC_BUS_VERIFY_KEY BRIC_RESERVE_TIMEOUT BRIC_DRAIN_TIMEOUT \
+             BRIC_CLOSE_TIMEOUT BRIC_POLL BRIC_CHUNK_RETRIES BRIC_LOCAL_TMPDIR BRIC_USER \
+             BRIC_CONFIG BRIC_SLURM_OPENSSL_MODULE BRIC_MODULE_INIT BRIC_SLURM_LOGDIR \
+             BRIC_LOG_DIR BRIC_LOG_FALLBACK_DIR BRIC_LOG_CAPTURE_STDIO BRIC_LOG_GROUP BRIC_LOG_MAX_MESSAGE BRIC_REQUIRE_LOGGING BRIC_NOTIFY_LOG BRIC_PRODUCER_WAIT \
+             BRIC_PRODUCER_POLL; do
+        if [ -n "${!v:-}" ]; then
+            SBATCH_ENV+=("$v=${!v}")
+            EXPORTS="$EXPORTS,$v"
+        fi
+    done
+    # The orchestrator is a real sbatch script.  It performs module purge/load itself and purges on
+    # EXIT, so correctness never depends on the interactive login shell's PATH/LD_LIBRARY_PATH.
+    local LOGDIR; LOGDIR="$(bric_slurm_logdir)"
+    local OID; OID="$(env "${SBATCH_ENV[@]}" sbatch --parsable -p archive -J "bric-orch-$PROJECT" \
+        --output="$LOGDIR/bric-orchestrator-%j.out" \
+        --export="$EXPORTS" "$HERE/../slurm/orchestrate.sbatch")"
+    bric_event INFO SLURM_JOB_SUBMITTED "kind=orchestrator job=$OID project=$PROJECT output=$LOGDIR/bric-orchestrator-%j.out"
+    log "submitted orchestrator job $OID for project '$PROJECT' (plans + submits array/finalize off the login node)"
+    echo "orchestrator job $OID submitted on partition 'archive'; run 'bric status' to see the run id once planned"
+    if [ "$WAIT" = yes ]; then
+        log "waiting for the orchestrator to plan, then for a terminal run state..."
+        local RUN_ID="" i=0 status="" err="" wait_max="${BRIC_WAIT_TIMEOUT:-86400}"
+        while [ -z "$RUN_ID" ] && [ "$i" -lt 1800 ]; do
+            # Do not hide a rapidly failed run: select the newest run regardless of state.
+            RUN_ID="$(sql "SELECT run_id FROM runs WHERE project_name='$(sql_quote "$PROJECT")' ORDER BY requested_at DESC, run_id DESC LIMIT 1;")"
+            [ -n "$RUN_ID" ] && break; sleep 5; i=$((i+5))
+        done
+        [ -n "$RUN_ID" ] || die "orchestrator $OID did not create a run within 1800s"
+        i=0
+        while [ "$i" -lt "$wait_max" ]; do
+            status="$(sql "SELECT status FROM runs WHERE run_id='$(sql_quote "$RUN_ID")';")"
+            case "$status" in
+                CLOSED) echo "$RUN_ID"; return 0 ;;
+                FAILED|CANCELLED)
+                    err="$(sql "SELECT COALESCE(error,'') FROM runs WHERE run_id='$(sql_quote "$RUN_ID")';")"
+                    die "run $RUN_ID ended $status${err:+: $err}"
+                    ;;
+            esac
+            sleep 5; i=$((i+5))
+        done
+        die "timed out after ${wait_max}s waiting for run $RUN_ID (last status: ${status:-unknown})"
+    fi
+}
+
+cmd_status() {
+    local PROJECT="" me; me="$(bric_whoami)"
+    while [ "$#" -gt 0 ]; do case "$1" in
+        --project) PROJECT="${2:-}"; shift 2;;
+        help|-h|--help) command_usage status; return 0;;
+        *) die "status: unknown option $1";;
+    esac; done
+    local where="owner='$(sql_quote "$me")'"
+    [ -n "$PROJECT" ] && where="project_name='$(sql_quote "$PROJECT")'"
+    if [ "$(sql "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='run_source_scan';")" -gt 0 ]; then
+        if [ "$(sql "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='run_source_semantics';")" -gt 0 ]; then
+            sqlite3 -header -column "$BRIC_DB" "SELECT r.run_id,r.kind,r.status,r.n_chunks,
+                (SELECT COUNT(*) FROM chunks c WHERE c.run_id=r.run_id AND c.state='DONE') AS done,
+                printf('%.2f',r.total_bytes/1099511627776.0) AS TiB,
+                CASE WHEN s.logical_bytes>0 THEN printf('%.1f%%',MIN(100.0,100.0*r.total_bytes/s.logical_bytes)) ELSE '' END AS scanned_progress,
+                COALESCE(ss.source_consistency,'') AS source_consistency
+                FROM runs r LEFT JOIN run_source_scan s ON s.run_id=r.run_id
+                LEFT JOIN run_source_semantics ss ON ss.run_id=r.run_id
+                WHERE $where ORDER BY r.requested_at DESC LIMIT 30;"
+        else
+            sqlite3 -header -column "$BRIC_DB" "SELECT r.run_id,r.kind,r.status,r.n_chunks,
+                (SELECT COUNT(*) FROM chunks c WHERE c.run_id=r.run_id AND c.state='DONE') AS done,
+                printf('%.2f',r.total_bytes/1099511627776.0) AS TiB,
+                CASE WHEN s.logical_bytes>0 THEN printf('%.1f%%',MIN(100.0,100.0*r.total_bytes/s.logical_bytes)) ELSE '' END AS scanned_progress
+                FROM runs r LEFT JOIN run_source_scan s ON s.run_id=r.run_id
+                WHERE $where ORDER BY r.requested_at DESC LIMIT 30;"
+        fi
+    else
+        sqlite3 -header -column "$BRIC_DB" "SELECT run_id,kind,status,n_chunks,
+            (SELECT COUNT(*) FROM chunks c WHERE c.run_id=r.run_id AND c.state='DONE') AS done,
+            printf('%.2f',total_bytes/1099511627776.0) AS TiB
+            FROM runs r WHERE $where ORDER BY requested_at DESC LIMIT 30;"
+    fi
+    local rid pf stage files bytes chunks
+    while IFS= read -r rid; do
+        [ -n "$rid" ] || continue
+        pf="$(run_state_dir "$rid")/progress"
+        [ -r "$pf" ] || continue
+        stage="$(awk -F= '$1=="stage"{v=$2} END{print v}' "$pf")"
+        files="$(awk -F= '$1=="files"{v=$2} END{print v}' "$pf")"
+        bytes="$(awk -F= '$1=="bytes"{v=$2} END{print v}' "$pf")"
+        chunks="$(awk -F= '$1=="chunks"{v=$2} END{print v}' "$pf")"
+        printf '  progress %s: stage=%s files=%s bytes=%s chunks=%s\n'             "$rid" "${stage:-?}" "${files:-0}" "${bytes:-0}" "${chunks:-0}"
+    done < <(sql "SELECT run_id FROM runs WHERE $where AND status IN('PLANNING','RESERVED','PRODUCING','DRAINING','CLOSING') ORDER BY requested_at DESC;")
+}
+
+meta_value() { # key file: last assignment wins
+    awk -F= -v k="$1" '$1==k{v=substr($0,index($0,"=")+1)} END{print v}' "$2"
+}
+resolve_job_meta() { # token -> meta path
+    local token="${1:-}" dir="${BRIC_PID_DIR:-$HOME/.bric/pids}" f pid
+    [ -d "$dir" ] || return 1
+    if [ -z "$token" ]; then
+        ls -1t "$dir"/*.meta 2>/dev/null | head -1
+        return
+    fi
+    [ -f "$dir/$token.meta" ] && { printf '%s\n' "$dir/$token.meta"; return; }
+    for f in "$dir"/*.meta; do
+        [ -f "$f" ] || continue
+        pid="$(meta_value pid "$f")"
+        [ "$pid" = "$token" ] && { printf '%s\n' "$f"; return; }
+    done
+    return 1
+}
+
+cmd_jobs() {
+    [ "$#" -eq 0 ] || { case "${1:-}" in help|-h|--help) command_usage jobs; return 0;; *) die "jobs: unknown option $1";; esac; }
+    local dir="${BRIC_PID_DIR:-$HOME/.bric/pids}" f id pid action project state started ended rc live
+    printf '%-52s %-8s %-8s %-16s %-12s %s\n' JOB_ID PID STATE ACTION PROJECT STARTED
+    [ -d "$dir" ] || return 0
+    for f in "$dir"/*.meta; do
+        [ -f "$f" ] || continue
+        id="$(meta_value job_id "$f")"; pid="$(meta_value pid "$f")"
+        action="$(meta_value action "$f")"; project="$(meta_value project "$f")"
+        state="$(meta_value state "$f")"; started="$(meta_value started "$f")"
+        ended="$(meta_value ended "$f")"; rc="$(meta_value rc "$f")"
+        live=0; [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null && live=1
+        [ "$live" -eq 1 ] && state=RUNNING
+        [ -n "$ended" ] && started="$started -> $ended${rc:+ rc=$rc}"
+        printf '%-52s %-8s %-8s %-16s %-12s %s\n' "$id" "$pid" "${state:-UNKNOWN}" "$action" "$project" "$started"
+    done | sort -k6,6r
+}
+
+cmd_log() {
+    case "${1:-}" in help|-h|--help) command_usage log; return 0;; esac
+    [ "$#" -le 1 ] || die "usage: bric log [JOB_ID|PID]"
+    local token="${1:-}" meta logf
+    meta="$(resolve_job_meta "$token")" || die "background job not found: ${token:-none}"
+    logf="$(meta_value log "$meta")"
+    [ -n "$logf" ] && [ -f "$logf" ] || die "log file not found for $(basename "$meta" .meta)"
+    tail -n 80 -f "$logf"
+}
+
+cmd_cancel() {
+    case "${1:-}" in help|-h|--help) command_usage cancel; return 0;; esac
+    [ "$#" -le 1 ] || die "usage: bric cancel JOB_ID|PID"
+    local token="${1:-}" meta pid state
+    [ -n "$token" ] || die "usage: bric cancel JOB_ID|PID"
+    meta="$(resolve_job_meta "$token")" || die "background job not found: $token"
+    pid="$(meta_value pid "$meta")"; state="$(meta_value state "$meta")"
+    [ -n "$pid" ] || die "job metadata has no PID"
+    if ! kill -0 "$pid" 2>/dev/null; then
+        die "job is not running (last state: ${state:-unknown})"
+    fi
+    # Background jobs run in their own session/process group. TERM reaches planner/chunk children too;
+    # their traps mark the active run FAILED/ABORTED rather than leaving it wedged.
+    kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid"
+    printf 'cancellation requested for PID %s (%s)\n' "$pid" "$(basename "$meta" .meta)"
+}
+
+cmd_list() {
+    local LONG="no" ALL="no" me; me="$(bric_whoami)"
+    while [ "$#" -gt 0 ]; do case "$1" in
+        --long) LONG=yes; shift;; --all) ALL=yes; shift;;
+        help|-h|--help) command_usage list; return 0;;
+        *) die "list: unknown option $1";;
+    esac; done
+    local where="owner='$(sql_quote "$me")'"; [ "$ALL" = yes ] && where="1=1"
+    if [ "$LONG" = yes ]; then
+        sqlite3 -header -column "$BRIC_DB" "SELECT p.project_name,p.owner,p.status,
+            (SELECT COUNT(*) FROM runs r WHERE r.project_name=p.project_name) AS runs,
+            (SELECT group_concat(volumetag,',') FROM project_tapes t WHERE t.project_name=p.project_name) AS tapes
+            FROM projects p WHERE $where ORDER BY p.created_at;"
+    else
+        sqlite3 -header -column "$BRIC_DB" "SELECT project_name,owner,status FROM projects WHERE $where ORDER BY created_at;"
+    fi
+}
+
+# Resolve and authorize a CLOSED archive run for catalog-only browsing. Normal users may
+# inspect only their own projects; root may inspect any project for administration.
+resolve_browse_run() { # PROJECT [RUN_ID]
+    local project="$1" requested="${2:-}" me owner run_id state
+    me="$(bric_whoami)"
+    owner="$(sql "SELECT owner FROM projects WHERE project_name='$(sql_quote "$project")';")"
+    [ -n "$owner" ] || die "project not found: $project"
+    if [ "$(id -u)" -ne 0 ] && [ "$owner" != "$me" ]; then
+        die "project '$project' belongs to '$owner', not '$me'"
+    fi
+    if [ -n "$requested" ]; then
+        state="$(sql "SELECT status FROM runs WHERE run_id='$(sql_quote "$requested")' AND project_name='$(sql_quote "$project")';")"
+        [ -n "$state" ] || die "run '$requested' does not belong to project '$project'"
+        [ "$state" = CLOSED ] || die "run '$requested' is $state; contents are available only for CLOSED backups"
+        run_id="$requested"
+    else
+        run_id="$(sql "SELECT run_id FROM runs WHERE project_name='$(sql_quote "$project")' AND status='CLOSED' ORDER BY COALESCE(closed_at,requested_at) DESC, requested_at DESC LIMIT 1;")"
+        [ -n "$run_id" ] || die "project '$project' has no CLOSED backup"
+    fi
+    printf '%s\n' "$run_id"
+}
+
+parse_browse_type() { # all|file|dir|link -> SQL predicate
+    case "$1" in
+        all)  printf '1=1\n';;
+        file) printf "entry_type='F'\n";;
+        dir|directory) printf "entry_type='D'\n";;
+        link|symlink) printf "entry_type='L'\n";;
+        *) die "invalid --type '$1' (expected all|file|dir|link)";;
+    esac
+}
+
+validate_page_number() { # option value
+    local opt="$1" value="$2"
+    case "$value" in ''|*[!0-9]*) die "$opt requires a non-negative integer";; esac
+}
+
+browse_query() { # PROJECT RUN_ID HISTORY TYPE_PRED QUERY LONG LIMIT OFFSET
+    local project="$1" run_id="$2" history="$3" type_pred="$4" query="$5" long="$6" limit="$7" offset="$8"
+    local auth cte where total shown limit_sql path_expr scope query_sql
+    auth="$(resolve_browse_run "$project" "$run_id")"  # owner check + CLOSED validation
+    [ -z "$run_id" ] || auth="$run_id"
+    [ "$history" != yes ] || [ -z "$run_id" ] || die "--history cannot be combined with --run"
+    bric_ensure_v34_cluster_schema
+
+    cte="WITH candidates AS (
+      SELECT f.run_id,f.rel_path,f.size_bytes,f.mtime,f.entry_type,
+             COALESCE(NULLIF(r.logical_root,''),'legacy-'||r.run_id) AS logical_root,
+             COALESCE(NULLIF(r.logical_root,''),'legacy-'||r.run_id)||'/'||f.rel_path AS logical_path,
+             r.closed_at,r.requested_at,
+             ROW_NUMBER() OVER (
+               PARTITION BY COALESCE(NULLIF(r.logical_root,''),'legacy-'||r.run_id),f.rel_path
+               ORDER BY COALESCE(r.closed_at,r.requested_at,'') DESC,COALESCE(r.requested_at,'') DESC,r.run_id DESC
+             ) AS version_rank
+      FROM files f JOIN runs r ON r.run_id=f.run_id
+      WHERE r.project_name='$(sql_quote "$project")' AND r.status='CLOSED'"
+    [ -z "$run_id" ] || cte+=" AND r.run_id='$(sql_quote "$run_id")'"
+    cte+=")"
+    if [ "$history" = yes ] || [ -n "$run_id" ]; then
+        cte+=", view_rows AS (SELECT * FROM candidates)"
+    else
+        cte+=", view_rows AS (SELECT * FROM candidates WHERE version_rank=1)"
+    fi
+
+    where="($type_pred)"
+    if [ -n "$query" ]; then
+        query_sql="$(sql_quote "$query")"
+        where+=" AND instr(lower(logical_path),lower('$query_sql'))>0"
+    fi
+    total="$(sql "$cte SELECT COUNT(*) FROM view_rows WHERE $where;")"
+    limit_sql="LIMIT $limit OFFSET $offset"; [ "$limit" -ne 0 ] || limit_sql="LIMIT -1 OFFSET $offset"
+    path_expr="replace(replace(replace(replace(logical_path,'\\','\\\\'),char(10),'\\n'),char(13),'\\r'),char(9),'\\t')"
+
+    if [ "$long" = yes ]; then
+        if [ "$history" = yes ]; then
+            sqlite3 -header -column "$BRIC_DB" "$cte SELECT run_id AS RUN_ID,
+              CASE entry_type WHEN 'F' THEN 'FILE' WHEN 'D' THEN 'DIR' WHEN 'L' THEN 'LINK' ELSE entry_type END AS TYPE,
+              size_bytes AS BYTES,CASE WHEN mtime IS NULL THEN '' ELSE datetime(mtime,'unixepoch')||'Z' END AS MTIME_UTC,
+              $path_expr AS PATH FROM view_rows WHERE $where
+              ORDER BY logical_path,COALESCE(closed_at,requested_at,'') DESC,requested_at DESC,run_id DESC $limit_sql;"
+        else
+            sqlite3 -header -column "$BRIC_DB" "$cte SELECT
+              CASE entry_type WHEN 'F' THEN 'FILE' WHEN 'D' THEN 'DIR' WHEN 'L' THEN 'LINK' ELSE entry_type END AS TYPE,
+              size_bytes AS BYTES,CASE WHEN mtime IS NULL THEN '' ELSE datetime(mtime,'unixepoch')||'Z' END AS MTIME_UTC,
+              $path_expr AS PATH FROM view_rows WHERE $where ORDER BY logical_path $limit_sql;"
+        fi
+    else
+        if [ "$history" = yes ]; then
+            sqlite3 -noheader -batch "$BRIC_DB" "$cte SELECT run_id||char(9)||$path_expr FROM view_rows WHERE $where
+              ORDER BY logical_path,COALESCE(closed_at,requested_at,'') DESC,requested_at DESC,run_id DESC $limit_sql;"
+        else
+            sqlite3 -noheader -batch "$BRIC_DB" "$cte SELECT $path_expr FROM view_rows WHERE $where ORDER BY logical_path $limit_sql;"
+        fi
+    fi
+    if [ "$limit" -eq 0 ]; then shown=$(( total > offset ? total - offset : 0 ));
+    else shown=$(( total > offset ? total - offset : 0 )); [ "$shown" -le "$limit" ] || shown="$limit"; fi
+    if [ -n "$run_id" ]; then scope="run=$run_id"; else scope="view=project"; fi
+    printf '%s history=%s total=%s shown=%s offset=%s\n' "$scope" "$history" "$total" "$shown" "$offset" >&2
+    if [ "$limit" -ne 0 ] && [ $((offset + shown)) -lt "$total" ]; then
+        printf 'more entries available; use --offset %s or --limit 0\n' "$((offset + shown))" >&2
+    fi
+}
+
+cmd_contents() {
+    local PROJECT="" RUN_ID="" HISTORY=no TYPE=all LONG=no LIMIT=1000 OFFSET=0
+    if [ "$#" -gt 0 ] && [[ "$1" != --* ]]; then PROJECT="$1"; shift; fi
+    while [ "$#" -gt 0 ]; do case "$1" in
+        --project) [ "$#" -ge 2 ] || die "contents: --project requires a value"; PROJECT="$2"; shift 2;;
+        --run) [ "$#" -ge 2 ] || die "contents: --run requires a value"; RUN_ID="$2"; shift 2;;
+        --history) HISTORY=yes; shift;;
+        --type) [ "$#" -ge 2 ] || die "contents: --type requires a value"; TYPE="$2"; shift 2;;
+        --long) LONG=yes; shift;;
+        --limit) [ "$#" -ge 2 ] || die "contents: --limit requires a value"; LIMIT="$2"; shift 2;;
+        --offset) [ "$#" -ge 2 ] || die "contents: --offset requires a value"; OFFSET="$2"; shift 2;;
+        help|-h|--help) command_usage contents; return 0;;
+        *) die "contents: unknown option $1";;
+    esac; done
+    [ -n "$PROJECT" ] || die "usage: bric contents PROJECT [--run RUN_ID] [--history] [--type TYPE] [--long] [--limit N] [--offset N]"
+    validate_page_number --limit "$LIMIT"; validate_page_number --offset "$OFFSET"
+    local type_pred; type_pred="$(parse_browse_type "$TYPE")"
+    browse_query "$PROJECT" "$RUN_ID" "$HISTORY" "$type_pred" "" "$LONG" "$LIMIT" "$OFFSET"
+}
+
+cmd_find() {
+    local PROJECT="" QUERY="" RUN_ID="" HISTORY=no TYPE=all LONG=no LIMIT=200 OFFSET=0
+    if [ "$#" -gt 0 ] && [[ "$1" != --* ]]; then PROJECT="$1"; shift; fi
+    if [ "$#" -gt 0 ] && [[ "$1" != --* ]]; then QUERY="$1"; shift; fi
+    while [ "$#" -gt 0 ]; do case "$1" in
+        --project) [ "$#" -ge 2 ] || die "find: --project requires a value"; PROJECT="$2"; shift 2;;
+        --query) [ "$#" -ge 2 ] || die "find: --query requires a value"; QUERY="$2"; shift 2;;
+        --run) [ "$#" -ge 2 ] || die "find: --run requires a value"; RUN_ID="$2"; shift 2;;
+        --history) HISTORY=yes; shift;;
+        --type) [ "$#" -ge 2 ] || die "find: --type requires a value"; TYPE="$2"; shift 2;;
+        --long) LONG=yes; shift;;
+        --limit) [ "$#" -ge 2 ] || die "find: --limit requires a value"; LIMIT="$2"; shift 2;;
+        --offset) [ "$#" -ge 2 ] || die "find: --offset requires a value"; OFFSET="$2"; shift 2;;
+        help|-h|--help) command_usage find; return 0;;
+        *) die "find: unknown option $1";;
+    esac; done
+    [ -n "$PROJECT" ] && [ -n "$QUERY" ] || die "usage: bric find PROJECT QUERY [--run RUN_ID] [--history] [--type TYPE] [--long] [--limit N] [--offset N]"
+    validate_page_number --limit "$LIMIT"; validate_page_number --offset "$OFFSET"
+    local type_pred; type_pred="$(parse_browse_type "$TYPE")"
+    browse_query "$PROJECT" "$RUN_ID" "$HISTORY" "$type_pred" "$QUERY" "$LONG" "$LIMIT" "$OFFSET"
+}
+
+cmd_exclusions() {
+    local PROJECT="" RUN_ID=""
+    if [ "$#" -gt 0 ] && [[ "$1" != --* ]]; then PROJECT="$1"; shift; fi
+    while [ "$#" -gt 0 ]; do case "$1" in
+        --project) [ "$#" -ge 2 ] || die "exclusions: --project requires a value"; PROJECT="$2"; shift 2;;
+        --run) [ "$#" -ge 2 ] || die "exclusions: --run requires a value"; RUN_ID="$2"; shift 2;;
+        help|-h|--help) command_usage exclusions; return 0;;
+        *) die "exclusions: unknown option $1";;
+    esac; done
+    [ -n "$PROJECT" ] || die "usage: bric exclusions PROJECT [--run RUN_ID]"
+    local rid; rid="$(resolve_browse_run "$PROJECT" "$RUN_ID")"
+    if [ "$(sql "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='run_exclusions';")" -eq 0 ]; then
+        printf 'run=%s declared_exclusions=0 (legacy catalog: table absent)\n' "$rid"
+        return 0
+    fi
+    local n; n="$(sql "SELECT COUNT(*) FROM run_exclusions WHERE run_id='$(sql_quote "$rid")';")"
+    printf 'run=%s exclusions=%s\n' "$rid" "$n" >&2
+    sqlite3 -header -column "$BRIC_DB" "SELECT ordinal AS N,rel_path AS EXCLUDED_SUBTREE,reason AS REASON FROM run_exclusions WHERE run_id='$(sql_quote "$rid")' ORDER BY ordinal;"
+}
+
+cmd_source_changes() {
+    local PROJECT="" RUN_ID=""
+    if [ "$#" -gt 0 ] && [[ "$1" != --* ]]; then PROJECT="$1"; shift; fi
+    while [ "$#" -gt 0 ]; do case "$1" in
+        --project) [ "$#" -ge 2 ] || die "source-changes: --project requires a value"; PROJECT="$2"; shift 2;;
+        --run) [ "$#" -ge 2 ] || die "source-changes: --run requires a value"; RUN_ID="$2"; shift 2;;
+        help|-h|--help) command_usage source-changes; return 0;;
+        *) die "source-changes: unknown option $1";;
+    esac; done
+    [ -n "$PROJECT" ] || die "usage: bric source-changes PROJECT [--run RUN_ID]"
+    local rid; rid="$(resolve_browse_run "$PROJECT" "$RUN_ID")"
+    if [ "$(sql "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='run_source_semantics';")" -eq 0 ]; then
+        printf 'run=%s source_consistency=unknown (legacy catalog: table absent)\n' "$rid"
+        return 0
+    fi
+    sqlite3 -header -column "$BRIC_DB" "SELECT sparse_map_method AS SPARSE_MAP,allocation_topology AS ALLOCATION_TOPOLOGY,restore_allocation_effect AS RESTORE_ALLOCATION_EFFECT,source_change_policy AS POLICY,source_consistency AS CONSISTENCY,source_changed_count AS CHANGED_PATHS,COALESCE(tar_exit_code,'') AS TAR_RC FROM run_source_semantics WHERE run_id='$(sql_quote "$rid")';"
+    if [ "$(sql "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='run_source_changes';")" -gt 0 ]; then
+        sqlite3 -header -column "$BRIC_DB" "SELECT ordinal AS N,kind AS KIND,path_text AS PATH,path_encoding AS PATH_ENCODING FROM run_source_changes WHERE run_id='$(sql_quote "$rid")' ORDER BY ordinal;"
+    fi
+}
+
+cmd_restore() {
+    [ -x "$SCRIPTS/bric-restore.sh" ] || die "restore not available in this build"
+    local PROJECT="" DEST="" FILE="" RUN_ID="" REQUIRE_DEST_VERIFY=0 ALLOW_METADATA_DEGRADATION=0
+    while [ "$#" -gt 0 ]; do case "$1" in
+        --project) PROJECT="${2:-}"; shift 2;; --dest) DEST="${2:-}"; shift 2;;
+        --file) FILE="${2:-}"; shift 2;; --run) RUN_ID="${2:-}"; shift 2;;
+        --require-destination-verify) REQUIRE_DEST_VERIFY=1; shift;;
+        --allow-metadata-degradation) ALLOW_METADATA_DEGRADATION=1; shift;;
+        --wait) shift;; help|-h|--help) command_usage restore; return 0;;
+        *) die "restore: unknown option $1";; esac; done
+    [ -n "$PROJECT" ] && [ -n "$DEST" ] || die "usage: bric restore --project NAME --dest DIR [--file REL] [--run RUN_ID] [--require-destination-verify] [--allow-metadata-degradation]"
+    bric_require_nfs_bus
+    if [ "$BRIC_RUN_MODE" = local ]; then
+        local args=(--project "$PROJECT" --dest "$DEST")
+        [ -z "$FILE" ] || args+=(--file "$FILE")
+        [ -z "$RUN_ID" ] || args+=(--run "$RUN_ID")
+        [ "$REQUIRE_DEST_VERIFY" -eq 0 ] || args+=(--require-destination-verify)
+        [ "$ALLOW_METADATA_DEGRADATION" -eq 0 ] || args+=(--allow-metadata-degradation)
+        "$SCRIPTS/bric-restore.sh" "${args[@]}"
+        return 0
+    fi
+    command -v sbatch >/dev/null 2>&1 || die "sbatch not found (set BRIC_RUN_MODE=local to restore inline)"
+    local LOGDIR; LOGDIR="$(bric_slurm_logdir)"
+    local EXPORTS="BRIC_RESTORE_PROJECT,BRIC_RESTORE_DEST"
+    local -a SBATCH_ENV=("BRIC_RESTORE_PROJECT=$PROJECT" "BRIC_RESTORE_DEST=$DEST")
+    if [ -n "$FILE" ]; then SBATCH_ENV+=("BRIC_RESTORE_FILE=$FILE"); EXPORTS="$EXPORTS,BRIC_RESTORE_FILE"; fi
+    if [ -n "$RUN_ID" ]; then SBATCH_ENV+=("BRIC_RESTORE_RUN_ID=$RUN_ID"); EXPORTS="$EXPORTS,BRIC_RESTORE_RUN_ID"; fi
+    if [ "$REQUIRE_DEST_VERIFY" -eq 1 ]; then SBATCH_ENV+=("BRIC_RESTORE_REQUIRE_DEST_VERIFY=1"); EXPORTS="$EXPORTS,BRIC_RESTORE_REQUIRE_DEST_VERIFY"; fi
+    if [ "$ALLOW_METADATA_DEGRADATION" -eq 1 ]; then SBATCH_ENV+=("BRIC_RESTORE_ALLOW_METADATA_DEGRADATION=1"); EXPORTS="$EXPORTS,BRIC_RESTORE_ALLOW_METADATA_DEGRADATION"; fi
+    local v
+    for v in BRIC_ROLE BRIC_HOME BRIC_DB BRIC_QNAP BRIC_QNAP_MNT BRIC_REQUIRE_NFS_BUS BRIC_KEYS BRIC_USER_KEYS_DIR BRIC_USER_KEY_FILE BRIC_RUNSTATE BRIC_LOCAL_LOCK_DIR \
+             BRIC_BUS_SIGN_KEY BRIC_BUS_VERIFY_KEY BRIC_RESTORE_TIMEOUT BRIC_RESTORE_QUEUE_TIMEOUT BRIC_RESTORE_INACTIVITY_TIMEOUT BRIC_POLL \
+             BRIC_LOCAL_TMPDIR BRIC_RESTORE_JOURNAL_ROOT BRIC_USER BRIC_CONFIG BRIC_SLURM_OPENSSL_MODULE \
+             BRIC_MODULE_INIT BRIC_SLURM_LOGDIR BRIC_LOG_DIR BRIC_LOG_FALLBACK_DIR \
+             BRIC_LOG_CAPTURE_STDIO BRIC_LOG_GROUP BRIC_LOG_MAX_MESSAGE BRIC_REQUIRE_LOGGING BRIC_NOTIFY_LOG; do
+        if [ -n "${!v:-}" ]; then SBATCH_ENV+=("$v=${!v}"); EXPORTS="$EXPORTS,$v"; fi
+    done
+    local out="$LOGDIR/bric-restore-%j.out" jid
+    jid="$(env "${SBATCH_ENV[@]}" sbatch --wait --parsable -p archive -J "bric-restore-$PROJECT" \
+        --output="$out" --export="$EXPORTS" "$HERE/../slurm/restore.sbatch")" \
+        || die "restore Slurm job failed; inspect $LOGDIR/bric-restore-*.out"
+    bric_event INFO SLURM_JOB_COMPLETED "kind=restore job=$jid project=$PROJECT output=$LOGDIR/bric-restore-%j.out destination=$DEST"
+    log "restore job $jid completed; destination=$DEST"
+    echo "$DEST"
+}
+
+cmd_register_user() {   # admin: legacy/staging registration; real users use bric-setup-user
+    [ "$(id -u)" -eq 0 ] || die "register-user is an administrator action; ask root to run bric-setup-user --user $(bric_whoami)"
+    [ -x "$SCRIPTS/bric-register-user.sh" ] || die "register-user not available in this build"
+    "$SCRIPTS/bric-register-user.sh" "$@"
+}
+
+SUB="${1:-}"; shift || true
+case "$SUB" in
+    backup)        cmd_backup        "$@";;
+    status)        cmd_status        "$@";;
+    jobs)          cmd_jobs          "$@";;
+    log)           cmd_log           "$@";;
+    cancel)        cmd_cancel        "$@";;
+    list)          cmd_list          "$@";;
+    contents)      cmd_contents      "$@";;
+    find)          cmd_find          "$@";;
+    exclusions)    cmd_exclusions    "$@";;
+    source-changes) cmd_source_changes "$@";;
+    restore)       cmd_restore       "$@";;
+    register-user) cmd_register_user "$@";;
+    help)          command_usage "${1:-}";;
+    ""|-h|--help) command_usage "${1:-}";;
+    *) die "unknown subcommand: $SUB (try: backup|restore|status|list|contents|find|exclusions|source-changes|jobs|log|cancel|help)";;
+esac

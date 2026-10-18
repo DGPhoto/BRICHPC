@@ -1,0 +1,39 @@
+BRIC Archive 2.0 — Review 32B5R2 validation
+Date: 2026-10-07
+Status: CANDIDATE — independent native rerun required
+
+INDEPENDENT INPUT
+-----------------
+The 32B5R1 independent gate reported an effective native 78/78 result: the single
+full-suite red item was run_real_e2e.sh killed at the runner's 300-second per-test
+default, and it passed standalone with the same harness in 319 seconds. R2 addresses
+the remaining F2b/N1/N3/N2 findings and closes B2 with the real 32B4A baseline.
+
+LOCAL TARGETED RESULTS
+----------------------
+PASS  bash -n on all R2-modified shell runtime/test files
+PASS  test/run_32b5_dr_verify_semantics.sh
+PASS  test/run_32b5_schema_namespace.sh
+PASS  test/run_32b5_slurm_cli.sh
+PASS  test/run_catalog_browse.sh
+PASS  test/run_cli_help_man.sh
+PASS  test/run_one_command_ux.sh
+PASS  test/run_update.sh
+PASS  run_all_tests.sh help/default reflects per-test timeout 600
+PASS  no Review 32B5A attribution in R2-modified runtime/tests
+
+The local schema/catalog/Slurm tests used a test-only sqlite CLI shim linked to the
+container's SQLite 3.46.1 library because the container does not ship the sqlite3 CLI.
+This is development evidence only and does not replace the native gate.
+
+Two broader simulated E2E attempts were limited by the test-only sqlite shim, not by
+R2 runtime assertions: `run_32b5_logical_restore.sh` reached close and stopped when the
+shim encountered the native CLI `.dump` command; `run_dr_e2e.sh` likewise did not reach
+the R2 DR phase. Neither is counted as PASS or FAIL. The R1 independent native/real-
+backend gate remains the relevant full-path evidence until R2 is rerun natively.
+
+REQUIRED BEFORE INSTALL
+-----------------------
+Run the complete native suite on the independent gate host with native sqlite3 and ACL
+tools. R2 raises the default per-test timeout to 600 seconds specifically so the known
+319-second real-backend E2E is not misclassified as a failure.

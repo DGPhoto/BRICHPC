@@ -1,0 +1,27 @@
+BRIC Archive 2.0 Review 32B1 validation
+Date: 2026-09-10
+Base: Review 32A7 (native 68/68 PASS on supekgate04fl)
+
+Static checks performed in the ChatGPT build container:
+PASS  bash -n across all shell scripts / executable BRIC shell entrypoints / sbatch files
+PASS  test/run_helper_portability.sh
+PASS  test/run_parallel_target_policy.sh
+PASS  cluster/libexec/bric-tar-stream is Linux x86-64 statically linked; readelf shows no NEEDED entries
+PASS  helper version: BRIC tar-stream 32B1-parallel-128GB
+PASS  test inventory: 70 non-hardware run_*.sh tests (run_all_tests.sh and run_real_tape_smoke.sh excluded)
+
+Runtime limitation of this build container:
+- sqlite3 CLI is not installed, so DB-backed simulation/E2E tests cannot be certified here.
+- Native certification is therefore required on supekgate04fl before any installation/promotion.
+
+Requested focused native gates:
+1. test/run_parallel_target_policy.sh
+2. test/run_performance_policy.sh
+3. test/run_restore_progressive.sh
+4. test/run_restore_fallback.sh
+5. test/run_local_e2e.sh
+6. test/run_dr_e2e.sh
+7. test/run_multi_pair_transition.sh
+8. test/run_all_tests.sh
+
+Physical LTO multi-pair transition smoke remains mandatory after software gates are green.

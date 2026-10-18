@@ -1,0 +1,22 @@
+BRIC Archive 2.0 Review 31A validation
+
+Scope: conservative sparse-batch default only; Review-31 source-integrity, exclusion, progress,
+daemon-rescan and BRIC-FORMAT-V1 semantics are unchanged.
+
+Verified in build environment:
+- operational sparse_batch_target_bytes default/fallback: 4294967296 bytes (4 GiB) in fresh catalog,
+  producer fallback and bric-tar-stream CLI default
+- bric-tar-stream rebuilt CGO_ENABLED=0, Linux x86-64, statically linked
+- gofmt + go vet
+- run_tar_stream: sparse V1 full/single-file restore + scale regression + 4 GiB default regression
+- run_source_integrity_scope
+- run_update after manifest regeneration
+- shell syntax for release scripts
+- systemd unit verification
+
+Rationale: each materially sparse member is observed through the authoritative outer tar read, GNU tar
+re-read at sparse-batch emission, and a final hashSourceFile re-read for fail-closed drift verification.
+The batch target therefore controls mutation exposure. 4 GiB retains most tape-file amortization while
+reducing drift/restart exposure versus the former 64 GiB default.
+
+Native sqlite3 full-suite validation on the deployment-compatible host remains the release gate.

@@ -1,0 +1,33 @@
+BRIC Archive 2.0 Review 31D1 validation
+=========================================
+
+review=31D1
+release_id=2.0-review31D1
+build_date=2026-09-07
+database_migration=none-v31d1-runtime-only
+on_tape_format=BRIC-FORMAT-V1
+
+Review 31D1 supersedes the rejected/un-deployed Review 31D candidate. It retains streaming verification
+and the 31D logging/errexit hardening, and corrects short-stream media attribution.
+
+Required native gate
+--------------------
+Run from a CLEAN extraction on supekgate04fl with the native host toolchain (including sqlite3):
+
+  sha256sum -c MANIFEST.sha256
+  bash test/run_all_tests.sh --timeout 600
+
+Expected: 64 selected tests, 64 passed, 0 failed.
+
+Critical policy assertions
+--------------------------
+- rc 20 transport/local verify failure: physical append accounted; media telemetry unchanged.
+- rc 21 clean byte-count mismatch: media/read-path failure. Immediate write -> write_errors + SUSPECT;
+  periodic reverify -> read_errors + BAD.
+- rc 22 exact-size SHA mismatch: same media penalty semantics as corruption.
+- No segment-sized readback tempfile is used by tape verification.
+- The daemon does not invoke one_pass under an errexit-suppressing `||` context.
+- Structured event paths rotate by event UTC day and primary logging failover leaves a LOG_FAILOVER event
+  on the fallback.
+
+Do not install or perform real-tape writes until the native 64/64 gate passes.

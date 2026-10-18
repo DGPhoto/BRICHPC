@@ -1,0 +1,12 @@
+ADDED	CHANGES_REVIEW34R2RC2_B3_RECOVERY_GATE_FIXES.md
+ADDED	CLAUDE_REVIEW_BRIEF_34R2RC2.md
+ADDED	MORNING_RUNBOOK_REVIEW34R2RC2.md
+CHANGED	README.md
+CHANGED	RELEASE
+CHANGED	cluster/libexec/bric-file-metadata
+CHANGED	cluster/libexec/bric-file-metadata.go
+CHANGED	cluster/scripts/bric-restore.sh
+CHANGED	cluster/scripts/lib_restore_txn.sh
+ADDED	review34r2rc2_VALIDATION.txt
+CHANGED	test/run_34r2_b3_payload_safe_recovery.sh
+CHANGED	test/run_helper_portability.sh

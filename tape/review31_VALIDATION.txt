@@ -1,0 +1,41 @@
+BRIC Archive 2.0 Review 31 validation
+Build date: 2026-09-03
+
+Scope
+- Source-integrity preflight before tape reservation
+- Explicit exact-relative exclusions recorded in encrypted catalog
+- Source scan logical/allocated byte denominator and status progress
+- Review 30AH sparse batching retained under BRIC-FORMAT-V1
+- Tape-daemon immediate rescan after observable progress
+
+Local validation in build environment
+PASS bash -n: 99 shell scripts
+PASS systemd-analyze verify: bric-tape-daemon.service
+PASS go vet: cluster/libexec/bric-tar-stream.go
+PASS static Linux x86-64 bric-tar-stream build
+PASS test/run_source_integrity_scope.sh
+PASS test/run_tar_stream.sh
+PASS test/run_helper_portability.sh
+PASS test/run_stream_gate_race.sh
+PASS test/run_drive_state_timing.sh
+PASS test/run_terminal_drain_safety.sh
+PASS test/run_cli_help_man.sh
+PASS synthetic `bric exclusions` catalog query
+PASS synthetic `bric status` scanned_progress calculation
+PASS GNU tar exact-subtree exclusion behavior
+
+SQLite note
+The build container does not provide the native sqlite3 CLI. SQLite-dependent targeted tests above were
+run only where compatible with a Python sqlite3 CLI shim; that is not considered equivalent to the
+production acceptance environment. The authoritative gate remains:
+
+    bash test/run_all_tests.sh --timeout 600
+
+from the complete extracted release on supekgate04fl with native sqlite3 3.45.1.
+
+Compatibility
+- on_tape_format=BRIC-FORMAT-V1
+- no existing table rewritten; v31 tables are additive/lazy
+- bus protocol unchanged
+- crypto/HMAC unchanged
+- read-back verification unchanged

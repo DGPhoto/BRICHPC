@@ -1,0 +1,1509 @@
+#!/bin/bash
+# bric-tape-daemon: the tape server's polling loop. It is the ONLY process that talks to the
+# changer and the ONLY holder of the physical catalog. It never sees a key (only ciphertext blobs).
+#
+#   pass 1  reservations : answer run.RESERVE_REQUEST -> run.RESERVED|run.DENIED (semantics B)
+#   pass 2  drain        : claim chunk_*.READY -> write PRIMARY+BACKUP -> read back & verify -> DONE
+#   pass 3  close        : run.PROJECT_CLOSING -> publish placement -> append the cluster's two
+#                          encrypted catalogs + plaintext restore scripts -> run.CLOSED
+#   recovery             : segments left in WRITING (crash mid-write) are abandoned (strategy A)
+set -euo pipefail
+IFS=$'\n\t'
+HERE="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+. "$HERE/../scripts/lib_common.sh"
+require_role tape
+. "$HERE/../scripts/lib_tape_io.sh"
+REPO_ROOT="$(cd "$HERE/../.." && pwd)"
+REVIEW="$(awk -F= '$1=="review"{print $2}' "$REPO_ROOT/RELEASE" 2>/dev/null | tail -1)"
+RELEASE_ID="$(awk -F= '$1=="release_id"{print $2}' "$REPO_ROOT/RELEASE" 2>/dev/null | tail -1)"
+export BRIC_LOG_PROCESS_EXTRA="script=$(readlink -f "$0") repo=$REPO_ROOT review=${REVIEW:-unknown} release_id=${RELEASE_ID:-unknown}"
+bric_log_process_start "tape-daemon" "$@"
+require_cmds sqlite3 sha256sum awk flock find mv stat mkdir chmod mkfifo tee wc
+bric_require_nfs_bus
+{ bus_sign_enabled || bus_verify_enabled; } && require_cmds openssl   # needed for bus marker signatures
+# Production hardening: if the catalog demands signed bus traffic, refuse to run degraded/unsigned.
+if [ "$(tcfg require_bus_signing)" = "1" ]; then
+    bus_sign_enabled   || die "require_bus_signing=1 but BRIC_BUS_SIGN_KEY is unset/missing — refusing to start unsigned"
+    bus_verify_enabled || die "require_bus_signing=1 but BRIC_BUS_VERIFY_KEY is unset/missing — refusing to start unverified"
+    log "require_bus_signing=1: bus authentication is MANDATORY"
+fi
+bus_verify_enabled && log "bus authentication ON: verifying cluster markers with $BRIC_BUS_VERIFY_KEY"
+bus_sign_enabled   && log "bus authentication ON: signing tape receipts with $BRIC_BUS_SIGN_KEY"
+
+LOCK="$BRIC_TAPE_LOCK"
+# Generation/work fences are intentionally inherited by every worker and external command, while
+# singleton fds are closed in workers. If the daemon is SIGKILLed, a surviving command-substitution
+# or tape process keeps every generation fence until it has really stopped touching tape/catalog
+# state. A new daemon may acquire the singleton set immediately, but must wait on the work-fence
+# set before recovery/reclaim, which prevents the old orphan and new generation from overlapping.
+WORK_LOCK="$BRIC_TAPE_WORK_LOCK"
+
+# Usable bytes per tape = (capacity_tb - headroom) * 1e12. A chunk never spans tapes, so reservation,
+# eligibility and FULL all reason about usable (not raw) capacity for coherent packing.
+_headroom_tb() { local h; h="$(tcfg tape_headroom_tb)"; echo "${h:-0.30}"; }
+bytes_free_pair() {  # pair_number -> usable-free bytes; 0 unless BOTH tapes are catalog-complete and usable
+    local h; h="$(_headroom_tb)"
+    # A pair contributes capacity only if it has exactly one PRIMARY and one BACKUP and both are usable.
+    # The physical-presence check is deliberately separate: reservation applies it only to the pairs
+    # needed by the current project, never to unrelated media elsewhere in the library or offsite.
+    tsql "SELECT CAST(CASE WHEN c=2 AND np=1 AND nb=1 THEN MAX(0, x) ELSE 0 END AS INTEGER)
+          FROM (SELECT MIN((capacity_tb - $h - used_tb)*1000000000000) AS x,
+                       COUNT(*) AS c,
+                       SUM(CASE WHEN role='PRIMARY' THEN 1 ELSE 0 END) AS np,
+                       SUM(CASE WHEN role='BACKUP'  THEN 1 ELSE 0 END) AS nb
+                FROM tapes WHERE pair_number=$1 AND status!='RETIRED' AND health!='BAD');"
+}
+
+# Snapshot of media physically visible to the changer.  It is consulted only for the pairs selected
+# for the current reservation.  Missing or incomplete unrelated pairs are irrelevant to a backup.
+RESERVATION_INVENTORY=""
+reservation_inventory_refresh() {
+    [ "$BRIC_TAPE_BACKEND" = real ] || { RESERVATION_INVENTORY=""; return 0; }
+    RESERVATION_INVENTORY="$(tape_list_volumetags)" || return 1
+    [ -n "$RESERVATION_INVENTORY" ] || return 1
+}
+reservation_vt_onsite() {  # volumetag
+    [ "$BRIC_TAPE_BACKEND" != real ] && return 0
+    printf '%s
+' "$RESERVATION_INVENTORY" | grep -Fqx -- "$1"
+}
+reservation_pair_onsite() {  # pair_number
+    [ "$BRIC_TAPE_BACKEND" != real ] && return 0
+    local p="$1" vt n=0
+    while IFS= read -r vt; do
+        [ -n "$vt" ] || continue
+        n=$((n+1))
+        reservation_vt_onsite "$vt" || return 1
+    done <<EOF
+$(tsql "SELECT volumetag FROM tapes WHERE pair_number=$p AND status!='RETIRED' AND health!='BAD' ORDER BY role DESC;")
+EOF
+    [ "$n" -eq 2 ]
+}
+
+# ---------- pass 1: reservations ----------
+handle_reservation() {
+    local rd="$1" req owner project bytes
+    marker_verify "$rd" run.RESERVE_REQUEST || return 0   # refuse unsigned/forged reservation
+    # bind the signed request to its location (anti replay/relocation)
+    [ "$(marker_field run_id  "$rd/run.RESERVE_REQUEST")" = "$(basename "$rd")" ]            || { log "bus: RESERVE_REQUEST run_id not bound to $(basename "$rd") — refusing"; return 0; }
+    [ "$(marker_field project "$rd/run.RESERVE_REQUEST")" = "$(basename "$(dirname "$rd")")" ] || { log "bus: RESERVE_REQUEST project mismatch — refusing"; return 0; }
+    req="$(marker_read "$rd" run.RESERVE_REQUEST)"
+    project="$(printf '%s' "$req" | awk -F= '/^project=/{print $2}')"
+    owner="$(printf '%s' "$req" | awk -F= '/^owner=/{print $2}')"
+    bytes="$(printf '%s' "$req" | awk -F= '/^requested_bytes=/{print $2}')"
+    local run_id; run_id="$(basename "$rd")"
+    export BRIC_LOG_RUN_ID="$run_id" BRIC_LOG_PROJECT="$project"
+    BRIC_LOG_BYTES="$bytes" bric_event INFO RESERVATION_BEGIN "owner=$owner requested_bytes=$bytes"
+    [ -n "$project" ] || return 0
+
+    # Hardware gate at the START of a backup (the reservation is its first act on the tape side).
+    # Runs in a subshell: a broken library must DENY this run with an explicit diagnosis, not kill
+    # the daemon. No-op in sim; ~1-2 s read-only on real hardware; skippable via BRIC_SKIP_HW_CHECK.
+    local hwmsg
+    if ! hwmsg="$( (tape_hw_quickcheck) 2>&1 )"; then
+        hwmsg="$(printf '%s' "$hwmsg" | tail -1 | sed 's/^\[[^]]*\] ERROR: //')"
+        marker_set_signed "$rd" run.DENIED "run_id=$run_id
+reason=tape hardware not ready: $hwmsg"
+        audit HW_NOT_READY "$run_id" FAIL "$hwmsg"
+        log "DENIED $run_id: tape hardware not ready: $hwmsg"
+        return 0
+    fi
+    [ -n "$hwmsg" ] && printf '%s\n' "$hwmsg" >&2   # forward the quickcheck's own success log line
+
+    # Capacity/media scope is PROJECT-LOCAL.  The daemon does not require every barcode in the
+    # library to have its partner onsite.  It verifies only: (a) pairs already assigned to this
+    # project, because close/TOC updates need them; and (b) fresh complete pairs selected to satisfy
+    # this reservation's requested bytes.
+    if ! reservation_inventory_refresh; then
+        marker_set_signed "$rd" run.DENIED "run_id=$run_id
+reason=cannot read physical tape inventory for project-scoped reservation"
+        audit DENIED "$run_id" FAIL "physical inventory unavailable"
+        BRIC_LOG_RC=1 bric_event ERROR RESERVATION_INVENTORY_FAILED "requested_bytes=$bytes"
+        log "DENIED $run_id: cannot read physical tape inventory"
+        return 0
+    fi
+
+    local owned_free=0 owned_pairs="" missing_owned="" p f
+    for p in $(tsql "SELECT DISTINCT pair_number FROM tapes WHERE project_name='$(sql_quote "$project")' ORDER BY pair_number;"); do
+        if ! reservation_pair_onsite "$p"; then
+            missing_owned="$missing_owned $p"
+            continue
+        fi
+        f="$(bytes_free_pair "$p")"; f="${f:-0}"
+        owned_free=$((owned_free + f)); owned_pairs="$owned_pairs $p"
+    done
+    if [ -n "$missing_owned" ]; then
+        marker_set_signed "$rd" run.DENIED "run_id=$run_id
+reason=project '$project' requires assigned tape pair(s) not fully onsite:$missing_owned"
+        audit DENIED "$run_id" FAIL "project media missing onsite:$missing_owned"
+        BRIC_LOG_RC=1 bric_event ERROR RESERVATION_PROJECT_MEDIA_MISSING "pairs=$missing_owned"
+        log "DENIED $run_id: project media not fully onsite:$missing_owned"
+        return 0
+    fi
+
+    local reserved_pairs="$owned_pairs" new_pairs="" remaining=$((bytes - owned_free))
+    [ "$remaining" -lt 0 ] && remaining=0
+    local required_before="$remaining" selected_free=0 selected_count=0
+    if [ "$remaining" -gt 0 ]; then
+        # Candidate pairs must be catalog-complete, unassigned, usable and physically onsite. Select
+        # only as many as this project needs; unrelated incomplete/offsite pairs are never examined.
+        local empties
+        empties="$(tsql "SELECT pair_number FROM tapes
+                         WHERE status='EMPTY' AND project_name IS NULL AND health IN ('OK','SUSPECT')
+                         GROUP BY pair_number
+                         HAVING COUNT(*)=2
+                            AND SUM(CASE WHEN role='PRIMARY' THEN 1 ELSE 0 END)=1
+                            AND SUM(CASE WHEN role='BACKUP'  THEN 1 ELSE 0 END)=1
+                         ORDER BY pair_number;")"
+        for p in $empties; do
+            [ "$remaining" -le 0 ] && break
+            reservation_pair_onsite "$p" || continue
+            f="$(bytes_free_pair "$p")"; f="${f:-0}"
+            [ "$f" -gt 0 ] || continue
+            tsql "UPDATE tapes SET status='RESERVED', project_name='$(sql_quote "$project")', owner='$(sql_quote "$owner")' WHERE pair_number=$p AND status='EMPTY' AND project_name IS NULL;"
+            # The singleton daemon serializes reservation, but verify both rows really transitioned.
+            if [ "$(tsql "SELECT COUNT(*) FROM tapes WHERE pair_number=$p AND status='RESERVED' AND project_name='$(sql_quote "$project")';")" != 2 ]; then
+                tsql "UPDATE tapes SET status='EMPTY', project_name=NULL, owner=NULL WHERE pair_number=$p AND status='RESERVED' AND project_name='$(sql_quote "$project")';"
+                BRIC_LOG_RC=1 bric_event ERROR RESERVATION_PAIR_TRANSITION_FAILED "pair=$p"
+                continue
+            fi
+            reserved_pairs="$reserved_pairs $p"; new_pairs="$new_pairs $p"
+            selected_count=$((selected_count+1)); selected_free=$((selected_free+f)); remaining=$((remaining-f))
+            BRIC_LOG_BYTES="$f" bric_event INFO RESERVATION_PAIR_SELECTED "pair=$p selected_pairs=$selected_count remaining_bytes=$((remaining>0?remaining:0))"
+        done
+    fi
+
+    if [ "$remaining" -gt 0 ]; then
+        # Roll back only fresh pairs selected by this request; pre-existing project pairs remain owned.
+        for p in $new_pairs; do
+            tsql "UPDATE tapes SET status='EMPTY', project_name=NULL, owner=NULL WHERE pair_number=$p AND status='RESERVED' AND project_name='$(sql_quote "$project")';"
+        done
+        marker_set_signed "$rd" run.DENIED "run_id=$run_id
+reason=insufficient complete onsite tape-pair capacity for project '$project': short_bytes=$remaining"
+        audit DENIED "$run_id" FAIL "short_bytes=$remaining selected_pairs=$selected_count"
+        BRIC_LOG_BYTES="$remaining" BRIC_LOG_RC=1 bric_event ERROR RESERVATION_CAPACITY_SHORTFALL "selected_pairs=$selected_count required_additional_bytes=$required_before"
+        log "DENIED $run_id: insufficient complete onsite pair capacity (short $remaining bytes)"
+        return 0
+    fi
+    BRIC_LOG_BYTES="$bytes" bric_event INFO RESERVATION_MEDIA_SCOPE_OK "owned_free_bytes=$owned_free selected_new_pairs=$selected_count selected_new_free_bytes=$selected_free"
+    local csv; csv="$(echo $reserved_pairs | tr ' ' ',' | sed 's/^,//')"
+    local npairs; npairs="$(echo $reserved_pairs | wc -w | tr -d ' ')"
+    tsql "INSERT OR REPLACE INTO reservation (run_id,project_name,owner,requested_tb,pairs_csv,state,granted_at,heartbeat_at)
+          VALUES ('$(sql_quote "$run_id")','$(sql_quote "$project")','$(sql_quote "$owner")',$(awk -v b="$bytes" 'BEGIN{printf "%.6f", b/1000000000000}'),'$(sql_quote "$csv")','GRANTED',datetime('now'),datetime('now'));"
+    local logical_capacity=$((owned_free + selected_free))
+    marker_set_signed "$rd" run.RESERVED "run_id=$run_id
+pairs=$npairs
+pairs_csv=$csv
+capacity_bytes=$logical_capacity"
+    audit RESERVED "$run_id" OK "project='$project' pairs=$npairs ($csv)"
+    log "RESERVED $run_id: pairs=$npairs ($csv)"
+    return 0
+}
+
+
+# Tar-driven streaming does not know the final byte count before production.  The cluster initially
+# reserves one logical chunk and requests additional project-scoped pairs only when the stream is
+# about to exceed the capacity already pinned to the run.  requested_total_bytes is the absolute
+# logical byte target for this run, not an incremental delta.
+handle_reservation_extend() {
+    local rd="$1" req run_id project owner required hwmsg
+    marker_verify "$rd" run.RESERVE_EXTEND_REQUEST || return 0
+    run_id="$(basename "$rd")"
+    [ "$(marker_field run_id "$rd/run.RESERVE_EXTEND_REQUEST")" = "$run_id" ] || { log "extend request run binding failed"; return 0; }
+    [ "$(marker_field project "$rd/run.RESERVE_EXTEND_REQUEST")" = "$(basename "$(dirname "$rd")")" ] || { log "extend request project binding failed"; return 0; }
+    req="$(marker_read "$rd" run.RESERVE_EXTEND_REQUEST)"
+    project="$(printf '%s' "$req" | awk -F= '/^project=/{print $2}')"
+    owner="$(printf '%s' "$req" | awk -F= '/^owner=/{print $2}')"
+    required="$(printf '%s' "$req" | awk -F= '/^requested_total_bytes=/{print $2}')"
+    case "$required" in ''|*[!0-9]*) return 0;; esac
+    export BRIC_LOG_RUN_ID="$run_id" BRIC_LOG_PROJECT="$project"
+    [ "$(tsql "SELECT COUNT(*) FROM reservation WHERE run_id='$(sql_quote "$run_id")' AND state='GRANTED';")" = 1 ] || {
+        marker_set_signed "$rd" run.RESERVE_EXTEND_DENIED "run_id=$run_id
+reason=no active reservation for this run"; return 0; }
+    if ! hwmsg="$( (tape_hw_quickcheck) 2>&1 )"; then
+        hwmsg="$(printf '%s' "$hwmsg" | tail -1 | sed 's/^\[[^]]*\] ERROR: //')"
+        marker_set_signed "$rd" run.RESERVE_EXTEND_DENIED "run_id=$run_id
+reason=tape hardware not ready: $hwmsg"; return 0
+    fi
+    reservation_inventory_refresh || { marker_set_signed "$rd" run.RESERVE_EXTEND_DENIED "run_id=$run_id
+reason=cannot read physical tape inventory"; return 0; }
+
+    local free=0 pairs="" missing="" p f
+    for p in $(tsql "SELECT DISTINCT pair_number FROM tapes WHERE project_name='$(sql_quote "$project")' ORDER BY pair_number;"); do
+        if ! reservation_pair_onsite "$p"; then missing="$missing $p"; continue; fi
+        f="$(bytes_free_pair "$p")"; f="${f:-0}"; free=$((free+f)); pairs="$pairs $p"
+    done
+    if [ -n "$missing" ]; then marker_set_signed "$rd" run.RESERVE_EXTEND_DENIED "run_id=$run_id
+reason=project tape pair(s) not fully onsite:$missing"; return 0; fi
+    # Count each logical chunk once although PRIMARY and BACKUP segments both exist.
+    local written
+    written="$(tsql "SELECT COALESCE(SUM(size_bytes),0) FROM (SELECT chunk_no,MAX(size_bytes) AS size_bytes FROM segments WHERE run_id='$(sql_quote "$run_id")' AND state IN('WRITTEN','VERIFIED') GROUP BY chunk_no);")"
+    written="${written:-0}"
+    local capacity=$((written + free)) new_pairs="" selected=0
+    if [ "$capacity" -lt "$required" ]; then
+        local empties
+        empties="$(tsql "SELECT pair_number FROM tapes WHERE status='EMPTY' AND project_name IS NULL AND health IN('OK','SUSPECT') GROUP BY pair_number HAVING COUNT(*)=2 AND SUM(CASE WHEN role='PRIMARY' THEN 1 ELSE 0 END)=1 AND SUM(CASE WHEN role='BACKUP' THEN 1 ELSE 0 END)=1 ORDER BY pair_number;")"
+        for p in $empties; do
+            [ "$capacity" -ge "$required" ] && break
+            reservation_pair_onsite "$p" || continue
+            f="$(bytes_free_pair "$p")"; f="${f:-0}"; [ "$f" -gt 0 ] || continue
+            tsql "UPDATE tapes SET status='RESERVED',project_name='$(sql_quote "$project")',owner='$(sql_quote "$owner")' WHERE pair_number=$p AND status='EMPTY' AND project_name IS NULL;"
+            if [ "$(tsql "SELECT COUNT(*) FROM tapes WHERE pair_number=$p AND status='RESERVED' AND project_name='$(sql_quote "$project")';")" != 2 ]; then
+                tsql "UPDATE tapes SET status='EMPTY',project_name=NULL,owner=NULL WHERE pair_number=$p AND status='RESERVED' AND project_name='$(sql_quote "$project")';"; continue
+            fi
+            pairs="$pairs $p"; new_pairs="$new_pairs $p"; capacity=$((capacity+f)); selected=$((selected+1))
+        done
+    fi
+    if [ "$capacity" -lt "$required" ]; then
+        for p in $new_pairs; do tsql "UPDATE tapes SET status='EMPTY',project_name=NULL,owner=NULL WHERE pair_number=$p AND status='RESERVED' AND project_name='$(sql_quote "$project")';"; done
+        marker_set_signed "$rd" run.RESERVE_EXTEND_DENIED "run_id=$run_id
+reason=insufficient additional complete onsite tape-pair capacity: short_bytes=$((required-capacity))"; return 0
+    fi
+    local csv npairs
+    csv="$(echo $pairs | tr ' ' ',' | sed 's/^,//')"; npairs="$(echo $pairs | wc -w | tr -d ' ')"
+    tsql "UPDATE reservation SET requested_tb=$(awk -v b="$required" 'BEGIN{printf "%.6f",b/1000000000000}'),pairs_csv='$(sql_quote "$csv")',heartbeat_at=datetime('now') WHERE run_id='$(sql_quote "$run_id")';"
+    marker_set_signed "$rd" run.RESERVE_EXTENDED "run_id=$run_id
+pairs=$npairs
+pairs_csv=$csv
+capacity_bytes=$capacity"
+    audit RESERVATION_EXTENDED "$run_id" OK "required=$required capacity=$capacity selected_pairs=$selected"
+    log "EXTENDED $run_id: required=$required capacity=$capacity pairs=$npairs"
+}
+
+# Account a physical file exactly once when a segment reached WRITTEN but cannot become VERIFIED.
+# Host/local verification failures consume tape capacity but MUST NOT poison media health. A clean
+# stream that ends at the wrong byte count, or an exact-size stream with a wrong cryptographic hash,
+# is evidence from the tape/drive read path and increments media error telemetry.
+_abandon_written_segment() { # SEG VT SIZE CLASS DETAIL
+    local seg="$1" vt="$2" size="$3" class="$4" detail="$5" penalty=""
+    case "$class" in media-hash-mismatch|media-size-mismatch) penalty=1;; esac
+    if [ -n "$penalty" ]; then
+        tsql "BEGIN IMMEDIATE;
+              UPDATE tapes SET used_tb=used_tb + $size/1000000000000.0,
+                  write_errors=write_errors+1,
+                  health=CASE WHEN health='BAD' THEN 'BAD' ELSE 'SUSPECT' END
+              WHERE volumetag='$(sql_quote "$vt")'
+                AND EXISTS (SELECT 1 FROM segments WHERE seg_id='$(sql_quote "$seg")' AND state='WRITTEN');
+              UPDATE segments SET state='ABANDONED' WHERE seg_id='$(sql_quote "$seg")' AND state='WRITTEN';
+              COMMIT;"
+        BRIC_LOG_RC=1 bric_event ERROR SEGMENT_VERIFY_FAILED \
+            "segment=$seg class=$class state=ABANDONED tape_health=SUSPECT media_penalty=yes $detail"
+        audit VERIFY_FAIL "$vt" FAIL "segment $seg media verify failure ($class)"
+    else
+        tsql "BEGIN IMMEDIATE;
+              UPDATE tapes SET used_tb=used_tb + $size/1000000000000.0
+              WHERE volumetag='$(sql_quote "$vt")'
+                AND EXISTS (SELECT 1 FROM segments WHERE seg_id='$(sql_quote "$seg")' AND state='WRITTEN');
+              UPDATE segments SET state='ABANDONED' WHERE seg_id='$(sql_quote "$seg")' AND state='WRITTEN';
+              COMMIT;"
+        BRIC_LOG_RC=1 bric_event ERROR SEGMENT_READBACK_FAILED \
+            "segment=$seg class=$class state=ABANDONED media_penalty=no $detail"
+        audit VERIFY_READ_FAIL "$vt" FAIL "segment $seg read-back incomplete/local failure ($class)"
+    fi
+}
+
+# ---------- pass 2: drain one claimed chunk ----------
+write_copy() {  # project owner run_id chunk_no role vt blob psha size -> 0 on verified
+    # This function always runs in an isolated subshell: serial fallback uses command substitution,
+    # while dual-drive mode starts one background subshell per copy.  Either form inherits the
+    # daemon singleton-lock fd (9).  Everything below — sqlite and nested tape I/O — must therefore
+    # Drop every inherited singleton descriptor immediately, so a worker surviving a daemon kill
+    # cannot keep any generation's singleton held. The work-fence descriptors remain inherited on
+    # purpose until this worker and any tape command it launches have really exited.
+    bric_close_daemon_singleton_fds
+    local project="$1" owner="$2" run_id="$3" cno="$4" role="$5" vt="$6" blob="$7" psha="$8" size="$9" drive="${10:-}"
+    local seg="${run_id}__c$(printf '%04d' "$cno")__${role}"
+    export BRIC_LOG_RUN_ID="$run_id" BRIC_LOG_PROJECT="$project" BRIC_LOG_CHUNK="$cno"            BRIC_LOG_COPY_ROLE="$role" BRIC_LOG_VOLUMETAG="$vt" BRIC_LOG_DRIVE="${drive:-auto}"
+    BRIC_LOG_BYTES="$size" bric_event INFO COPY_BEGIN "segment=$seg owner=$owner payload_sha256=$psha"
+    # strategy A: record the intent BEFORE touching the tape.
+    tsql "INSERT OR REPLACE INTO segments (seg_id,run_id,project_name,owner,chunk_no,copy_role,volumetag,payload_sha256,size_bytes,state,started_at)
+          VALUES ('$(sql_quote "$seg")','$(sql_quote "$run_id")','$(sql_quote "$project")','$(sql_quote "$owner")',$cno,'$role','$(sql_quote "$vt")','$(sql_quote "$psha")',$size,'WRITING',datetime('now'));"
+    bric_event INFO SEGMENT_WRITING "segment=$seg"
+    local fn; fn="$(tape_append_file "$vt" "$blob" "$drive")"
+    tsql "UPDATE segments SET file_number=$fn, state='WRITTEN' WHERE seg_id='$(sql_quote "$seg")';"
+    bric_event INFO SEGMENT_WRITTEN "segment=$seg file_number=$fn"
+    tsql "UPDATE tapes SET write_count=write_count+1 WHERE volumetag='$(sql_quote "$vt")';"
+    # Deterministic external-kill window for the WRITTEN recovery/accounting regression test. At
+    # this point the physical file + filemark exist, but read-back verification and used_tb accounting
+    # have not happened. The test kills the daemon while this command-substitution worker sleeps; the
+    # orphan then exits without touching the row, leaving a genuine WRITTEN for the next daemon.
+    # Never load BRIC_FAULT_* from bric.conf; tests pass it only in the daemon environment.
+    if [ -n "${BRIC_FAULT_AFTER_WRITTEN_DELAY:-}" ]; then
+        log "FAULT INJECTION: WRITTEN crash window open for ${BRIC_FAULT_AFTER_WRITTEN_DELAY}s ($seg on $vt#$fn)"
+        sleep "$BRIC_FAULT_AFTER_WRITTEN_DELAY"
+        exit 97
+    fi
+    # Stream the just-written tape file directly through byte counting + SHA-256. No segment-sized
+    # tempfile is created. Return status is handled EXPLICITLY: the daemon loop historically invokes
+    # one_pass from a guarded context, and Bash can suppress errexit throughout that dynamic call tree.
+    # Never use `set -e` as verification control flow.
+    local vrc=0
+    if tape_verify_file_immediate "$vt" "$fn" "$size" "$psha" "$drive"; then
+        vrc=0
+    else
+        vrc=$?
+    fi
+    case "$vrc" in
+        0) ;;
+        22)
+            _abandon_written_segment "$seg" "$vt" "$size" media-hash-mismatch \
+                "file_number=$fn expected_sha256=$psha verify_rc=$vrc"
+            return 1
+            ;;
+        21)
+            _abandon_written_segment "$seg" "$vt" "$size" media-size-mismatch \
+                "file_number=$fn expected_bytes=$size verify_rc=$vrc"
+            return 1
+            ;;
+        *)
+            _abandon_written_segment "$seg" "$vt" "$size" readback-io-local \
+                "file_number=$fn expected_bytes=$size verify_rc=$vrc"
+            return 1
+            ;;
+    esac
+    # VERIFIED + used_tb must commit atomically. Otherwise a crash after VERIFIED but before the
+    # capacity UPDATE makes the append invisible to recovery and eventually overbooks real tape.
+    local h tgt; h="$(_headroom_tb)"; tgt="$(tcfg chunk_target_bytes)"; tgt="${tgt:-128000000000}"
+    tsql "BEGIN IMMEDIATE;
+          UPDATE segments SET state='VERIFIED', verified_at=datetime('now') WHERE seg_id='$(sql_quote "$seg")';
+          UPDATE tapes SET used_tb=used_tb + $size/1000000000000.0,
+              status=CASE WHEN (capacity_tb - $h - (used_tb + $size/1000000000000.0))*1000000000000 < $tgt THEN 'FULL' ELSE 'PARTIAL' END
+          WHERE volumetag='$(sql_quote "$vt")';
+          COMMIT;"
+    BRIC_LOG_BYTES="$size" bric_event INFO SEGMENT_VERIFIED "segment=$seg file_number=$fn"
+    audit SEGMENT_VERIFIED "$seg" OK "$vt#$fn ${size}B"
+    if [ "$(tsql "SELECT status FROM tapes WHERE volumetag='$(sql_quote "$vt")';")" = FULL ]; then audit TAPE_FULL "$vt" OK "role=$role"; fi
+    printf '%s' "$fn"
+}
+
+# Free a bus blob + its sidecars once both copies are VERIFIED on tape.
+# Two hard requirements, in tension:
+#   - it must NEVER fail the operation (this daemon runs under `set -euo pipefail`), and
+#   - it must NEVER be silent. On a bus shared by two hosts (different UID mappings, NFS squash
+#     settings, ...) a permission problem leaves ~segment-sized blobs on the QNAP while every log
+#     line still reports DONE: the staging area fills up, the next run stalls, and no diagnosis
+#     points at the cause. So: attempt, then VERIFY, then warn loudly if the blob survived.
+# Single implementation used by both call sites below (they also used to spell the sidecar paths
+# two different ways — unified here).
+_free_bus_blob() {  # blob  run_dir  chunk_basename  run_id  chunk_no
+    local blob="$1" rd="$2" cb="$3" rid="$4" cno="$5"
+    rm -f "$blob" "$rd/$cb.enc.sha256" "$rd/$cb.enc.hmac" 2>/dev/null || true
+    [ -e "$blob" ] || return 0
+    log "WARNING: could not free bus blob for chunk $cno of $rid — '$blob' is still on the bus."
+    log "WARNING: the bus will NOT drain and the staging area will fill up. Check write permission"
+    log "WARNING: on '$rd' for user $(id -un 2>/dev/null || echo '?') (uid $(id -u 2>/dev/null || echo '?'))."
+    return 0
+}
+
+# A terminal run must never re-enter the tape data path. Existence is deliberately enough for this
+# hot-path SAFETY FENCE: even an unsigned/torn terminal marker stops further append-only tape I/O.
+# IMPORTANT: existence is NOT authority to delete staging. Destructive cleanup is performed only by
+# handlers that cryptographically verify and path-bind the corresponding terminal marker.
+_run_is_terminal() {  # run_dir
+    local rd="$1"
+    marker_exists "$rd" run.ABORTED || marker_exists "$rd" run.ABORT_DONE \
+        || marker_exists "$rd" run.CLOSED || marker_exists "$rd" run.DENIED
+}
+
+# CLOSED is terminal for new tape I/O, but it still permits the protocol-level idempotent
+# reconstruction of a DONE receipt for a chunk that is already VERIFIED on both tapes.
+# ABORT/DENIED states allow no chunk handling at all.
+_run_blocks_chunk_receipt() {  # run_dir
+    local rd="$1"
+    marker_exists "$rd" run.ABORTED || marker_exists "$rd" run.ABORT_DONE \
+        || marker_exists "$rd" run.DENIED
+}
+
+_discard_terminal_run_pending() {  # run_dir
+    local rd="$1"
+    rm -f "$rd"/chunk_*.READY "$rd"/chunk_*.READY.sig "$rd"/chunk_*.CLAIMED           "$rd"/chunk_*.ERROR "$rd"/chunk_*.ERROR.sig           "$rd"/chunk_*.enc "$rd"/chunk_*.enc.sha256 "$rd"/chunk_*.enc.hmac           2>/dev/null || true
+    return 0
+}
+
+handle_chunk() {  # run_dir  chunk_basename(without ext)
+    local rd="$1" cb="$2"
+    # Fence only. Never delete ciphertext because of an unverified terminal/error marker.
+    _run_blocks_chunk_receipt "$rd" && return 0
+    # Once an ERROR receipt exists the cluster treats the chunk/run as failed and will publish
+    # run.ABORTED. Existence fences the data path; verified ABORT handling owns cleanup.
+    marker_exists "$rd" "$cb.ERROR" && return 0
+    marker_verify "$rd" "$cb.READY" || return 0               # refuse unsigned/forged READY
+    marker_claim "$rd" "$cb.READY" "$cb.CLAIMED" || return 0   # lost the race / already taken
+    # rename(2) preserves mtime.  Refresh it explicitly so claim_ttl_hours measures time since THIS
+    # daemon acquired the claim, not the age of the READY marker originally published by the cluster.
+    if ! touch "$rd/$cb.CLAIMED" 2>/dev/null; then
+        marker_set_signed "$rd" "$cb.ERROR" "cannot timestamp CLAIMED marker"
+        rm -f "$rd/$cb.CLAIMED" "$rd/$cb.READY.sig" 2>/dev/null || true
+        return 0
+    fi
+    # ABORT/DENIED can be published asynchronously between directory scan and claim. Re-check after
+    # winning the claim. CLOSED is intentionally allowed through the receipt-reconstruction branch
+    # below, but the full terminal fence still blocks every new tape write.
+    _run_blocks_chunk_receipt "$rd" && return 0
+    local cno; cno=$((10#${cb#chunk_}))
+    if ! marker_verify "$rd" "$cb.meta"; then                  # refuse unsigned/forged meta (binds sha)
+        marker_set_signed "$rd" "$cb.ERROR" "unsigned/forged meta"; return 0
+    fi
+    # bind the signed meta to its location and chunk number (anti replay/relocation)
+    if [ "$(marker_field run_id "$rd/$cb.meta")" != "$(basename "$rd")" ] \
+    || [ "$(marker_field project "$rd/$cb.meta")" != "$(basename "$(dirname "$rd")")" ] \
+    || [ "$(marker_field chunk_no "$rd/$cb.meta")" != "$cno" ]; then
+        log "bus: $cb.meta not bound to its path/chunk in $(basename "$rd") — refusing"
+        marker_set_signed "$rd" "$cb.ERROR" "meta path/chunk binding mismatch"; return 0
+    fi
+    local meta; meta="$(marker_read "$rd" "$cb.meta")"
+    local project owner psha size blob
+    project="$(printf '%s' "$meta" | awk -F= '/^project=/{print $2}')"
+    owner="$(printf '%s' "$meta" | awk -F= '/^owner=/{print $2}')"
+    psha="$(printf '%s' "$meta" | awk -F= '/^payload_sha256=/{print $2}')"
+    size="$(printf '%s' "$meta" | awk -F= '/^size_bytes=/{print $2}')"
+    local run_id; run_id="$(basename "$rd")"
+    export BRIC_LOG_RUN_ID="$run_id" BRIC_LOG_PROJECT="$project" BRIC_LOG_CHUNK="$cno"
+    BRIC_LOG_BYTES="$size" bric_event INFO CHUNK_DRAIN_BEGIN "chunk_marker=$cb owner=$owner payload_sha256=$psha"
+    blob="$rd/$cb.enc"
+
+    # Idempotency: a re-published READY (e.g. a SLURM array task requeued after node failure) must NOT
+    # write a duplicate physical segment to the append-only tape. If both copies are already VERIFIED for
+    # this (run,chunk), just re-publish the DONE receipt from the recorded placement and free the blob.
+    local pdone bdone
+    pdone="$(tsqlc "SELECT volumetag,file_number,payload_sha256 FROM segments WHERE run_id='$(sql_quote "$run_id")' AND chunk_no=$cno AND copy_role='PRIMARY' AND state='VERIFIED' LIMIT 1;")"
+    bdone="$(tsqlc "SELECT volumetag,file_number,payload_sha256 FROM segments WHERE run_id='$(sql_quote "$run_id")' AND chunk_no=$cno AND copy_role='BACKUP' AND state='VERIFIED' LIMIT 1;")"
+    local pvt="" pfn="" ppay="" bvt="" bfn="" bpay=""
+    [ -n "$pdone" ] && IFS='|' read -r pvt pfn ppay <<<"$pdone"
+    [ -n "$bdone" ] && IFS='|' read -r bvt bfn bpay <<<"$bdone"
+    if [ -n "$pdone" ] && [ -n "$bdone" ]; then
+        # Make DONE a strong receipt: when observers can see it, bus reclamation has already been
+        # attempted and verified. If the daemon dies after freeing but before publishing DONE, this
+        # idempotent branch reconstructs the receipt from the VERIFIED tape catalog on the next pass.
+        _free_bus_blob "$blob" "$rd" "$cb" "$run_id" "$cno"
+        marker_set_signed "$rd" "$cb.DONE" "run_id=$run_id
+chunk_no=$cno
+primary_volumetag=$pvt
+primary_file=$pfn
+backup_volumetag=$bvt
+backup_file=$bfn"
+        rm -f "$rd/$cb.CLAIMED" "$rd/$cb.READY.sig" 2>/dev/null || true
+        log "chunk $cno of $run_id already VERIFIED on tape — re-published DONE (idempotent, no rewrite)"
+        return 0
+    fi
+    # From here onward the path may allocate/write tape. CLOSED is therefore a hard fence unless the
+    # idempotent VERIFIED-receipt branch above already returned successfully.
+    _run_is_terminal "$rd" && return 0
+    [ -f "$blob" ] || { marker_set_signed "$rd" "$cb.ERROR" "blob missing"; return 0; }
+
+    # Partial-pair resume: exactly ONE copy is already VERIFIED (daemon crashed between the PRIMARY
+    # and BACKUP writes; recover() abandoned the interrupted one, the chunk got re-claimed). Rewriting
+    # the SURVIVING copy too would burn another ~1 TB orphan on the append-only tape. Reuse it ONLY if
+    # its recorded payload sha matches this blob's signed meta (reclaim renames the marker, the blob is
+    # untouched, so they match in the crash case); any mismatch means a different ciphertext -> fall
+    # back to a full rewrite of both copies (safety over tape).
+    if [ -n "$pdone" ] && [ "$ppay" != "$psha" ]; then log "chunk $cno: VERIFIED PRIMARY has different payload sha — full rewrite"; pdone=""; pvt=""; fi
+    if [ -n "$bdone" ] && [ "$bpay" != "$psha" ]; then log "chunk $cno: VERIFIED BACKUP has different payload sha — full rewrite"; bdone=""; bvt=""; fi
+
+    local row h; h="$(_headroom_tb)"
+    if [ -n "$pdone" ] || [ -n "$bdone" ]; then
+        # The missing copy MUST land on the partner of the surviving copy's tape (copies of a chunk
+        # live on the two tapes of the same pair). Check the partner is usable and has room.
+        local anchor_vt other_vt
+        anchor_vt="$pvt"; [ -n "$anchor_vt" ] || anchor_vt="$bvt"
+        other_vt="$(tsql "SELECT paired_volumetag FROM tapes WHERE volumetag='$(sql_quote "$anchor_vt")';")"
+        row="$(tsqlc "SELECT volumetag FROM tapes WHERE volumetag='$(sql_quote "$other_vt")' AND status NOT IN ('RETIRED') AND health!='BAD' AND (capacity_tb - $h - used_tb)*1000000000000 >= $size LIMIT 1;")"
+        [ -n "$row" ] || { marker_set_signed "$rd" "$cb.ERROR" "partner tape $other_vt of $anchor_vt unusable or out of room for the missing copy"; return 0; }
+        if [ -z "$pdone" ]; then
+            pvt="$other_vt"
+            pfn="$(write_copy "$project" "$owner" "$run_id" "$cno" PRIMARY "$pvt" "$blob" "$psha" "$size")" \
+                || { marker_set_signed "$rd" "$cb.ERROR" "PRIMARY verify failed on $pvt"; return 0; }
+            log "chunk $cno of $run_id: reused VERIFIED BACKUP on $bvt#$bfn, rewrote only PRIMARY"
+        else
+            bvt="$other_vt"
+            bfn="$(write_copy "$project" "$owner" "$run_id" "$cno" BACKUP "$bvt" "$blob" "$psha" "$size")" \
+                || { marker_set_signed "$rd" "$cb.ERROR" "BACKUP verify failed on $bvt"; return 0; }
+            log "chunk $cno of $run_id: reused VERIFIED PRIMARY on $pvt#$pfn, rewrote only BACKUP"
+        fi
+    else
+        # pick a PRIMARY tape of this project with usable room, + its BACKUP partner
+        row="$(tsqlc "SELECT p.volumetag,p.paired_volumetag
+                      FROM tapes p JOIN tapes b ON b.volumetag=p.paired_volumetag
+                      WHERE p.project_name='$(sql_quote "$project")'
+                        AND b.project_name='$(sql_quote "$project")'
+                        AND p.role='PRIMARY' AND b.role='BACKUP'
+                        AND p.status IN ('RESERVED','PARTIAL')
+                        AND b.status IN ('RESERVED','PARTIAL')
+                        AND p.health!='BAD' AND b.health!='BAD'
+                        AND (p.capacity_tb - $h - p.used_tb)*1000000000000 >= $size
+                        AND (b.capacity_tb - $h - b.used_tb)*1000000000000 >= $size
+                      ORDER BY p.used_tb DESC LIMIT 1;")"
+        [ -n "$row" ] || { marker_set_signed "$rd" "$cb.ERROR" "no reserved tape with room"; return 0; }
+        pvt="${row%%|*}"; bvt="${row##*|}"
+
+        local parallel; parallel="${BRIC_PARALLEL_DRIVES:-$(tcfg parallel_drives)}"; parallel="${parallel:-1}"
+        # The between-copies crash test intentionally exercises the serial partial-pair path.
+        [ -n "${BRIC_FAULT_DIE_BETWEEN_COPIES:-}" ] && parallel=1
+        if [ "$parallel" -ge 2 ] 2>/dev/null; then
+            local IFS=$' \t\n' pdrive bdrive ptmp btmp pp bp prc=0 brc=0
+            set -- $BRIC_TAPE_DRIVES
+            [ "$#" -ge 2 ] || { marker_set_signed "$rd" "$cb.ERROR" "parallel_drives=2 but BRIC_TAPE_DRIVES has fewer than two drives"; return 0; }
+            pdrive="$1"; bdrive="$2"
+            [ "$pdrive" != "$bdrive" ] || { marker_set_signed "$rd" "$cb.ERROR" "parallel drives are not distinct"; return 0; }
+            # Resolve swapped/preloaded media before forking. Thereafter changer operations are brief
+            # and serialized, while each worker holds only its own drive lock during mt/dd streaming.
+            local prep_rc=0
+            ( tape_prepare_pair "$pvt" "$bvt" "$pdrive" "$bdrive" ) || prep_rc=$?
+            if [ "$prep_rc" -ne 0 ]; then
+                marker_set_signed "$rd" "$cb.ERROR"                     "cannot prepare tape pair $pvt/$bvt on drives $pdrive/$bdrive (rc=$prep_rc)"
+                return 0
+            fi
+            ptmp="$(mktemp)"; btmp="$(mktemp)"
+            bric_event INFO PARALLEL_COPY_BEGIN "primary=$pvt drive_primary=$pdrive backup=$bvt drive_backup=$bdrive semantics=asynchronous-independent-timeouts"
+            ( write_copy "$project" "$owner" "$run_id" "$cno" PRIMARY "$pvt" "$blob" "$psha" "$size" "$pdrive" >"$ptmp" ) & pp=$!
+            ( write_copy "$project" "$owner" "$run_id" "$cno" BACKUP  "$bvt" "$blob" "$psha" "$size" "$bdrive" >"$btmp" ) & bp=$!
+            bric_event INFO PARALLEL_COPY_BARRIER_BEGIN "primary_pid=$pp backup_pid=$bp note=one drive may finish earlier; DONE waits for both"
+            wait "$pp" || prc=$?
+            if [ "$prc" -eq 0 ]; then
+                BRIC_LOG_RC=0 bric_event INFO PARALLEL_COPY_PRIMARY_JOINED "pid=$pp rc=0 peer_pid=$bp"
+            else
+                BRIC_LOG_RC="$prc" bric_event ERROR PARALLEL_COPY_PRIMARY_JOINED "pid=$pp rc=$prc peer_pid=$bp"
+            fi
+            wait "$bp" || brc=$?
+            if [ "$brc" -eq 0 ]; then
+                BRIC_LOG_RC=0 bric_event INFO PARALLEL_COPY_BACKUP_JOINED "pid=$bp rc=0 peer_pid=$pp"
+            else
+                BRIC_LOG_RC="$brc" bric_event ERROR PARALLEL_COPY_BACKUP_JOINED "pid=$bp rc=$brc peer_pid=$pp"
+            fi
+            if [ "$prc" -eq 0 ] && [ "$brc" -eq 0 ]; then
+                bric_event INFO PARALLEL_COPY_BARRIER_END "primary_rc=0 backup_rc=0"
+            else
+                BRIC_LOG_RC=1 bric_event ERROR PARALLEL_COPY_BARRIER_END "primary_rc=$prc backup_rc=$brc"
+            fi
+            pfn="$(cat "$ptmp" 2>/dev/null || true)"; bfn="$(cat "$btmp" 2>/dev/null || true)"
+            rm -f "$ptmp" "$btmp"
+            if [ "$prc" -ne 0 ] || [ -z "$pfn" ] || [ "$brc" -ne 0 ] || [ -z "$bfn" ]; then
+                BRIC_LOG_RC=1 bric_event ERROR PARALLEL_COPY_FAILED "primary_vt=$pvt primary_drive=$pdrive primary_rc=$prc primary_file=${pfn:-none} backup_vt=$bvt backup_drive=$bdrive backup_rc=$brc backup_file=${bfn:-none}"
+                marker_set_signed "$rd" "$cb.ERROR" "parallel copy failed: PRIMARY rc=$prc BACKUP rc=$brc"
+                return 0
+            fi
+            bric_event INFO PARALLEL_COPY_VERIFIED "primary=$pvt#$pfn drive_primary=$pdrive backup=$bvt#$bfn drive_backup=$bdrive"
+            log "chunk $cno of $run_id: PRIMARY/BACKUP streamed concurrently on drives $pdrive/$bdrive"
+        else
+            pfn="$(write_copy "$project" "$owner" "$run_id" "$cno" PRIMARY "$pvt" "$blob" "$psha" "$size")" \
+                || { marker_set_signed "$rd" "$cb.ERROR" "PRIMARY verify failed on $pvt"; return 0; }
+            # Fault injection (tests only): die between the two copies — PRIMARY VERIFIED, BACKUP never
+            # started. Exercises recover() + the partial-pair resume above on the next daemon start.
+            if [ -n "${BRIC_FAULT_DIE_BETWEEN_COPIES:-}" ]; then
+                log "FAULT INJECTION: dying between PRIMARY and BACKUP copies of chunk $cno"
+                exit 99
+            fi
+            bfn="$(write_copy "$project" "$owner" "$run_id" "$cno" BACKUP "$bvt" "$blob" "$psha" "$size")" \
+                || { marker_set_signed "$rd" "$cb.ERROR" "BACKUP verify failed on $bvt"; return 0; }
+        fi
+    fi
+
+    # Both copies are VERIFIED on tape: free the QNAP blob + sidecars before publishing DONE. This
+    # makes DONE an externally observable barrier: a caller that sees DONE can rely on the blob no
+    # longer being present (unless deletion failed, in which case the daemon emits a loud warning).
+    # Crash safety is preserved because the VERIFIED catalog rows can reconstruct DONE idempotently.
+    _free_bus_blob "$blob" "$rd" "$cb" "$run_id" "$cno"
+    marker_set_signed "$rd" "$cb.DONE" "run_id=$run_id
+chunk_no=$cno
+primary_volumetag=$pvt
+primary_file=$pfn
+backup_volumetag=$bvt
+backup_file=$bfn"
+    rm -f "$rd/$cb.CLAIMED" "$rd/$cb.READY.sig" 2>/dev/null || true
+    bric_event INFO CHUNK_DRAIN_DONE "primary=$pvt#$pfn backup=$bvt#$bfn bus_blob_freed=$([ -e "$blob" ] && echo no || echo yes)"
+    log "DONE chunk $cno of $run_id -> $pvt#$pfn (P) / $bvt#$bfn (B)"
+    return 0
+}
+
+APPEND_COUNT=0
+# Append one close artifact to one tape (strategy A). Idempotent AND content-checked: if a VERIFIED
+# row already exists, we re-append only when the source content is byte-identical; if the content
+# differs we REFUSE (return 1) instead of silently skipping — a changed artifact under the same id is
+# a real inconsistency, not a no-op. Honors BRIC_FAULT_CLOSE_AFTER (crash after the physical append,
+# row left WRITING) for fault-injection testing.
+append_artifact() {  # run project vt srcfile filename kind [drive] -> 0 ok/idempotent, 1 blocked/abandoned
+    local run="$1" project="$2" vt="$3" src="$4" fname="$5" kind="$6" drive="${7:-}"
+    local aid="${run}__close__${vt}__${fname}"
+    export BRIC_LOG_RUN_ID="$run" BRIC_LOG_PROJECT="$project" BRIC_LOG_VOLUMETAG="$vt"            BRIC_LOG_DRIVE="${drive:-auto}" BRIC_LOG_COPY_ROLE="ARTIFACT"
+    bric_event INFO ARTIFACT_APPEND_BEGIN "artifact=$fname kind=$kind id=$aid"
+    local newsha; newsha="$(sha256sum "$src" | awk '{print $1}')"
+    local prevsha; prevsha="$(tsql "SELECT sha256 FROM tape_artifacts WHERE artifact_id='$(sql_quote "$aid")' AND state='VERIFIED';")"
+    if [ -n "$prevsha" ]; then
+        [ "$prevsha" = "$newsha" ] && return 0   # identical content already VERIFIED on tape: idempotent
+        log "close: artifact $fname on $vt already VERIFIED with DIFFERENT content (${prevsha:0:12}…!=${newsha:0:12}…) — refusing to seal"
+        return 1                                  # fail strong, never silently skip a changed artifact
+    fi
+    tsql "INSERT OR REPLACE INTO tape_artifacts (artifact_id,run_id,project_name,volumetag,filename,kind,sha256,state,started_at)
+          VALUES ('$(sql_quote "$aid")','$(sql_quote "$run")','$(sql_quote "$project")','$(sql_quote "$vt")','$(sql_quote "$fname")','$kind','$newsha','WRITING',datetime('now'));"
+    local fn; fn="$(tape_append_file "$vt" "$src" "$drive")"
+    APPEND_COUNT=$((APPEND_COUNT+1))
+    if [ -n "${BRIC_FAULT_CLOSE_AFTER:-}" ] && [ "$APPEND_COUNT" -ge "$BRIC_FAULT_CLOSE_AFTER" ]; then
+        log "FAULT INJECTION: simulated crash after physical append #$APPEND_COUNT ($fname on $vt, row left WRITING)"; exit 1
+    fi
+    local asize vrc=0; asize="$(stat -c %s "$src")"
+    if tape_verify_file_immediate "$vt" "$fn" "$asize" "$newsha" "$drive"; then vrc=0; else vrc=$?; fi
+    if [ "$vrc" -eq 0 ]; then
+        tsql "UPDATE tape_artifacts SET file_number=$fn, state='VERIFIED', verified_at=datetime('now') WHERE artifact_id='$(sql_quote "$aid")';"
+        bric_event INFO ARTIFACT_VERIFIED "artifact=$fname kind=$kind file_number=$fn bytes=$asize verify=streaming"
+        return 0
+    fi
+    tsql "UPDATE tape_artifacts SET file_number=$fn, state='ABANDONED' WHERE artifact_id='$(sql_quote "$aid")';"
+    if [ "$vrc" -eq 22 ]; then
+        BRIC_LOG_RC="$vrc" bric_event ERROR ARTIFACT_VERIFY_FAILED "artifact=$fname kind=$kind file_number=$fn class=hash-mismatch media_penalty=no"
+    else
+        BRIC_LOG_RC="$vrc" bric_event ERROR ARTIFACT_READBACK_FAILED "artifact=$fname kind=$kind file_number=$fn class=io-or-size verify_rc=$vrc media_penalty=no"
+    fi
+    return 1
+}
+
+# Write the plaintext per-tape table of contents as the LAST file on the tape. This is the on-tape
+# index DR reads first: it locates the encrypted catalogs (and every chunk copy) by file number
+# without any database. Built from VERIFIED rows only (abandoned partials are never referenced).
+# Content is deterministic (no timestamp) so the artifact id is the content sha: re-running with the
+# same VERIFIED set is a perfect idempotent skip; a changed set appends a fresh TOC (latest wins).
+write_tape_toc() {  # run project vt [drive] -> 0/1
+    local run="$1" project="$2" vt="$3" drive="${4:-}"
+    local toc; toc="$(mktemp)"
+    {
+        printf '# BRIC tape TOC v1\nvolumetag=%s\nrun_id=%s\nproject=%s\n' "$vt" "$run" "$project"
+        printf 'file|kind|run_id|chunk_no|copy_role|filename|sha256\n'
+        tsqlc "SELECT file_number,run_id,chunk_no,copy_role,payload_sha256 FROM segments WHERE volumetag='$(sql_quote "$vt")' AND state='VERIFIED' ORDER BY file_number;" \
+            | awk -F'|' '{print $1"|CHUNK|"$2"|"$3"|"$4"||"$5}'
+        tsqlc "SELECT file_number,run_id,filename,sha256 FROM tape_artifacts WHERE volumetag='$(sql_quote "$vt")' AND state='VERIFIED' AND kind!='TOC' ORDER BY file_number;" \
+            | awk -F'|' '{print $1"|ARTIFACT|"$2"|||"$3"|"$4}'
+    } > "$toc"
+    # Invariant guard: the plaintext TOC carries ONLY safe values (integers, hex shas, valid_name
+    # run_ids, fixed artifact names) — never a user path, which lives encrypted inside catalog_project.enc.
+    # So every VERIFIED record is exactly one line. Enforce it: if a field ever contained a newline the
+    # data-line count would drift from the record count — fail the close loudly instead of writing a TOC
+    # the pattern-based DR parser could misread.
+    local exp got_lines
+    exp="$(tsql "SELECT (SELECT COUNT(*) FROM segments WHERE volumetag='$(sql_quote "$vt")' AND state='VERIFIED') + (SELECT COUNT(*) FROM tape_artifacts WHERE volumetag='$(sql_quote "$vt")' AND state='VERIFIED' AND kind!='TOC');")"
+    got_lines="$(grep -c '^[0-9][0-9]*|' "$toc" 2>/dev/null || true)"
+    if [ "${got_lines:-0}" != "${exp:-0}" ]; then
+        log "close: TOC integrity guard tripped on $vt (expected ${exp:-0} records, got ${got_lines:-0} data lines — a field may contain a newline) — refusing to seal"
+        rm -f "$toc"; return 1
+    fi
+    local tsha; tsha="$(sha256sum "$toc" | awk '{print $1}')"
+    local aid="${run}__close__${vt}__TAPE_TOC__${tsha:0:16}"
+    if [ "$(tsql "SELECT state FROM tape_artifacts WHERE artifact_id='$(sql_quote "$aid")';")" = VERIFIED ]; then rm -f "$toc"; return 0; fi
+    tsql "INSERT OR REPLACE INTO tape_artifacts (artifact_id,run_id,project_name,volumetag,filename,kind,sha256,state,started_at)
+          VALUES ('$(sql_quote "$aid")','$(sql_quote "$run")','$(sql_quote "$project")','$(sql_quote "$vt")','TAPE_TOC.txt','TOC','$tsha','WRITING',datetime('now'));"
+    local fn; fn="$(tape_append_file "$vt" "$toc" "$drive")"
+    APPEND_COUNT=$((APPEND_COUNT+1))
+    if [ -n "${BRIC_FAULT_CLOSE_AFTER:-}" ] && [ "$APPEND_COUNT" -ge "$BRIC_FAULT_CLOSE_AFTER" ]; then
+        log "FAULT INJECTION: simulated crash after physical append #$APPEND_COUNT (TAPE_TOC.txt on $vt, row left WRITING)"; rm -f "$toc"; exit 1
+    fi
+    local tsize vrc=0; tsize="$(stat -c %s "$toc")"
+    if tape_verify_file_immediate "$vt" "$fn" "$tsize" "$tsha" "$drive"; then vrc=0; else vrc=$?; fi
+    rm -f "$toc"
+    if [ "$vrc" -eq 0 ]; then
+        tsql "UPDATE tape_artifacts SET file_number=$fn, state='VERIFIED', verified_at=datetime('now') WHERE artifact_id='$(sql_quote "$aid")';"
+        return 0
+    fi
+    tsql "UPDATE tape_artifacts SET file_number=$fn, state='ABANDONED' WHERE artifact_id='$(sql_quote "$aid")';"
+    BRIC_LOG_RC="$vrc" bric_event ERROR TOC_READBACK_FAILED "artifact=TAPE_TOC.txt file_number=$fn verify_rc=$vrc media_penalty=no"
+    return 1
+}
+
+# ---------- pass 3: close a project run ----------
+# The tape catalog is the authoritative terminal-state barrier.  run.CLOSED is published only
+# after the CLOSED audit row + reservation RELEASED commit succeeds, so this local DB test cannot
+# be forged by a bus marker.  A late cluster ABORT must never de-terminalize a durable CLOSED run.
+_catalog_run_closed() {  # run_id
+    local rid q n
+    rid="$1"; q="$(sql_quote "$rid")"
+    n="$(tsql "SELECT COUNT(*) FROM audit_log WHERE actor='tape-daemon' AND action='CLOSED' AND object='$q' AND result='OK';")"
+    [ "${n:-0}" -gt 0 ]
+}
+
+# Cluster signalled the run failed: release the reservation, orphan partials, free blobs.
+handle_abort() {
+    local rd="$1" run_id project
+    marker_verify "$rd" run.ABORTED || return 0
+    run_id="$(basename "$rd")"
+    [ "$(marker_field run_id "$rd/run.ABORTED")" = "$run_id" ] || { log "bus: ABORTED run_id not bound to $(basename "$rd") — refusing"; return 0; }
+    project="$(marker_field project "$rd/run.ABORTED")"; [ -n "$project" ] || project="$(basename "$(dirname "$rd")")"
+    export BRIC_LOG_RUN_ID="$run_id" BRIC_LOG_PROJECT="$project"
+    bric_event WARN RUN_ABORT_BEGIN "handling signed run.ABORTED"
+    [ "$project" = "$(basename "$(dirname "$rd")")" ] || { log "bus: ABORTED project mismatch — refusing"; return 0; }
+    if _catalog_run_closed "$run_id"; then
+        bric_event WARN LATE_ABORT_IGNORED "run_id=$run_id project=$project reason=already_closed"
+        audit ABORT_IGNORED_CLOSED "$run_id" OK "project='$project'; durable CLOSED catalog barrier already committed"
+        log "IGNORED late ABORTED $run_id — durable CLOSED catalog barrier already committed"
+        return 0
+    fi
+    # Stop referencing this run: orphan ALL its segments (the physical blocks stay on the append-only
+    # tape, unreferenced, exactly like a crash partial), and release the tape reservation so the pairs
+    # are reusable. used_tb is left as-is: the consumed tape is honestly accounted as orphan.
+    tsql "UPDATE segments SET state='ABANDONED' WHERE run_id='$(sql_quote "$run_id")' AND state!='ABANDONED';"
+    tsql "UPDATE reservation SET state='RELEASED' WHERE run_id='$(sql_quote "$run_id")';"
+    # A failed run is terminal: remove every pending data-path marker as well as ciphertext staging.
+    # DONE/meta receipts may remain briefly for forensic inspection until normal bus cleanup removes the
+    # run directory, but READY/CLAIMED/ERROR must never be eligible for another drain/reclaim pass.
+    _discard_terminal_run_pending "$rd"
+    marker_set_signed "$rd" run.ABORT_DONE "run_id=$run_id
+project=$project
+aborted_at=$(date -Iseconds)"
+    audit ABORTED "$run_id" OK "project='$project'"
+    log "ABORTED $run_id — reservation released, segments orphaned, staging freed"
+}
+
+handle_close() {
+    local rd="$1" run_id project
+    marker_verify "$rd" run.PROJECT_CLOSING || return 0   # refuse unsigned/forged close request
+    run_id="$(basename "$rd")"
+    project="$(tsql "SELECT DISTINCT project_name FROM segments WHERE run_id='$(sql_quote "$run_id")' LIMIT 1;")"
+    [ -n "$project" ] || project="$(basename "$(dirname "$rd")")"
+    export BRIC_LOG_RUN_ID="$run_id" BRIC_LOG_PROJECT="$project"
+    bric_event INFO RUN_CLOSE_PASS_BEGIN "marker=run.PROJECT_CLOSING"
+    [ "$(marker_field run_id "$rd/run.PROJECT_CLOSING")" = "$run_id" ] || { log "bus: PROJECT_CLOSING run_id not bound to $(basename "$rd") — refusing"; return 0; }
+
+    if ! marker_exists "$rd" run.CLOSE_PLACEMENT; then
+        # publish placement: chunk -> (volumetag,file) for both copies, plus the project's tapes
+        local pl; pl="$(tsqlc "SELECT chunk_no,copy_role,volumetag,file_number FROM segments WHERE run_id='$(sql_quote "$run_id")' ORDER BY chunk_no,copy_role;" | awk -F'|' '{print "chunk="$1";role="$2";vt="$3";file="$4}')"
+        local tapes; tapes="$(tsql "SELECT DISTINCT volumetag FROM segments WHERE project_name='$(sql_quote "$project")';" | paste -sd, -)"
+        marker_set_signed "$rd" run.CLOSE_PLACEMENT "run_id=$run_id
+project=$project
+volumetags=$tapes
+$pl"
+        log "published placement for $run_id (tapes: $tapes)"
+        return 0
+    fi
+
+    # The cluster, having seen CLOSE_PLACEMENT, encrypts and drops the catalogs + scripts plus a SIGNED
+    # manifest (run.CLOSE_CATALOGS). We verify the signature, bind it to this run/project, then enforce
+    # the manifest: every listed artifact must be present with the exact sha and land VERIFIED on every
+    # tape. Only THEN do we append the TOC(s) and seal — never a premature/partial CLOSED.
+    if marker_exists "$rd" run.CLOSE_CATALOGS; then
+        marker_verify "$rd" run.CLOSE_CATALOGS || return 0
+        [ "$(marker_field run_id  "$rd/run.CLOSE_CATALOGS")" = "$run_id" ]  || { log "close: CLOSE_CATALOGS run_id not bound to $(basename "$rd") — refusing"; return 0; }
+        [ "$(marker_field project "$rd/run.CLOSE_CATALOGS")" = "$project" ] || { log "close: CLOSE_CATALOGS project mismatch — refusing"; return 0; }
+        local manifest; manifest="$(grep '^artifact|' "$rd/run.CLOSE_CATALOGS" 2>/dev/null || true)"
+        [ -n "$manifest" ] || { log "close: empty/absent artifact manifest — refusing to seal"; return 0; }
+        local expected; expected="$(printf '%s\n' "$manifest" | grep -c '^artifact|')"
+
+        local vts; vts="$(tsql "SELECT DISTINCT volumetag FROM segments WHERE project_name='$(sql_quote "$project")';")"
+        local pairs; pairs="$(tsqlc "SELECT p.volumetag,p.paired_volumetag FROM tapes p JOIN tapes b ON b.volumetag=p.paired_volumetag WHERE p.project_name='$(sql_quote "$project")' AND b.project_name='$(sql_quote "$project")' AND p.role='PRIMARY' ORDER BY p.pair_number;")"
+        local all_ok=1 vt name kind sha f got parallel pdrive="" bdrive=""
+        parallel="${BRIC_PARALLEL_DRIVES:-$(tcfg parallel_drives)}"; parallel="${parallel:-1}"
+        [ -n "${BRIC_FAULT_CLOSE_AFTER:-}" ] && parallel=1
+        if [ "$parallel" -ge 2 ] 2>/dev/null; then
+            local IFS=$' \t\n'; set -- $BRIC_TAPE_DRIVES
+            [ "$#" -ge 2 ] || { log "close: parallel_drives=2 but fewer than two drives configured"; all_ok=0; }
+            pdrive="${1:-}"; bdrive="${2:-}"
+            [ "$pdrive" != "$bdrive" ] || { log "close: parallel drive elements are not distinct"; all_ok=0; }
+        fi
+
+        # phase 1: every signed artifact must land and verify on BOTH tapes.  For a two-drive host the
+        # two sides of each pair run concurrently and are joined after each artifact; a fast drive may
+        # finish first, but the next close phase cannot begin until the slower side has also completed.
+        if [ "$all_ok" = 1 ] && [ "$parallel" -ge 2 ] 2>/dev/null; then
+            local pvt bvt pp bp prc brc prep_rc
+            while IFS='|' read -r pvt bvt; do
+                [ -n "$pvt" ] && [ -n "$bvt" ] || { all_ok=0; continue; }
+                prep_rc=0
+                ( tape_prepare_pair "$pvt" "$bvt" "$pdrive" "$bdrive" ) || prep_rc=$?
+                if [ "$prep_rc" -ne 0 ]; then
+                    all_ok=0; log "close: cannot prepare pair $pvt/$bvt for artifacts (rc=$prep_rc)"; continue
+                fi
+                while IFS='|' read -r _tag name kind sha; do
+                    [ -n "$name" ] || continue
+                    f="$rd/close/$name"
+                    if [ ! -f "$f" ]; then log "close: REQUIRED artifact MISSING on bus: $name"; all_ok=0; continue; fi
+                    got="$(sha256sum "$f" | awk '{print $1}')"
+                    if [ "$got" != "$sha" ]; then log "close: artifact $name does not match signed manifest (sha)"; all_ok=0; continue; fi
+                    prc=0; brc=0
+                    ( append_artifact "$run_id" "$project" "$pvt" "$f" "$name" "$kind" "$pdrive" ) & pp=$!
+                    ( append_artifact "$run_id" "$project" "$bvt" "$f" "$name" "$kind" "$bdrive" ) & bp=$!
+                    wait "$pp" || prc=$?
+                    wait "$bp" || brc=$?
+                    if [ "$prc" -ne 0 ] || [ "$brc" -ne 0 ]; then
+                        all_ok=0; log "close: parallel artifact $name incomplete ($pvt rc=$prc, $bvt rc=$brc)"
+                    fi
+                done <<EOF_MAN
+$manifest
+EOF_MAN
+            done <<EOF_PAIRS
+$pairs
+EOF_PAIRS
+        else
+            for vt in $vts; do
+                while IFS='|' read -r _tag name kind sha; do
+                    [ -n "$name" ] || continue
+                    f="$rd/close/$name"
+                    if [ ! -f "$f" ]; then log "close: REQUIRED artifact MISSING on bus: $name"; all_ok=0; continue; fi
+                    got="$(sha256sum "$f" | awk '{print $1}')"
+                    if [ "$got" != "$sha" ]; then log "close: artifact $name does not match signed manifest (sha)"; all_ok=0; continue; fi
+                    append_artifact "$run_id" "$project" "$vt" "$f" "$name" "$kind" || all_ok=0
+                done <<EOF_MAN
+$manifest
+EOF_MAN
+            done
+        fi
+
+        # phase 2: catalog state is the barrier.  Every manifest artifact must be VERIFIED on every
+        # tape, regardless of which drive completed first, before either TOC may be written.
+        if [ "$all_ok" = 1 ]; then
+            for vt in $vts; do
+                local nver; nver="$(tsql "SELECT COUNT(*) FROM tape_artifacts WHERE run_id='$(sql_quote "$run_id")' AND volumetag='$(sql_quote "$vt")' AND kind!='TOC' AND state='VERIFIED';")"
+                [ "${nver:-0}" -ge "$expected" ] || { all_ok=0; log "close: $vt has ${nver:-0}/$expected artifacts VERIFIED — not sealing yet"; }
+            done
+        fi
+
+        # phase 3: TOCs are also paired and joined.  CLOSED remains impossible until both TOCs verify.
+        if [ "$all_ok" = 1 ] && [ "$parallel" -ge 2 ] 2>/dev/null; then
+            local pvt bvt pp bp prc brc prep_rc
+            while IFS='|' read -r pvt bvt; do
+                [ -n "$pvt" ] && [ -n "$bvt" ] || { all_ok=0; continue; }
+                prep_rc=0
+                ( tape_prepare_pair "$pvt" "$bvt" "$pdrive" "$bdrive" ) || prep_rc=$?
+                if [ "$prep_rc" -ne 0 ]; then
+                    all_ok=0; log "close: cannot prepare pair $pvt/$bvt for TOC (rc=$prep_rc)"; continue
+                fi
+                prc=0; brc=0
+                ( write_tape_toc "$run_id" "$project" "$pvt" "$pdrive" ) & pp=$!
+                ( write_tape_toc "$run_id" "$project" "$bvt" "$bdrive" ) & bp=$!
+                wait "$pp" || prc=$?
+                wait "$bp" || brc=$?
+                if [ "$prc" -ne 0 ] || [ "$brc" -ne 0 ]; then all_ok=0; log "close: parallel TOC incomplete ($pvt rc=$prc, $bvt rc=$brc)"; fi
+            done <<EOF_PAIRS
+$pairs
+EOF_PAIRS
+        elif [ "$all_ok" = 1 ]; then
+            for vt in $vts; do write_tape_toc "$run_id" "$project" "$vt" || all_ok=0; done
+        fi
+
+        # Final hardware barrier: all workers are already joined and every row is VERIFIED.  Return
+        # media to slots and wait for each drive's independent eject/unload timing.  A failed/slow
+        # eject leaves the run unsealed and safely retryable on the next pass.
+        if [ "$all_ok" = 1 ]; then
+            if ! ( tape_release_all ); then all_ok=0; log "close: media release incomplete — NOT sealing"; fi
+        fi
+
+        # Review 31E7: run.CLOSED is the terminal durability barrier, not merely a tape-I/O barrier.
+        # Commit the final reservation state and CLOSED audit row in one SQLite transaction BEFORE
+        # publishing the signed receipt.  Therefore any observer that sees run.CLOSED can immediately
+        # read a terminally consistent catalog without racing the daemon's own close writes.  The
+        # INSERT is idempotent across a crash after COMMIT but before receipt publication.
+        if [ "$all_ok" = 1 ]; then
+            local close_detail close_qrun close_qdetail
+            close_detail="project='$project'; both copies/artifacts/TOCs verified; drives empty"
+            close_qrun="$(sql_quote "$run_id")"
+            close_qdetail="$(sql_quote "$close_detail")"
+            if tsql "BEGIN IMMEDIATE;
+UPDATE reservation SET state='RELEASED' WHERE run_id='$close_qrun';
+INSERT INTO audit_log (actor,action,object,result,detail)
+SELECT 'tape-daemon','CLOSED','$close_qrun','OK','$close_qdetail'
+WHERE NOT EXISTS (
+  SELECT 1 FROM audit_log
+  WHERE actor='tape-daemon' AND action='CLOSED' AND object='$close_qrun' AND result='OK'
+);
+COMMIT;"; then
+                BRIC_LOG_PROJECT="$project" bric_event INFO AUDIT "action=CLOSED object=$run_id result=OK detail=$close_detail"
+                marker_set_signed "$rd" run.CLOSED "run_id=$run_id
+project=$project
+closed_at=$(date -Iseconds)"
+                log "CLOSED $run_id (both copies complete; media returned to slots; catalog terminal state committed)"
+            else
+                all_ok=0
+                BRIC_LOG_RC=1 bric_event ERROR CLOSE_FINAL_CATALOG_COMMIT_FAILED "run_id=$run_id project=$project"
+                log "close: final catalog commit failed — NOT sealing; will retry next pass"
+            fi
+        fi
+        if [ "$all_ok" != 1 ]; then
+            log "close of $run_id incomplete — NOT sealing; will retry next pass"
+        fi
+    fi
+    return 0
+}
+
+# A daemon that dies after READY -> CLAIMED but before DONE leaves the chunk invisible to the
+# normal drain loop.  The old TTL fallback is deliberately conservative while a daemon may still be
+# alive, but at startup we have both the singleton and the generation/work fence: no older worker can
+# still touch tape/catalog state. Therefore every unresolved non-terminal CLAIMED marker can be
+# requeued now, not six hours later. Terminal/DONE/ERROR claims are fenced but left intact here:
+# marker existence is sufficient to stop I/O, not sufficient authority for destructive cleanup.
+reclaim_startup_claims() {
+    [ -d "$BRIC_QNAP/archive" ] || return 0
+    local m rd cb n=0 stale=0
+    for m in "$BRIC_QNAP"/archive/*/*/chunk_*.CLAIMED; do
+        [ -e "$m" ] || continue
+        rd="$(dirname "$m")"; cb="$(basename "$m" .CLAIMED)"
+        # DONE/ERROR or any terminal run marker fences reclaim. Do not delete a claim merely because
+        # an unverified marker exists; the verified terminal handler / normal bus cleanup owns deletion.
+        if marker_exists "$rd" "$cb.DONE" || marker_exists "$rd" "$cb.ERROR" || _run_is_terminal "$rd"; then
+            stale=$((stale+1)); continue
+        fi
+        if mv "$m" "$rd/$cb.READY" 2>/dev/null; then n=$((n+1)); fi
+    done
+    [ "$n" -gt 0 ] && log "recovery: requeued $n unresolved CLAIMED chunk(s) immediately"
+    [ "$stale" -gt 0 ] && log "recovery: fenced $stale terminal/DONE/ERROR CLAIMED marker(s) without requeue"
+    return 0
+}
+
+# ---------- recovery: abandon crash-interrupted writes (strategy A) ----------
+recover() {
+    local n a
+    bric_event INFO RECOVERY_BEGIN "scanning interrupted segments and close artifacts"
+    n="$(tsql "SELECT COUNT(*) FROM segments WHERE state IN ('WRITING','WRITTEN');")"
+    if [ "$n" -gt 0 ]; then
+        # WRITING may have consumed up to size_bytes; WRITTEN definitely has a physical file+filemark.
+        # Account both conservatively and abandon them in ONE transaction. The old code ignored
+        # WRITTEN entirely, so a crash during read-back leaked real capacity from used_tb; separate
+        # accounting/state UPDATEs could also double-count or under-count across another crash.
+        tsql "BEGIN IMMEDIATE;
+              UPDATE tapes SET used_tb = used_tb + COALESCE((SELECT SUM(s.size_bytes) FROM segments s
+                  WHERE s.state IN ('WRITING','WRITTEN') AND s.volumetag=tapes.volumetag),0)/1000000000000.0
+              WHERE volumetag IN (SELECT volumetag FROM segments WHERE state IN ('WRITING','WRITTEN'));
+              UPDATE segments SET state='ABANDONED' WHERE state IN ('WRITING','WRITTEN');
+              COMMIT;"
+        log "recovery: accounted and abandoned $n interrupted WRITING/WRITTEN chunk write(s); their chunks will be re-claimed and rewritten"
+    fi
+    a="$(tsql "SELECT COUNT(*) FROM tape_artifacts WHERE state='WRITING';")"
+    [ "$a" -gt 0 ] && { tsql "UPDATE tape_artifacts SET state='ABANDONED' WHERE state='WRITING';"; log "recovery: abandoned $a interrupted close-artifact append(s); they will be re-appended"; }
+    bric_event INFO RECOVERY_END "segments_abandoned=$n artifacts_abandoned=$a"
+    return 0
+}
+
+# ---------- restore staging (reverse bus) ----------
+# Review 32B1 restore protocol:
+#   * ciphertext sha256 is computed INLINE while tape bytes are copied to the QNAP (one physical read);
+#   * request.PROGRESS is signed/refreshed while positioning/reading so the cluster can distinguish a
+#     healthy long restore from a stalled one;
+#   * progressive-v1 callers consume one READY chunk at a time and acknowledge CONSUMED before the
+#     daemon stages the next chunk. This bounds reverse-bus staging to roughly one chunk per request.
+# Legacy callers (no protocol=restore-progressive-v1) retain the old stage-all behavior.
+_restore_cancelled() { # RDIR -> 0 only for a valid signed cancellation
+    local rdir="$1"
+    marker_exists "$rdir" request.CANCELLED || return 1
+    if marker_verify "$rdir" request.CANCELLED; then return 0; fi
+    log "restore $(basename "$rdir"): ignoring forged/invalid request.CANCELLED"
+    return 1
+}
+
+_restore_progress() { # RDIR STATE RUN CHUNK IDX TOTAL CUR CURTOTAL DONE TOTALBYTES VT FN
+    local rdir="$1" state="$2" run="$3" chunk="$4" idx="$5" total="$6" cur="$7" curtotal="$8" done="$9"
+    shift 9
+    local totalbytes="$1" vt="$2" fn="$3" now
+    now="$(date +%s)"
+    marker_set_signed "$rdir" request.PROGRESS "state=$state
+run=$run
+chunk=$chunk
+chunk_index=$idx
+chunks_total=$total
+bytes_current=$cur
+bytes_current_total=$curtotal
+bytes_done=$done
+bytes_total=$totalbytes
+volumetag=$vt
+file=$fn
+updated_epoch=$now"
+}
+
+_restore_release_with_progress() { # RDIR RUN TOTAL DONE TOTALBYTES PROGRESS_INTERVAL
+    local rdir="$1" run="$2" total="$3" done="$4" totalbytes="$5" progress_interval="${6:-30}"
+    local rcf="$1/.restore_release_rc.$$" pid rc=0 now last=0
+    rm -f "$rcf"
+    (
+        set +e
+        tape_release_all
+        prc=$?
+        printf '%s\n' "$prc" > "$rcf"
+        exit "$prc"
+    ) &
+    pid=$!
+    while [ ! -f "$rcf" ]; do
+        now="$(date +%s)"
+        if [ $((now-last)) -ge "$progress_interval" ]; then
+            _restore_progress "$rdir" RELEASING "$run" 0 "$total" "$total" 0 0 "$done" "$totalbytes" "" ""
+            last="$now"
+        fi
+        sleep 2
+    done
+    rc="$(cat "$rcf" 2>/dev/null || echo 1)"; case "$rc" in ''|*[!0-9]*) rc=1;; esac
+    wait "$pid" 2>/dev/null || true
+    rm -f "$rcf"
+    return "$rc"
+}
+
+_restore_cancel_finish() { # RDIR RUN CHUNK IDX TOTAL DONE TOTALBYTES
+    local rdir="$1" run="$2" chunk="${3:-0}" idx="${4:-0}" total="${5:-0}" done="${6:-0}" totalbytes="${7:-0}"
+    rm -f "$rdir"/staged_*.enc "$rdir"/staged_*.enc.part "$rdir"/.restore_sha.* 2>/dev/null || true
+    _restore_progress "$rdir" CANCELLED "$run" "$chunk" "$idx" "$total" 0 0 "$done" "$totalbytes" "" ""
+    if ! ( tape_release_all ); then
+        log "restore $(basename "$rdir"): cancellation recorded; media release incomplete"
+        return 0
+    fi
+    marker_set_signed "$rdir" request.STAGED "cancelled by cluster; staged ciphertext discarded; drives empty"
+    bric_event INFO RESTORE_STAGE_CANCELLED "request=$(basename "$rdir") drives_empty=yes"
+    return 0
+}
+
+handle_restore() {
+    local rdir="$1"
+    marker_exists "$rdir" request || return 0
+    marker_exists "$rdir" request.STAGED && return 0
+    marker_verify "$rdir" request || { marker_set_signed "$rdir" request.STAGED "refused: unsigned/forged request"; return 0; }
+    [ "$(marker_field project "$rdir/request")" = "$(basename "$(dirname "$rdir")")" ] || { log "bus: restore request project mismatch — refusing"; marker_set_signed "$rdir" request.STAGED "refused: request path binding mismatch"; return 0; }
+
+    local req run_id project protocol progressive=0
+    req="$(marker_read "$rdir" request)"
+    run_id="$(marker_field run "$rdir/request")"
+    project="$(marker_field project "$rdir/request")"
+    protocol="$(marker_field protocol "$rdir/request")"
+    [ "$protocol" = restore-progressive-v1 ] && progressive=1
+    export BRIC_LOG_RUN_ID="$run_id" BRIC_LOG_PROJECT="$project"
+
+    if _restore_cancelled "$rdir"; then
+        _restore_cancel_finish "$rdir" "$run_id" 0 0 0 0 0
+        return 0
+    fi
+
+    # Hardware gate at the START of a restore (before any staging). Subshell: never kills the daemon.
+    local hwmsg
+    if ! hwmsg="$( (tape_hw_quickcheck) 2>&1 )"; then
+        hwmsg="$(printf '%s' "$hwmsg" | tail -1 | sed 's/^\[[^]]*\] ERROR: //')"
+        marker_set_signed "$rdir" request.STAGED "refused: tape hardware not ready: $hwmsg"
+        audit HW_NOT_READY "$(basename "$rdir")" FAIL "$hwmsg"
+        log "restore $(basename "$rdir") refused: tape hardware not ready: $hwmsg"
+        return 0
+    fi
+    [ -n "$hwmsg" ] && printf '%s\n' "$hwmsg" >&2
+
+    local total_chunks=0 total_bytes=0 tag run chunk sz
+    while IFS='|' read -r tag run chunk; do
+        [ "$tag" = stage ] || continue
+        total_chunks=$((total_chunks+1))
+        sz="$(tsqlc "SELECT COALESCE(MAX(size_bytes),0) FROM segments WHERE run_id='$(sql_quote "$run")' AND chunk_no=$chunk AND state='VERIFIED';")"
+        case "$sz" in ''|*[!0-9]*) sz=0;; esac
+        total_bytes=$((total_bytes+sz))
+    done <<TOTALS
+$(printf '%s' "$req")
+TOTALS
+
+    bric_event INFO RESTORE_STAGE_BEGIN "request=$(basename "$rdir") protocol=${protocol:-legacy} chunks=$total_chunks bytes=$total_bytes"
+    local idx=0 done_bytes=0 progress_interval="${BRIC_RESTORE_PROGRESS_INTERVAL:-30}" consume_timeout="${BRIC_RESTORE_CONSUME_TIMEOUT:-21600}"
+    case "$progress_interval" in ''|*[!0-9]*|0) progress_interval=30;; esac
+    case "$consume_timeout" in ''|*[!0-9]*|0) consume_timeout=21600;; esac
+
+    while IFS='|' read -r tag run chunk; do
+        [ "$tag" = stage ] || continue
+        idx=$((idx+1))
+        local cb; cb="${run}__c$(printf '%04d' "$chunk")"
+        sz="$(tsqlc "SELECT COALESCE(MAX(size_bytes),0) FROM segments WHERE run_id='$(sql_quote "$run")' AND chunk_no=$chunk AND state='VERIFIED';")"
+        case "$sz" in ''|*[!0-9]*) sz=0;; esac
+
+        if _restore_cancelled "$rdir"; then
+            _restore_cancel_finish "$rdir" "$run" "$chunk" "$idx" "$total_chunks" "$done_bytes" "$total_bytes"
+            return 0
+        fi
+
+        # A READY marker is the durable per-request staging receipt. The consumer may already have
+        # removed the ciphertext after publishing CONSUMED, so never infer completion from .enc alone.
+        if marker_exists "$rdir" "staged_$cb.READY"; then
+            if [ "$progressive" -eq 1 ] && ! marker_exists "$rdir" "staged_$cb.CONSUMED"; then
+                local resumed_wait=0
+                while [ "$resumed_wait" -lt "$consume_timeout" ]; do
+                    if marker_exists "$rdir" "staged_$cb.CONSUMED" && marker_verify "$rdir" "staged_$cb.CONSUMED"; then
+                        rm -f "$rdir/staged_$cb.enc" 2>/dev/null || true
+                        break
+                    fi
+                    if _restore_cancelled "$rdir"; then
+                        _restore_cancel_finish "$rdir" "$run" "$chunk" "$idx" "$total_chunks" "$done_bytes" "$total_bytes"
+                        return 0
+                    fi
+                    [ $((resumed_wait % 30)) -ne 0 ] || _restore_progress "$rdir" WAITING_CONSUMER "$run" "$chunk" "$idx" "$total_chunks" "$sz" "$sz" "$done_bytes" "$total_bytes" "" ""
+                    sleep 2; resumed_wait=$((resumed_wait+2))
+                done
+                if ! marker_exists "$rdir" "staged_$cb.CONSUMED"; then
+                    marker_set_signed "$rdir" "staged_$cb.ERROR" "consumer acknowledgement timeout after ${consume_timeout}s"
+                    _restore_cancel_finish "$rdir" "$run" "$chunk" "$idx" "$total_chunks" "$done_bytes" "$total_bytes"
+                    return 0
+                fi
+            fi
+            done_bytes=$((done_bytes+sz))
+            continue
+        fi
+
+        # Invariant 5: PRIMARY first, then BACKUP. Tape bytes flow once through tee+sha256sum so the
+        # payload hash is produced during the tape read instead of a second ~chunk-sized QNAP pass.
+        local staged=0 cvt cfn cpsha csize got part hashf read_pid read_rc cur cancel_pending=0
+        while IFS='|' read -r cvt cfn cpsha csize; do
+            [ -n "$cvt" ] || continue
+            case "$csize" in ''|*[!0-9]*) csize="$sz";; esac
+            part="$rdir/staged_$cb.enc.part"
+            hashf="$rdir/.restore_sha.$cb.$$"
+            rm -f "$part" "$hashf"
+            _restore_progress "$rdir" STAGING "$run" "$chunk" "$idx" "$total_chunks" 0 "$csize" "$done_bytes" "$total_bytes" "$cvt" "$cfn"
+
+            local read_rcf="$rdir/.restore_rc.$cb.$$" last_emit=0 now_epoch
+            rm -f "$read_rcf"
+            (
+                set +e
+                set -o pipefail
+                tape_stream_file "$cvt" "$cfn" | tee "$part" | sha256sum > "$hashf"
+                prc=$?
+                printf '%s\n' "$prc" > "$read_rcf"
+                exit "$prc"
+            ) &
+            read_pid=$!
+            read_rc=0
+            # Do not use `kill -0` as the completion test: an exited child can remain a zombie until
+            # wait(1), and kill -0 still succeeds for a zombie. The child publishes its rc atomically
+            # enough for this private control file; we poll every 2s but sign progress only at the
+            # configured heartbeat interval so completion is not delayed by up to 30s per chunk.
+            while [ ! -f "$read_rcf" ]; do
+                now_epoch="$(date +%s)"
+                if [ $((now_epoch-last_emit)) -ge "$progress_interval" ]; then
+                    cur="$(stat -c %s "$part" 2>/dev/null || echo 0)"
+                    case "$cur" in ''|*[!0-9]*) cur=0;; esac
+                    _restore_progress "$rdir" STAGING "$run" "$chunk" "$idx" "$total_chunks" "$cur" "$csize" "$done_bytes" "$total_bytes" "$cvt" "$cfn"
+                    last_emit="$now_epoch"
+                fi
+                _restore_cancelled "$rdir" && cancel_pending=1 || true
+                sleep 2
+            done
+            read_rc="$(cat "$read_rcf" 2>/dev/null || echo 1)"
+            case "$read_rc" in ''|*[!0-9]*) read_rc=1;; esac
+            wait "$read_pid" 2>/dev/null || true
+            rm -f "$read_rcf"
+
+            if [ "$cancel_pending" -eq 1 ] || _restore_cancelled "$rdir"; then
+                rm -f "$part" "$hashf"
+                _restore_cancel_finish "$rdir" "$run" "$chunk" "$idx" "$total_chunks" "$done_bytes" "$total_bytes"
+                return 0
+            fi
+            if [ "$read_rc" -ne 0 ]; then
+                BRIC_LOG_CHUNK="$chunk" BRIC_LOG_VOLUMETAG="$cvt" BRIC_LOG_RC="$read_rc" bric_event ERROR RESTORE_COPY_READ_FAILED "copy=$cb file_number=$cfn trying_next=yes"
+                log "restore: cannot read $cb from $cvt#$cfn — trying next copy"
+                audit RESTORE_READ_FAIL "$cvt" FAIL "chunk $cb unreadable at file $cfn"
+                rm -f "$part" "$hashf"; continue
+            fi
+            got="$(awk 'NR==1{print $1}' "$hashf" 2>/dev/null || true)"
+            rm -f "$hashf"
+            if [ -z "$got" ] || [ "$got" != "$cpsha" ]; then
+                log "restore: $cb from $cvt#$cfn fails sha256 — marking $cvt SUSPECT, trying next copy"
+                tsql "UPDATE tapes SET read_errors=COALESCE(read_errors,0)+1, health=CASE WHEN health='BAD' THEN 'BAD' ELSE 'SUSPECT' END WHERE volumetag='$(sql_quote "$cvt")';"
+                audit RESTORE_VERIFY_FAIL "$cvt" FAIL "chunk $cb sha mismatch at file $cfn"
+                rm -f "$part"; continue
+            fi
+            mv -f "$part" "$rdir/staged_$cb.enc"
+            marker_set_signed "$rdir" "staged_$cb.READY" "vt=$cvt
+file=$cfn
+sha256=$got
+size_bytes=$csize"
+            _restore_progress "$rdir" CHUNK_READY "$run" "$chunk" "$idx" "$total_chunks" "$csize" "$csize" "$done_bytes" "$total_bytes" "$cvt" "$cfn"
+            BRIC_LOG_CHUNK="$chunk" BRIC_LOG_VOLUMETAG="$cvt" bric_event INFO RESTORE_CHUNK_STAGED "copy=$cb file_number=$cfn inline_sha256=yes"
+            log "staged $cb for restore from $cvt#$cfn (sha256 verified inline)"
+            staged=1
+
+            if [ "$progressive" -eq 1 ]; then
+                # Backpressure: do not stage another chunk until the cluster has authenticated,
+                # consumed and released this one. This is the bounded-staging contract.
+                local waited=0
+                _restore_progress "$rdir" WAITING_CONSUMER "$run" "$chunk" "$idx" "$total_chunks" "$csize" "$csize" "$done_bytes" "$total_bytes" "$cvt" "$cfn"
+                while [ "$waited" -lt "$consume_timeout" ]; do
+                    if marker_exists "$rdir" "staged_$cb.CONSUMED"; then
+                        if marker_verify "$rdir" "staged_$cb.CONSUMED"; then
+                            rm -f "$rdir/staged_$cb.enc" 2>/dev/null || true
+                            break
+                        fi
+                    fi
+                    if _restore_cancelled "$rdir"; then
+                        _restore_cancel_finish "$rdir" "$run" "$chunk" "$idx" "$total_chunks" "$done_bytes" "$total_bytes"
+                        return 0
+                    fi
+                    [ $((waited % 30)) -ne 0 ] || _restore_progress "$rdir" WAITING_CONSUMER "$run" "$chunk" "$idx" "$total_chunks" "$csize" "$csize" "$done_bytes" "$total_bytes" "$cvt" "$cfn"
+                    sleep 2; waited=$((waited+2))
+                done
+                if ! marker_exists "$rdir" "staged_$cb.CONSUMED"; then
+                    marker_set_signed "$rdir" "staged_$cb.ERROR" "consumer acknowledgement timeout after ${consume_timeout}s"
+                    log "restore: consumer did not acknowledge $cb within ${consume_timeout}s; stopping request"
+                    _restore_cancel_finish "$rdir" "$run" "$chunk" "$idx" "$total_chunks" "$done_bytes" "$total_bytes"
+                    return 0
+                fi
+            fi
+            break
+        done <<COPIES
+$(tsqlc "SELECT volumetag,file_number,payload_sha256,size_bytes FROM segments WHERE run_id='$(sql_quote "$run")' AND chunk_no=$chunk AND state='VERIFIED' ORDER BY (copy_role='PRIMARY') DESC;")
+COPIES
+        if [ "$staged" != 1 ]; then
+            marker_set_signed "$rdir" "staged_$cb.ERROR" "no readable verified copy (all copies failed read or sha256)"
+            if [ "$progressive" -eq 1 ]; then
+                _restore_progress "$rdir" ERROR "$run" "$chunk" "$idx" "$total_chunks" 0 "$sz" "$done_bytes" "$total_bytes" "" ""
+                ( tape_release_all ) || true
+                marker_set_signed "$rdir" request.STAGED "failed: chunk=$chunk; no readable verified copy; drives release attempted"
+                return 0
+            fi
+            continue
+        fi
+        done_bytes=$((done_bytes+sz))
+    done <<EOF
+$(printf '%s' "$req")
+EOF
+
+    _restore_progress "$rdir" RELEASING "$run_id" 0 "$total_chunks" "$total_chunks" 0 0 "$done_bytes" "$total_bytes" "" ""
+    # The request is terminal only when robotics confirms all media back in slots. Keep signed
+    # progress alive during a slow real-library unload so the cluster does not misclassify robotics
+    # latency as a stalled restore.
+    if ! _restore_release_with_progress "$rdir" "$run_id" "$total_chunks" "$done_bytes" "$total_bytes" "$progress_interval"; then
+        log "restore $(basename "$rdir"): media release incomplete — request not marked STAGED"
+        return 0
+    fi
+    _restore_progress "$rdir" DONE "$run_id" 0 "$total_chunks" "$total_chunks" 0 0 "$done_bytes" "$total_bytes" "" ""
+    marker_set_signed "$rdir" request.STAGED "done; drives empty; protocol=${protocol:-legacy}"
+    bric_event INFO RESTORE_STAGE_DONE "request=$(basename "$rdir") drives_empty=yes protocol=${protocol:-legacy}"
+    return 0
+}
+
+# Guard against a forged/hostile directory name on the shared bus (defence in depth; the primary
+# control is that the QNAP share is writable only by the archive service group — see README).
+_safe_busdir() { valid_name "$(basename "$(dirname "$1")")" && valid_name "$(basename "$1")"; }
+
+# ---------- one polling pass over the QNAP ----------
+one_pass() {
+    BRIC_PASS_PROGRESS=0
+    [ -d "$BRIC_QNAP/archive" ] || return 0
+    local rd before_staged
+    # reservations
+    for rd in "$BRIC_QNAP"/archive/*/*; do
+        [ -d "$rd" ] || continue
+        _safe_busdir "$rd" || { log "skip hostile bus dir: $rd"; continue; }
+        _run_is_terminal "$rd" && continue
+        if marker_exists "$rd" run.RESERVE_REQUEST && ! marker_exists "$rd" run.RESERVED && ! marker_exists "$rd" run.DENIED; then
+            handle_reservation "$rd"
+            if marker_exists "$rd" run.RESERVED || marker_exists "$rd" run.DENIED; then BRIC_PASS_PROGRESS=1; fi
+        fi
+        if marker_exists "$rd" run.RESERVE_EXTEND_REQUEST && ! marker_exists "$rd" run.RESERVE_EXTENDED && ! marker_exists "$rd" run.RESERVE_EXTEND_DENIED; then
+            handle_reservation_extend "$rd"
+            if marker_exists "$rd" run.RESERVE_EXTENDED || marker_exists "$rd" run.RESERVE_EXTEND_DENIED; then BRIC_PASS_PROGRESS=1; fi
+        fi
+    done
+    # drain READY chunks
+    for rd in "$BRIC_QNAP"/archive/*/*; do
+        [ -d "$rd" ] || continue
+        _safe_busdir "$rd" || continue
+        local m cb
+        # ABORT/DENIED fence all chunk handling. CLOSED still permits receipt-only idempotency:
+        # handle_chunk may reconstruct DONE from already-VERIFIED catalog rows, but the full terminal
+        # fence below the idempotency branch prevents any new tape write.
+        _run_blocks_chunk_receipt "$rd" && continue
+        for m in "$rd"/chunk_*.READY; do
+            [ -e "$m" ] || continue
+            cb="$(basename "$m" .READY)"
+            handle_chunk "$rd" "$cb"
+            if marker_exists "$rd" "$cb.DONE" || marker_exists "$rd" "$cb.ERROR"; then BRIC_PASS_PROGRESS=1; fi
+        done
+        # reclaim CLAIMED chunks stuck past TTL (crash between claim and DONE).  ERROR is already a
+        # terminal chunk receipt to the cluster/finalizer; only an unresolved claim may be requeued.
+        local ttl; ttl="$(tcfg claim_ttl_hours)"; ttl="${ttl:-6}"
+        for m in "$rd"/chunk_*.CLAIMED; do
+            [ -e "$m" ] || continue
+            cb="$(basename "$m" .CLAIMED)"
+            # Terminal chunk receipts fence reclaim. Leave the claim/ciphertext intact until a verified
+            # terminal handler or normal bus cleanup removes it; marker existence alone is not delete authority.
+            if [ -e "$rd/$cb.DONE" ] || [ -e "$rd/$cb.ERROR" ] || _run_is_terminal "$rd"; then
+                continue
+            fi
+            if [ -n "$(find "$m" -mmin +$((ttl*60)) 2>/dev/null)" ]; then
+                if mv "$m" "$rd/$cb.READY" 2>/dev/null; then
+                    log "reclaimed stale CLAIMED $cb in $(basename "$rd")"
+                    BRIC_PASS_PROGRESS=1
+                fi
+            fi
+        done
+    done
+    # Closings / aborts.  The local CLOSED audit row is the irreversible durability barrier.
+    # A late signed run.ABORTED may coexist with run.CLOSED after a cluster-side interruption; in
+    # that case preserve VERIFIED segments/artifacts and leave the bus directory for reconciliation.
+    for rd in "$BRIC_QNAP"/archive/*/*; do
+        [ -d "$rd" ] || continue
+        _safe_busdir "$rd" || continue
+        run_id="$(basename "$rd")"
+        if _catalog_run_closed "$run_id"; then
+            if marker_exists "$rd" run.ABORTED && ! marker_exists "$rd" run.ABORT_DONE; then
+                handle_abort "$rd"
+            fi
+            continue
+        fi
+        if marker_exists "$rd" run.ABORTED; then
+            if ! marker_exists "$rd" run.ABORT_DONE; then
+                handle_abort "$rd"
+                marker_exists "$rd" run.ABORT_DONE && BRIC_PASS_PROGRESS=1
+            fi
+            continue
+        fi
+        marker_exists "$rd" run.CLOSED && continue
+        if marker_exists "$rd" run.PROJECT_CLOSING; then
+            handle_close "$rd"
+            marker_exists "$rd" run.CLOSED && BRIC_PASS_PROGRESS=1
+        fi
+    done
+    # restore requests (reverse bus)
+    if [ -d "$BRIC_QNAP/restore" ]; then
+        for rd in "$BRIC_QNAP"/restore/*/*; do
+            [ -d "$rd" ] || continue
+            _safe_busdir "$rd" || { log "skip hostile restore dir: $rd"; continue; }
+            before_staged=0; marker_exists "$rd" request.STAGED && before_staged=1
+            handle_restore "$rd"
+            if [ "$before_staged" -eq 0 ] && marker_exists "$rd" request.STAGED; then BRIC_PASS_PROGRESS=1; fi
+        done
+    fi
+    return 0
+}
+
+# ---------- periodic re-verification (tape health) ----------
+# Re-reads every VERIFIED segment + close artifact on a tape, re-hashes the ciphertext, and updates
+# last_verify / health / read_errors. This catches slow LTO media degradation before a restore needs
+# the data. Run from cron, e.g. one tape per night.
+reverify() {
+    local vt="$1" media_bad=0 operational_bad=0 n=0 kind fn sha expected_size vrc current_health health
+    [ -n "$vt" ] || die "usage: bric-tape-daemon --verify VOLUMETAG"
+    log "re-verifying $vt with streaming byte/hash verification ..."
+    while IFS='|' read -r kind fn sha expected_size; do
+        [ -n "$fn" ] || continue; n=$((n+1)); vrc=0
+        if tape_verify_file "$vt" "$fn" "$expected_size" "$sha"; then vrc=0; else vrc=$?; fi
+        case "$vrc" in
+            0) ;;
+            22) media_bad=$((media_bad+1)); log "  HASH MISMATCH at $kind file $fn (complete stream)";;
+            21) media_bad=$((media_bad+1)); log "  SIZE MISMATCH at $kind file $fn (clean short/long tape stream)";;
+            *) operational_bad=$((operational_bad+1)); log "  READ/LOCAL ERROR at $kind file $fn rc=$vrc (media health unchanged)";;
+        esac
+    done <<EOF
+$(tsqlc "SELECT 'SEGMENT',file_number,payload_sha256,size_bytes FROM segments WHERE volumetag='$(sql_quote "$vt")' AND state='VERIFIED' AND file_number IS NOT NULL
+         UNION ALL SELECT 'ARTIFACT',file_number,sha256,-1 FROM tape_artifacts WHERE volumetag='$(sql_quote "$vt")' AND state='VERIFIED' AND file_number IS NOT NULL;")
+EOF
+    current_health="$(tsql "SELECT health FROM tapes WHERE volumetag='$(sql_quote "$vt")';")"; health="$current_health"
+    if [ "$media_bad" -gt 0 ]; then
+        health=BAD
+        tsql "UPDATE tapes SET last_verify=datetime('now'), read_errors=read_errors+$media_bad, health='BAD' WHERE volumetag='$(sql_quote "$vt")';"
+    elif [ "$operational_bad" -eq 0 ]; then
+        health=OK
+        tsql "UPDATE tapes SET last_verify=datetime('now'), health='OK' WHERE volumetag='$(sql_quote "$vt")';"
+    else
+        # Transport/local failures (rc 20 or other non-media errors) are not evidence against the
+        # cartridge. Clean size mismatches are counted above as media/read-path failures.
+        tsql "UPDATE tapes SET last_verify=datetime('now') WHERE volumetag='$(sql_quote "$vt")';"
+    fi
+    audit REVERIFY "$vt" "$([ "$media_bad" -eq 0 ] && [ "$operational_bad" -eq 0 ] && echo OK || echo FAIL)" \
+        "$n checked, media_bad=$media_bad operational_bad=$operational_bad health=$health"
+    log "re-verify $vt: $n file(s), media_bad=$media_bad operational_bad=$operational_bad -> health=$health"
+    [ "$media_bad" -eq 0 ] && [ "$operational_bad" -eq 0 ]
+}
+
+main() {
+    local MODE="loop" VERIFY_VT=""
+    case "${1:-}" in
+        --once) MODE=once;; --loop|"") MODE=loop;; --recover) MODE=recover;;
+        --verify) MODE=verify; VERIFY_VT="${2:-}";;
+        *) die "usage: bric-tape-daemon [--once|--loop|--recover|--verify VOLUMETAG]";;
+    esac
+    # Only project-exclusive tapes are implemented: reservations, placement and decommissioning are all
+    # keyed on project_name. The 'owner'/'shared' values are reserved for future work and are NOT honored,
+    # so refuse to start on them rather than silently treating them as 'project'.
+    local excl; excl="$(tcfg tape_exclusivity)"; excl="${excl:-project}"
+    [ "$excl" = project ] || die "tape_exclusivity='$excl' is not supported (only 'project' is implemented). Set it to 'project'."
+    case "$LOCK" in /*) ;; *) die "BRIC_TAPE_LOCK must be absolute: $LOCK";; esac
+    case "$WORK_LOCK" in /*) ;; *) die "BRIC_TAPE_WORK_LOCK must be absolute: $WORK_LOCK";; esac
+
+    # Hold the selected canonical namespace plus every known deployed historical namespace.
+    # This closes the 30E -> 30P/30AA migration hole in both directions: a legacy daemon already
+    # alive refuses 31C, and a legacy tree started after 31C also sees its own old lock held.
+    local singleton_paths=("$LOCK") work_paths=("$WORK_LOCK") p seen
+    seen="|$LOCK|"
+    while IFS= read -r p; do
+        [ -n "$p" ] || continue
+        case "$seen" in *"|$p|"*) continue;; esac
+        singleton_paths+=("$p"); seen="${seen}${p}|"
+    done < <(bric_tape_legacy_singleton_paths "$LOCK")
+    seen="|$WORK_LOCK|"
+    while IFS= read -r p; do
+        [ -n "$p" ] || continue
+        case "$seen" in *"|$p|"*) continue;; esac
+        work_paths+=("$p"); seen="${seen}${p}|"
+    done < <(bric_tape_legacy_work_paths "$LOCK")
+
+    bric_event INFO DAEMON_MODE "mode=$MODE backend=$BRIC_TAPE_BACKEND drives=$BRIC_TAPE_DRIVES singleton_lock=$LOCK work_fence=$WORK_LOCK singleton_namespaces=${#singleton_paths[@]} work_namespaces=${#work_paths[@]}"
+    local singleton_fds=() work_fds=() fd csv=""
+    for p in "${singleton_paths[@]}"; do
+        bric_tape_open_lock_fd fd "$p"
+        bric_event INFO SINGLETON_LOCK_WAIT "lock=$p nonblocking=yes"
+        if flock -n "$fd"; then
+            singleton_fds+=("$fd")
+            bric_event INFO SINGLETON_LOCK_ACQUIRED "lock=$p fd=$fd"
+        else
+            eval "exec ${fd}>&-" 2>/dev/null || true
+            BRIC_LOG_RC=1 bric_event ERROR SINGLETON_LOCK_REFUSED "lock=$p another daemon/generation is active"
+            die "another daemon generation holds $p"
+        fi
+    done
+    for fd in "${singleton_fds[@]}"; do csv="${csv:+$csv,}$fd"; done
+    BRIC_TAPE_SINGLETON_FDS="$csv"
+
+    # Work fences are blocking by design. A crash-orphaned legacy dd/mt/worker inherited the old
+    # work fd even after its parent singleton vanished; recovery/reclaim cannot start until ALL
+    # known generation fences are clear.
+    local fence_start fence_end
+    csv=""
+    for p in "${work_paths[@]}"; do
+        bric_tape_open_lock_fd fd "$p"
+        fence_start="$(_epoch_ms)"
+        bric_event INFO WORK_FENCE_WAIT_BEGIN "lock=$p"
+        if flock "$fd"; then
+            fence_end="$(_epoch_ms)"
+            work_fds+=("$fd")
+            BRIC_LOG_DURATION_MS="$((fence_end-fence_start))" bric_event INFO WORK_FENCE_ACQUIRED "lock=$p fd=$fd"
+        else
+            eval "exec ${fd}>&-" 2>/dev/null || true
+            BRIC_LOG_RC=1 bric_event ERROR WORK_FENCE_FAILED "lock=$p"
+            die "cannot acquire tape work fence $p"
+        fi
+    done
+    for fd in "${work_fds[@]}"; do csv="${csv:+$csv,}$fd"; done
+    BRIC_TAPE_WORK_FDS="$csv"
+    recover
+    reclaim_startup_claims
+    [ "$MODE" = recover ] && exit 0
+    [ "$MODE" = verify ] && { reverify "$VERIFY_VT"; exit $?; }
+    if [ "$MODE" = once ]; then
+        bric_event INFO DAEMON_PASS_BEGIN "mode=once"
+        one_pass
+        bric_event INFO DAEMON_PASS_END "mode=once"
+        exit 0
+    fi
+    local poll; poll="$(tcfg poll_seconds)"; poll="${poll:-10}"
+    bric_event INFO DAEMON_LOOP_START "poll_seconds=$poll"
+    log "tape daemon started (role=$BRIC_ROLE backend=$BRIC_TAPE_BACKEND drives=$BRIC_TAPE_DRIVES parallel=${BRIC_PARALLEL_DRIVES:-$(tcfg parallel_drives)} poll=${poll}s)"
+    while true; do
+        # Never invoke one_pass under `if`, `||`, `&&` or `!`: Bash suppresses errexit throughout the
+        # dynamic function call tree in those contexts. Run the pass as an asynchronous child instead,
+        # then inspect wait(1)'s status in the parent. The child drops singleton fds but deliberately
+        # retains generation/work fences, preserving the crash-fencing design.
+        local pass_progress pass_pid pass_rc=0
+        pass_progress="$(mktemp "${TMPDIR:-/tmp}/bric-pass-progress.XXXXXX")"
+        (
+            bric_close_daemon_singleton_fds
+            BRIC_PASS_PROGRESS=0
+            one_pass
+            printf '%s
+' "${BRIC_PASS_PROGRESS:-0}" >"$pass_progress"
+        ) & pass_pid=$!
+        if wait "$pass_pid"; then pass_rc=0; else pass_rc=$?; fi
+        BRIC_PASS_PROGRESS="$(cat "$pass_progress" 2>/dev/null || echo 0)"
+        rm -f "$pass_progress"
+        if [ "$pass_rc" -ne 0 ]; then
+            BRIC_LOG_RC="$pass_rc" bric_event ERROR DAEMON_PASS_FAILED "rc=$pass_rc continuing=yes"
+            log "pass error rc=$pass_rc (continuing)"
+        fi
+        if [ "${BRIC_PASS_PROGRESS:-0}" = 1 ]; then
+            # Review 31: after observable progress, rescan immediately. A producer may have published
+            # the next READY while this pass was writing/verifying the previous chunk; sleeping the full
+            # poll interval here created a deterministic idle gap between otherwise ready tape work.
+            continue
+        fi
+        # Idle sleep must not keep either singleton or generation fences alive if the daemon is killed.
+        ( bric_close_daemon_singleton_fds; bric_close_daemon_work_fds; sleep "$poll" )
+    done
+}
+main "$@"

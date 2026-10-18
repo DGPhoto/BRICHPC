@@ -1,0 +1,51 @@
+BRIC Archive 2.0 Review 30AD validation
+Date: 2026-09-03
+
+Release decision
+----------------
+Review 30AC remains the validated base. A real 30AC smoke run reproduced a producer-side
+bric-stream-gate rc=1 -> bric-tar-stream rc=1 -> tar rc=141/SIGPIPE abort. Review 30AD fixes the
+remaining global QNAP byte-budget race and the same latent race in the legacy bric-chunk producer.
+Do not run another real tape smoke on 30AC; validate/deploy 30AD first.
+
+Code/test changes
+-----------------
+- cluster/scripts/lib_common.sh:qnap_inflight_bytes now uses GNU find -ignore_readdir_race.
+  Expected ENOENT from a concurrently drained chunk is ignored; genuine find failures still propagate
+  under pipefail, so QNAP budget accounting remains fail-closed.
+- cluster/scripts/bric-chunk.sh counts run-local staged chunk_*.enc files using a Bash nullglob array,
+  removing its independent find|wc race.
+- test/run_stream_gate_race.sh now covers:
+    1. per-run window counting without find;
+    2. global budget scan requiring -ignore_readdir_race;
+    3. genuine find failure remains fatal;
+    4. legacy bric-chunk no longer uses find for staged counting.
+- No DB migration, bus protocol change, tape catalog change, or on-tape format change.
+
+Validation completed in this build environment
+----------------------------------------------
+PASS  bash -n across 97 Bash scripts
+PASS  systemd-analyze verify tape/systemd/bric-tape-daemon.service
+PASS  test/run_all_tests.sh --only stream_gate_race --timeout 30
+      - 1 passed, 0 failed
+      - all four flow-control race invariants passed
+PASS  test/run_update.sh with Review 30AD version assertions
+PASS  production-code scan: the only remaining find over chunk_*.enc is qnap_inflight_bytes(),
+      explicitly using -ignore_readdir_race
+PASS  MANIFEST.sha256 verification before final packaging
+
+SQLite note
+-----------
+The build container does not provide the distribution sqlite3 CLI. The delta regression test uses a
+minimal local compatibility CLI linked to libsqlite3 only to exercise the gate's SQL config lookup.
+Review 30AC itself was subsequently validated by the operator with native sqlite3 3.45.1: 55 tests
+passed and the only two failures were pre-existing environmental setfacl absences; importantly,
+run_job_lifecycle.sh passed. Review 30AD changes only producer flow-control accounting and its regression
+test. Before production smoke, run the full suite on supekgate04fl with its native sqlite3 CLI.
+
+Real-run evidence motivating 30AD
+---------------------------------
+30AC run smoke_real1__20260903T102531Z__0006 reached stream chunk 85 READY. The stream gate then exited
+1 while invoked with --required-total 1031183361696; bric-tar-stream exited 1 and tar received SIGPIPE
+(rc=141). The tape daemon completed chunk 79 on both copies (file #201) and then cleanly handled ABORT,
+confirming the terminal-fencing fixes while isolating the remaining failure to producer flow control.

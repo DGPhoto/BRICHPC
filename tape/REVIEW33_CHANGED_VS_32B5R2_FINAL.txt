@@ -1,0 +1,19 @@
+BRIC Archive 2.0 Review 33 — changed files vs 32B5R2 final
+
+Only in /mnt/data/bric33_full: CHANGES_REVIEW33_RESTORE_METADATA_TRANSACTION.md
+Only in /mnt/data/bric33_full: CLAUDE_REVIEW_BRIEF_33.md
+Files /mnt/data/bric32b5r2_final_full/README.md and /mnt/data/bric33_full/README.md differ
+Files /mnt/data/bric32b5r2_final_full/RELEASE and /mnt/data/bric33_full/RELEASE differ
+Only in /mnt/data/bric33_full: REVIEW33_CHANGED_VS_32B5R2_FINAL.txt
+Files /mnt/data/bric32b5r2_final_full/cluster/bin/bric and /mnt/data/bric33_full/cluster/bin/bric differ
+Files /mnt/data/bric32b5r2_final_full/cluster/bin/bric-run and /mnt/data/bric33_full/cluster/bin/bric-run differ
+Files /mnt/data/bric32b5r2_final_full/cluster/scripts/bric-dr-from-tapes.sh and /mnt/data/bric33_full/cluster/scripts/bric-dr-from-tapes.sh differ
+Files /mnt/data/bric32b5r2_final_full/cluster/scripts/bric-restore.sh and /mnt/data/bric33_full/cluster/scripts/bric-restore.sh differ
+Only in /mnt/data/bric33_full/cluster/scripts: lib_restore_txn.sh
+Files /mnt/data/bric32b5r2_final_full/cluster/slurm/restore.sbatch and /mnt/data/bric33_full/cluster/slurm/restore.sbatch differ
+Files /mnt/data/bric32b5r2_final_full/docs/man/bric.1 and /mnt/data/bric33_full/docs/man/bric.1 differ
+Only in /mnt/data/bric33_full: review33_INVARIANTS.txt
+Only in /mnt/data/bric33_full: review33_VALIDATION.txt
+Only in /mnt/data/bric33_full/test: run_33_restore_txn.sh
+Files /mnt/data/bric32b5r2_final_full/test/run_cli_help_man.sh and /mnt/data/bric33_full/test/run_cli_help_man.sh differ
+Files /mnt/data/bric32b5r2_final_full/test/run_dr_e2e.sh and /mnt/data/bric33_full/test/run_dr_e2e.sh differ

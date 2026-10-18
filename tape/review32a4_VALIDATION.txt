@@ -1,0 +1,21 @@
+BRIC Archive 2.0 Review 32A4 targeted validation — 2026-09-09
+State: candidate; native full suite pending.
+
+PASS test/run_parallel_target_policy.sh
+PASS test/run_single_run_parallel.sh (strengthened: 25 MB oversized file -> 3 interleaved LARGE_FILE_CHUNK pieces -> exact restore)
+PASS test/run_performance_policy.sh
+PASS test/run_tar_stream.sh
+PASS test/run_stream_verify.sh
+PASS test/run_filemark_semantics.sh
+PASS bash -n on modified shell files
+
+Root cause addressed:
+- 32A3 allowed stream_worker_chunk_bytes=245GB to exceed a reduced segment_target_bytes.
+- run_local_e2e's 12MiB huge.bam therefore became TAR_PART instead of LARGE_FILE_CHUNK.
+- 32A4 makes segment_target_bytes a hard upper bound on the per-worker target.
+
+Required native validation:
+- run_parallel_target_policy
+- run_single_run_parallel
+- run_local_e2e
+- full run_all_tests

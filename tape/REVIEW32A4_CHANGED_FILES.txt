@@ -1,0 +1,11 @@
+diff -ruN '--exclude=MANIFEST.sha256' -> CHANGES_REVIEW32A4_LARGE_FILE_TARGET_CAP.md /mnt/data/bric32a4_work/CHANGES_REVIEW32A4_LARGE_FILE_TARGET_CAP.md
+diff -ruN '--exclude=MANIFEST.sha256' -> CLAUDE_REVIEW_BRIEF_32A4.md /mnt/data/bric32a4_work/CLAUDE_REVIEW_BRIEF_32A4.md
+diff -ruN '--exclude=MANIFEST.sha256' -> RELEASE /mnt/data/bric32a4_work/RELEASE
+diff -ruN '--exclude=MANIFEST.sha256' -> bric-setup.sh /mnt/data/bric32a4_work/bric-setup.sh
+diff -ruN '--exclude=MANIFEST.sha256' -> bric.conf.example /mnt/data/bric32a4_work/bric.conf.example
+diff -ruN '--exclude=MANIFEST.sha256' -> bric-stream-backup.sh /mnt/data/bric32a4_work/cluster/scripts/bric-stream-backup.sh
+diff -ruN '--exclude=MANIFEST.sha256' -> lib_common.sh /mnt/data/bric32a4_work/cluster/scripts/lib_common.sh
+diff -ruN '--exclude=MANIFEST.sha256' -> cluster_init.sql /mnt/data/bric32a4_work/cluster/sql/cluster_init.sql
+diff -ruN '--exclude=MANIFEST.sha256' -> review32a4_VALIDATION.txt /mnt/data/bric32a4_work/review32a4_VALIDATION.txt
+diff -ruN '--exclude=MANIFEST.sha256' -> run_parallel_target_policy.sh /mnt/data/bric32a4_work/test/run_parallel_target_policy.sh
+diff -ruN '--exclude=MANIFEST.sha256' -> run_single_run_parallel.sh /mnt/data/bric32a4_work/test/run_single_run_parallel.sh

@@ -1,0 +1,54 @@
+BRIC Archive 2.0 Review 30AF validation
+Date: 2026-09-03
+
+Baseline
+--------
+Built from the complete Review 30AE release tree.
+Review 30AE native full-suite result supplied from supekgate04fl (sqlite3 3.45.1):
+56 passed, 1 failed. The only failure was run_setup_e2e.sh, and within that test the provisioned
+backup CLOSED, restore was bit-identical, and DR was bit-identical. The failure was the test harness
+calling the real host systemd/admin destinations.
+
+30AF scope
+----------
+Test-harness hermeticity only. Production cluster/tape datapaths are unchanged from 30AE.
+No database migration. Bus protocol unchanged. On-tape format remains BRIC-FORMAT-V1.
+
+30AF targeted validation
+------------------------
+PASS: run_setup_e2e.sh redirects BRIC_SYSTEMD_UNIT_DIR into the temporary host root.
+PASS: all setup administrative links/man destination variables are redirected into the temporary root.
+PASS: deterministic test-local systemctl shim exercises daemon-reload, enable --now and is-active.
+PASS: deterministic test-local ps shim forces the systemd branch independent of the test host PID 1.
+PASS: deterministic test-local pgrep shim exercises the manual-daemon collision check without returning host PIDs.
+PASS: first setup --role all completes through the formerly failing systemd section.
+PASS: second setup --role all remains idempotent through the same isolated systemd section.
+PASS: real administrative host paths are fingerprinted before setup and unchanged after both setup runs.
+PASS: run_update.sh release assertions advanced to 30AF.
+PASS: Bash syntax validation for the modified tests and all release shell scripts.
+PASS: systemd-analyze verify for tape/systemd/bric-tape-daemon.service.
+
+Validation environment note
+---------------------------
+This build container does not provide the sqlite3 CLI binary. For the changed A/B provisioning portions
+of run_setup_e2e.sh, a local test-only CLI linked directly against libsqlite3 3.46.1 was used to execute
+the same SQLite SQL calls. This is sufficient to validate the 30AF shell/systemd isolation delta, but is
+not claimed as a substitute for the deployment-host native full suite.
+
+Required native gate before production/smoke
+--------------------------------------------
+Run from the COMPLETE EXTRACTED 30AF release tree on supekgate04fl with native sqlite3 3.45.1:
+
+    bash test/run_all_tests.sh --timeout 600
+
+Expected selected count remains 57, with [n/57] progress. Because production datapath code is unchanged
+from 30AE, the decisive new expectation is that run_setup_e2e.sh now passes instead of touching the real
+host systemd service.
+
+Final package-preparation checks
+--------------------------------
+PASS: run_update.sh targeted updater regression test.
+PASS: run_stream_gate_race.sh (30AE QNAP-probe regression remains green).
+PASS: 97 shell scripts/entry points pass bash -n.
+PASS: systemd-analyze verify returns rc=0 for bric-tape-daemon.service.
+PASS: selected full-suite count remains 57 tests (run_all_tests.sh and real-tape smoke excluded).

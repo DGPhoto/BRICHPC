@@ -1,0 +1,43 @@
+BRIC Archive 2.0 — Review 34R2rc3 focused validation
+Date: 2026-10-15
+Baseline: Review 34R2rc2 emergency recovery candidate
+
+FIELD INPUT FROM REAL ONEFS/NFSv4 DESTINATION
+- mount: nfs4 vers=4.0
+- CREATE -> CLOSE -> REOPEN O_WRONLY: PASS
+- user.* xattr: EOPNOTSUPP
+- POSIX setfacl: EOPNOTSUPP
+- nfs4_getfacl: PASS
+- nfs4_setfacl: rc=255
+- raw system.nfs4_acl GET: PASS (184 bytes on probe object)
+- raw system.nfs4_acl SET of same blob to same object: EINVAL (errno 22)
+
+RC3 LOCAL PASS
+- CGO_ENABLED=0 static bric-file-metadata build; version BRIC file-metadata 34R2rc3
+- go vet cluster/libexec/bric-file-metadata.go
+- Go errno policy test: EINVAL degradable; EIO/ESTALE/ENOSPC/EROFS/ENOENT remain fatal
+- test/run_34r2_b3_payload_safe_recovery.sh PASS
+  * degraded TAR_PART path forces --no-xattrs --no-acls
+  * CLI/Slurm flag propagation present
+  * unprivileged final mode 0444 + user.* + unsupported system.nfs4_acl: rc=4, mode/mtime/user.* preserved
+  * strict metadata mode remains fail-closed
+  * synthesized base POSIX ACL not journaled
+  * empty ACL + non-empty xattr tuple framing preserved
+  * directory relaxation create/unlink canary passes
+  * EINVAL degradation boundary test passes
+- test/run_helper_portability.sh PASS
+- test/run_tar_stream.sh PASS
+- bash -n sweep: 120 shell entrypoints/scripts PASS
+- tape/** vs Review 34R2rc2: byte-identical, 10/10 files; rc2 was byte-identical to 34R1
+- database_migration=files-v34-mode-metadata unchanged
+- on_tape_format=BRIC-FORMAT-V1 unchanged
+
+NOT EXECUTED IN THIS LOCAL ENVIRONMENT
+- test/run_33_restore_txn.sh: native sqlite3 CLI missing in this container
+- complete native 83-test rc3 suite
+
+INDEPENDENT CONTEXT
+- Claude native rc1 suite: 82 OK / 1 FAIL; sole failure D1, corrected in rc2
+- Real OneFS field probe exposed rc2 EINVAL gap, corrected in rc3
+
+Release state: candidate. rc3 supersedes rc2 for the emergency degraded recovery path.

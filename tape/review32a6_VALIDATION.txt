@@ -1,0 +1,34 @@
+BRIC Archive 2.0 Review 32A6 targeted validation — 2026-09-09
+State: candidate; native RHEL8/sqlite3 runtime gate pending.
+
+CHANGE CLASS
+- Packaging/portability correction plus one test-contract cleanup.
+- bric-tar-stream.go source unchanged from Review 32A5.
+- Production shell/data path unchanged from Review 32A5.
+- BRIC-FORMAT-V1 unchanged.
+- Database migration unchanged.
+
+LOCAL STATIC VALIDATION
+PASS helper rebuilt with CGO_ENABLED=0 GOOS=linux GOARCH=amd64
+PASS file reports statically linked Linux x86-64 ELF
+PASS readelf dynamic section contains no NEEDED entries
+PASS helper --version => BRIC tar-stream 32A-parallel
+PASS test/run_helper_portability.sh
+PASS bash -n test/run_helper_portability.sh
+PASS bash -n test/run_local_e2e.sh
+PASS test/run_performance_policy.sh
+
+ROOT CAUSE CONFIRMED IN 32A5
+The previous packaged helper had a libc NEEDED dependency and required GLIBC_2.32/GLIBC_2.34.
+That violated the static-helper contract introduced in Review 30Q and explains the native RHEL8 failure.
+
+LOCAL EXECUTION LIMITATION
+The ChatGPT build container has no sqlite3 CLI. test/run_tar_stream.sh stops at its sqlite3 prerequisite, and run_local_e2e/run_dr_e2e likewise cannot be certified here.
+
+REQUIRED NATIVE VALIDATION
+1. test/run_helper_portability.sh
+2. test/run_local_e2e.sh
+3. test/run_dr_e2e.sh
+4. test/run_parallel_target_policy.sh
+5. test/run_single_run_parallel.sh
+6. full test/run_all_tests.sh

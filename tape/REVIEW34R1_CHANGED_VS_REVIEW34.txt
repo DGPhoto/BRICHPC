@@ -1,0 +1,17 @@
+CHANGES_REVIEW34R1_GATE_FIXES.md
+CHANGES_REVIEW34_FILE_METADATA_FIDELITY.md
+CLAUDE_REVIEW_BRIEF_34R1.md
+README.md
+RELEASE
+REVIEW34R1_CHANGED_VS_REVIEW34.txt
+cluster/libexec/bric-tar-stream
+cluster/libexec/bric-tar-stream.go
+cluster/scripts/bric-chunk.sh
+cluster/scripts/bric-plan.sh
+cluster/scripts/lib_restore_txn.sh
+review34r1_INVARIANTS.txt
+review34r1_VALIDATION.txt
+test/run_33_restore_txn.sh
+test/run_34_file_metadata_fidelity.sh
+test/run_posix.sh
+test/run_tar_stream.sh

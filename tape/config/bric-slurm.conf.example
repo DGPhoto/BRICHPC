@@ -1,0 +1,49 @@
+# /etc/bric/bric.conf on supekgate / Slurm side
+BRIC_ROLE=slurm
+BRIC_HOME=/projects/bricsoftware/apps/bric2/cluster
+BRIC_DB=/projects/bricsoftware/apps/bric2/cluster/db/cluster_catalog.db
+BRIC_SQL_INIT=/projects/bricsoftware/apps/bric2/cluster/sql/cluster_init.sql
+BRIC_QNAP=/mnt/data/bric
+BRIC_QNAP_MNT=/mnt/data
+BRIC_REQUIRE_NFS_BUS=1
+BRIC_ISILON_MNT=/mnt/isilon
+# Do NOT set BRIC_KEYS to a root/admin directory here. Each real user is provisioned by root with
+# cluster/scripts/bric-setup-user.sh and receives ~/.bric/<user>_user_key.txt plus ~/.bric/env.sh.
+# BRIC_USER_KEY_FILE is loaded from that per-user env file and exported into Slurm jobs.
+BRIC_RUNSTATE=/projects/bricsoftware/apps/bric2/cluster/db/runstate
+BRIC_RUN_MODE=local
+BRIC_LOCAL_TMPDIR=/var/tmp/bric
+# BRIC_SLURM_LOGDIR is ignored in local mode
+
+# Durable logs: system components use /var/log/bric. Real users receive isolated central trees
+# /var/log/bric/users/USER (owner USER, group bric, mode 2750) plus private ~/.bric/log fallback.
+BRIC_LOG_DIR=/var/log/bric
+BRIC_USER_LOG_ROOT=/var/log/bric/users
+BRIC_LOG_ADMIN_GROUP=bric
+BRIC_LOG_FALLBACK_DIR=/projects/bricsoftware/apps/bric2/log/supekgate
+BRIC_LOG_CAPTURE_STDIO=1
+BRIC_LOG_GROUP=bric
+BRIC_REQUIRE_LOGGING=1
+BRIC_LOG_MAX_MESSAGE=4000
+BRIC_NOTIFY_LOG=/var/log/bric/notifications.log
+
+# BRIC keeps the current OpenSSL when it is >=3. Otherwise it searches `module avail openssl` and
+# tries loadable versions from newest to oldest. This value is only the preferred first candidate.
+BRIC_MODULE_INIT=/etc/profile.d/modules.sh
+BRIC_OPENSSL_MIN_MAJOR=3
+BRIC_SLURM_OPENSSL_MODULE=openssl/3.5.7
+BRIC_COMMAND_LINK=/usr/local/bin/bric
+BRIC_ACTIVATE_USER_LINK=/usr/local/sbin/bric-activate-user
+BRIC_UPDATE_LINK=/usr/local/sbin/bric-update
+
+BRIC_BUS_SIGN_KEY=/projects/bricsoftware/apps/bric2/keys/cluster_bus_ecdsa_p256.pem
+BRIC_BUS_VERIFY_KEY=/projects/bricsoftware/apps/bric2/keys/tape_bus_ecdsa_p256.pub
+BRIC_REQUIRE_SIGNING=1
+BRIC_DRAIN_TIMEOUT=259200
+BRIC_CLOSE_TIMEOUT=3600
+BRIC_RESTORE_TIMEOUT=3600
+BRIC_POLL=5
+
+# QNAP is a transient transport bus. Keep terminal marker directories only for debugging.
+BRIC_KEEP_TERMINAL_BUS=0
+BRIC_ABORT_ACK_TIMEOUT=120

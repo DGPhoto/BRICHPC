@@ -1,0 +1,18 @@
+BRIC Archive 2.0 Review 30AG validation
+
+Scope: deterministic asynchronous barriers in test/run_close_hardening.sh only.
+Production datapath delta from 30AF: NONE.
+
+Validated in build environment:
+- changed-file review against 30AF: only RELEASE/README/changelog/validation, test/run_close_hardening.sh, test/run_update.sh and MANIFEST differ
+- bash -n: PASS on 97 Bash scripts
+- test/run_update.sh: PASS
+- systemd-analyze verify tape/systemd/bric-tape-daemon.service: PASS
+- MANIFEST.sha256: PASS after final regeneration
+- clean tar extraction integrity: PASS after final packaging
+
+Not executable in this build environment:
+- sqlite-dependent tests, including run_close_hardening.sh and run_stream_gate_race.sh, because the native sqlite3 CLI is absent.
+
+Release gate:
+Run the complete 57-test suite with native sqlite3 on supekgate04fl from the complete extracted release tarball.

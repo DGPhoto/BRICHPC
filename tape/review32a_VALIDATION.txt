@@ -1,0 +1,58 @@
+Review 32A performance-parallel validation — 2026-09-09
+
+STATUS: CANDIDATE FOR NATIVE/CLAUDE REVIEW, NOT YET PRODUCTION-APPROVED
+
+Build environment facts:
+- Go compiler available: go1.23.2 linux/amd64
+- Real sqlite3 CLI unavailable in this container.
+- A Python sqlite3 compatibility shim was used only where necessary; it is not an adequate substitute
+  for release certification of concurrent SQLite behavior.
+
+PASS:
+- Go build of cluster/libexec/bric-tar-stream.go
+- helper version: BRIC tar-stream 32A-parallel
+- bash -n on modified operational shell scripts
+- test/run_tar_stream.sh complete PASS:
+    * ordinary TAR_PART
+    * LARGE_FILE_CHUNK
+    * OpenSSL compatibility
+    * ciphertext SHA/HMAC
+    * sparse PAX batching
+    * sparse allocation restore
+    * 100-file sparse scale
+    * lightly-sparse normalization
+- standalone metadata-only tar stream with --chunk-start completed and produced final TAR_PART chunks
+- outer tar 4 MiB record EOF-padding regression fixed by draining zero padding to pipe EOF
+
+PARTIAL / ENVIRONMENT-LIMITED:
+- test/run_single_run_parallel.sh:
+    * four data workers launched under one run_id
+    * greedy byte balancing observed
+    * concurrent allocator produced unique chunk numbers
+    * four concurrent data chunks reached READY
+    * workers exited and coordinator moved to final metadata phase
+    * Python sqlite compatibility shim stalls in later metadata catalog transaction
+  This must be rerun with native sqlite3 on RHEL before deployment.
+
+REQUIRED BEFORE PRODUCTION:
+1. Native `test/run_all_tests.sh` with real sqlite3.
+2. Native `test/run_single_run_parallel.sh` PASS.
+3. Controlled same-run benchmark on supekgate04fl with workers 1, 2, 4.
+4. Confirm source-consistency strict failure propagation under parallel mode.
+5. Confirm one very large file spanning multiple LARGE_FILE_CHUNK records restores correctly when
+   global chunk numbers from other workers interleave.
+6. Confirm terminal metadata chunk numbers are greater than all data chunk numbers.
+7. Physical tape acceptance: dual write/readback, adaptive positioning, CLOSED barrier and restore.
+
+Do not install while PPCG_ONT__20260908T115257Z__0015 or any Review 31E7 tape operation is active.
+
+FOLLOW-UP 2026-09-09 after Claude design discussion:
+- PASS test/run_qnap_parallel_capacity.sh: physical occupancy includes .enc + .enc.part; free-space
+  requirement fails closed before reservation.
+- PASS run_performance_policy.sh, run_tar_stream.sh, run_stream_verify.sh, run_filemark_semantics.sh
+  rechecked on the updated tree.
+- run_single_run_parallel.sh again reaches four concurrent READY data chunks and then stalls in the
+  Python sqlite3 compatibility shim during serialized metadata publication; native sqlite3 remains required.
+- P0 unresolved by design: durable same-run resume/checkpoint after coordinator/host failure.
+  Candidate MUST NOT be described as production-ready for the 70 TB operation until this is resolved or
+  an explicitly accepted hidden run-group design replaces it.

@@ -1,0 +1,51 @@
+BRIC Archive 2.0 — Review 32B5 validation evidence
+Date: 2026-09-24
+State: candidate; NOT cleared for installation
+
+BASELINE
+PASS  32B4A source package SHA-256 matched handoff:
+      095878febc2f71f7f695aaf8976220470a0a445b63532685e6cc5378a4606ca4
+
+STATIC / TARGETED TESTS
+PASS  bash -n on all changed shell programs and new/changed shell tests
+PASS  test/run_32b5_schema_namespace.sh
+      fresh/migrated schema order; idempotent legacy backfill; validation;
+      synchronous --as rejection; pre-reservation collision fence
+PASS  test/run_catalog_browse.sh
+      multi-run latest-wins; history; exact run; filtering; global pagination;
+      logical full-path case-insensitive search; escaping
+PASS  standard runner progress contract for new schema test:
+      [1/1] OK run_32b5_schema_namespace.sh
+
+SIMULATED-TAPE E2E (developer compatibility SQLite harness)
+PASS  test/run_32b5_logical_restore.sh
+      backup through declared symlink with --as; declared/canonical metadata;
+      logical TAR restore; LARGE_FILE_CHUNK restore; exact --run; legacy bare
+      explicit --run; full restore unchanged/unprefixed; ambiguous bare path
+      rejection; root/run mismatch rejection; traversal rejection;
+      VERIFIED-STREAM on destination digest read failure; CHECKSUM-MISMATCH
+      on computed unequal digest.
+PASS  test/run_update.sh
+      checksum-delta update; config-derived role safety; mutable-state
+      preservation; backup; idempotency; release versioning
+PASS  existing test/run_restore_progressive.sh
+      progressive restore checks passed, all chunks consumed, no staged
+      ciphertext, inline tape-read sha256 path preserved.
+
+INVARIANTS
+PASS  producer/data-path files listed in review32b5_INVARIANTS.txt are byte-identical
+      to 32B4A.
+PASS  tape/** is byte-identical to 32B4A.
+PASS  on_tape_format remains BRIC-FORMAT-V1.
+
+ENVIRONMENT LIMITATION / RELEASE GATE
+BLOCKED  Native full test/run_all_tests.sh release validation was NOT run.
+         This container does not provide /usr/bin/sqlite3 (or another native
+         sqlite3 CLI on the normal system PATH). The targeted developer tests
+         above used a local test-only compatibility CLI linked to libsqlite3.
+         That compatibility CLI is OUTSIDE the release tree and is NOT treated
+         as equivalent evidence for the native full-suite gate.
+PENDING  Independent Claude review requested by the handoff has not been done.
+
+Therefore Review 32B5 is packaged as build_state=candidate and is not cleared
+for installation. No production installation procedure is part of this candidate.

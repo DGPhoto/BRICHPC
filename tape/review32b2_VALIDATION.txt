@@ -1,0 +1,32 @@
+BRIC Archive 2.0 Review 32B2 validation
+Date: 2026-09-10
+Base: Review 32B1
+Scope: test-only correction for progressive restore structured-event assertion
+
+Static checks performed in the ChatGPT build container:
+PASS  cluster/ is byte-identical to Review 32B1
+PASS  tape/ is byte-identical to Review 32B1
+PASS  bash -n across shell scripts / BRIC shell entrypoints / sbatch files
+PASS  test/run_helper_portability.sh
+PASS  test/run_parallel_target_policy.sh
+PASS  cluster/libexec/bric-tar-stream remains statically linked Linux x86-64
+PASS  helper contains no GLIBC_ symbol references
+PASS  test inventory remains 70 selected tests (72 run_*.sh files minus run_all_tests.sh and run_real_tape_smoke.sh)
+
+Review 32B2 test-contract change:
+- test/run_restore_progressive.sh uses private BRIC_LOG_DIR/BRIC_LOG_FALLBACK_DIR under its temporary ROOT.
+- the inline SHA assertion searches the structured events trees for inline_sha256=yes.
+- daemon stdout/stderr wording is no longer the assertion contract.
+
+Runtime limitation of this build container:
+- sqlite3 CLI is not installed, so run_restore_progressive.sh and the full DB-backed suite cannot be executed here.
+
+Required native certification on supekgate04fl:
+1. sudo KEEP=1 ./test/run_restore_progressive.sh
+2. sudo ./test/run_all_tests.sh
+
+Expected native result:
+- progressive restore: PASS
+- full suite: 70 OK, 0 FAIL
+
+After native-green certification, proceed to physical multi-pair transition smoke.

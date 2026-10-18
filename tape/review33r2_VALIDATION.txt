@@ -1,0 +1,39 @@
+BRIC Archive 2.0 — Review 33R2 local validation
+Date: 2026-10-08
+State: candidate; NOT approved for installation until native gate.
+
+Baseline anchors
+- Review 33 candidate: d1537c131ee64b09c0ddcfec862d24c9b7a924ba1cb173fe4452dcde6424d377
+- Final Review 32B5R2 supplied locally and SHA-256 verified:
+  46874ddae77cd32fa1a9fee0ecae26b0e136b413c4f78bdd56bddbdfeda3748b
+
+Local checks completed
+- bash -n: PASS on 128 bash scripts.
+- suite discovery: 81 tests (excluding run_all_tests.sh and real-tape smoke).
+- test/run_33_restore_txn.sh: PASS using a development SQLite CLI shim linked to libsqlite3.
+  ACL/xattr subtests skipped locally because acl/attr CLI tools are not installed in this container.
+- test/run_32b5_dr_verify_semantics.sh: PASS with development SQLite CLI shim.
+- test/run_32b5_slurm_cli.sh: PASS with development SQLite CLI shim/stub sbatch.
+- test/run_cli_help_man.sh: PASS.
+- synthetic process-group teardown reproducer: PASS after setsid + group-kill cleanup pattern.
+- five protected producer files: byte-identical to exact final 32B5R2.
+- tape/**: recursively byte-identical to exact final 32B5R2.
+- on_tape_format=BRIC-FORMAT-V1; database_migration=config-v32b5-logical-namespace.
+
+Not claimed locally
+- No native sqlite3 executable is installed in this container.
+- No real getfacl/setfacl/getfattr/setfattr tooling is installed here.
+- The complete 81-test native suite has therefore NOT been certified here.
+- run_bus_signing.sh is too slow through the development SQLite shim to be a meaningful determinism gate.
+
+Required independent/native gate
+- native sqlite3 + acl + attr;
+- complete suite twice serially, both 81/81;
+- repeat run_bus_signing several times;
+- run all three Review 33 tests independently;
+- repeat D1–D8 and S1/N1–N3 probes from CLAUDE_REVIEW_BRIEF_33R2.md.
+Additional local checks after final code freeze
+- test/run_update.sh: PASS with development SQLite CLI shim.
+- S1 static audit: all 26 tests named by the independent 33R1 gate contain a dedicated `setsid` daemon launch and process-group termination path.
+- final bash syntax sweep: 128/128 bash scripts PASS.
+- final release contains 81 suite tests.

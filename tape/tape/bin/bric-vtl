@@ -1,0 +1,214 @@
+#!/bin/bash
+# bric-vtl — Virtual Tape Library: fake devices backed by plain files, so the REAL backend
+# (BRIC_TAPE_BACKEND=real: mtx/mt/dd orchestration, load/unload, positioning, file numbering,
+# preflight) can be exercised end-to-end WITHOUT consuming LTO-9 cartridges.
+#
+# What it emulates (same faithful mocks the test suite validates):
+#   - changer: mock `mtx` (status/load/unload) over a slots/ directory, multi-drive
+#   - drives:  mock `mt` (setblk/rewind/fsf/eod/status, plus explicit-weof fault modelling) with per-drive position state
+#   - IO:      mock `dd` that maps device <-> per-tape numbered files (tapes/<VT>/f_NNNNNN);
+#              any dd not touching a VTL device falls through to the real /usr/bin/dd
+#   - SCSI:    mock `sg_inq` / `sg_turs` / `sg_requests` (healthy MSL-like answers) so
+#              bric-library-preflight passes against the VTL
+# NOT emulated: real SCSI semantics, tape errors, timing, LTO initialization. For a kernel-level
+# faithful stack (real /dev/st*, real mtx/mt) see mhvtl — heavier, needs a kernel module.
+#
+# Usage:
+#   bric-vtl create  DIR [--tapes N] [--drives N] [--start N]   # build a library (default 4/2/0)
+#   bric-vtl env     DIR          # print eval-able exports:  eval "$(bric-vtl env DIR)"
+#   bric-vtl status  DIR          # inventory (via the mock mtx)
+#   bric-vtl reset   DIR          # wipe written tape content + positions; keep the library
+#   bric-vtl destroy DIR          # remove everything (asks confirmation unless --force)
+#
+# Typical session on brictape (NO real hardware touched):
+#   tape/bin/bric-vtl create /tmp/vtl --tapes 4 --drives 2
+#   eval "$(tape/bin/bric-vtl env /tmp/vtl)"
+#   tape/bin/bric-library-preflight            # green on a healthy VTL
+#   bric-tape-daemon --loop &                  # real-backend daemon against fake devices
+#   ... bric backup / restore / DR ...
+set -uo pipefail
+HERE="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+. "$HERE/../scripts/lib_common.sh"
+bric_log_process_start "bric-vtl" "$@"
+
+CMD="${1:-}"; DIR="${2:-}"
+[ -n "$CMD" ] && [ -n "$DIR" ] || { sed -n '2,30p' "$0"; exit 2; }
+shift 2
+TAPES=4; DRIVES=2; START=0; FORCE=0
+while [ "$#" -gt 0 ]; do case "$1" in
+    --tapes)  TAPES="${2:-4}"; shift 2;;
+    --drives) DRIVES="${2:-2}"; shift 2;;
+    --start)  START="${2:-0}"; shift 2;;
+    --force)  FORCE=1; shift;;
+    *) die "unknown option: $1";; esac; done
+
+write_mocks() {  # $1 = vtl dir
+    local B="$1/bin"; mkdir -p "$B"
+
+    cat > "$B/mtx" <<'M'
+#!/bin/bash
+# mock mtx -f CH (status | load SLOT DRV | unload SLOT DRV)
+ST="$BRIC_MOCK_LIB"; shift 2; cmd="$1"
+case "$cmd" in
+  status)
+    ndrv=$(cat "$ST/ndrives" 2>/dev/null || echo 1)
+    nslot=$(ls "$ST/slots" | wc -l | tr -d ' ')
+    echo "  Storage Changer $BRIC_CHANGER:${ndrv} Drives, ${nslot} Slots ( 0 Import/Export )"
+    for d in $(seq 0 $((ndrv-1))); do
+        if [ -s "$ST/drive$d.vt" ]; then
+            echo "Data Transfer Element $d:Full (Storage Element $(cat "$ST/drive$d.slot") Loaded):VolumeTag = $(cat "$ST/drive$d.vt")"
+        else
+            echo "Data Transfer Element $d:Empty"
+        fi
+    done
+    for s in "$ST"/slots/*; do
+        [ -s "$s" ] && echo "      Storage Element $(basename "$s"):Full :VolumeTag=$(cat "$s")" \
+                    || echo "      Storage Element $(basename "$s"):Empty"
+    done ;;
+  load)   slot="$2"; drv="${3:-0}"
+          [ -s "$ST/slots/$slot" ] || { echo "mtx: source Element Address $slot is Empty" >&2; exit 1; }
+          [ -s "$ST/drive$drv.vt" ] && { echo "mtx: drive $drv full" >&2; exit 1; }
+          cat "$ST/slots/$slot" > "$ST/drive$drv.vt"; echo "$slot" > "$ST/drive$drv.slot"; : > "$ST/slots/$slot" ;;
+  unload) slot="$2"; drv="${3:-0}"
+          [ -s "$ST/drive$drv.vt" ] || { echo "mtx: drive $drv empty" >&2; exit 1; }
+          cat "$ST/drive$drv.vt" > "$ST/slots/$slot"; rm -f "$ST/drive$drv.vt" "$ST/drive$drv.slot"; : > "$ST/drive$drv.pos" ;;
+  *) echo "mtx-mock: unsupported: $cmd" >&2; exit 1;;
+esac
+M
+
+    cat > "$B/mt" <<'M'
+#!/bin/bash
+# mock mt -f DEV op [arg] — per-drive position; drive element = trailing digits of DEV name (nstN)
+dev="$2"; op="$3"; arg="${4:-}"
+d="${dev##*nst}"; case "$d" in ''|*[!0-9]*) d=0;; esac
+ST="$BRIC_MOCK_LIB"; st="$ST/drive$d.pos"
+vt="$(cat "$ST/drive$d.vt" 2>/dev/null || true)"
+eod(){ cat "$ST/tapes/$vt/.eod" 2>/dev/null || echo 0; }
+pos(){ cat "$st" 2>/dev/null || echo 0; }
+case "$op" in
+  setblk|compression) : ;;
+  weof)   n=$(( $(eod) + 1 )); mkdir -p "$ST/tapes/$vt"; echo "$n" > "$ST/tapes/$vt/.eod"; echo "$n" > "$st" ;;
+  rewind) echo 0 > "$st" ;;
+  eod)    eod > "$st" ;;
+  fsf)    echo $(( $(pos) + ${arg:-1} )) > "$st" ;;
+  bsf)    p=$(( $(pos) - ${arg:-1} )); [ "$p" -lt 0 ] && p=0; echo "$p" > "$st" ;;
+  status) echo "SCSI 2 tape drive:"; echo "File number=$(pos), block number=0, partition=0."
+          [ -n "$vt" ] && echo "General status bits on (41010000): BOT ONLINE IM_REP_EN" \
+                       || echo "General status bits on (40000): DR_OPEN IM_REP_EN" ;;
+  *) : ;;
+esac
+M
+
+    cat > "$B/dd" <<'M'
+#!/bin/bash
+# mock dd: VTL device <-> per-tape numbered file; everything else -> real dd
+IN=""; OUT=""; for a in "$@"; do case "$a" in if=*) IN="${a#if=}";; of=*) OUT="${a#of=}";; esac; done
+ST="$BRIC_MOCK_LIB"
+resolve() {  # device path -> drive element, or "" if not a VTL device
+    case "$1" in "$ST"/nst*) printf '%s' "${1##*nst}";; *) printf '';; esac
+}
+DW="$(resolve "$OUT")"; DR="$(resolve "$IN")"
+if [ -n "$DW" ]; then
+    vt="$(cat "$ST/drive$DW.vt" 2>/dev/null || true)"; [ -n "$vt" ] || { echo "dd-mock: drive $DW empty" >&2; exit 1; }
+    d="$ST/tapes/$vt"; mkdir -p "$d"
+    eod="$(cat "$d/.eod" 2>/dev/null || echo 0)"; n=$((eod + 1))
+    cp -f "$IN" "$d/$(printf 'f_%06d' "$n")"
+    # Model Linux st close-after-write: the close emits one flushing filemark.
+    echo "$n" > "$d/.eod"; echo "$n" > "$ST/drive$DW.pos"
+elif [ -n "$DR" ]; then
+    vt="$(cat "$ST/drive$DR.vt" 2>/dev/null || true)"; [ -n "$vt" ] || { echo "dd-mock: drive $DR empty" >&2; exit 1; }
+    pos="$(cat "$ST/drive$DR.pos" 2>/dev/null || echo 0)"
+    f="$ST/tapes/$vt/$(printf 'f_%06d' "$((pos+1))")"
+    [ -f "$f" ] || { echo "dd-mock: read past EOD (file $((pos+1)) of $vt)" >&2; exit 1; }
+    if [ -n "$OUT" ]; then cp -f "$f" "$OUT"; else cat "$f"; fi
+else
+    exec /usr/bin/dd "$@"
+fi
+M
+
+    cat > "$B/sg_inq" <<'M'
+#!/bin/bash
+case "$1" in
+  *sch*|*changer*) echo "Vendor identification: HPE"; echo "Product identification: MSL G3 Series (VTL)"; echo "Product revision level: VTL1";;
+  *) echo "Vendor identification: HPE"; echo "Product identification: Ultrium 9-SCSI (VTL)"; echo "Product revision level: VTL1";;
+esac
+M
+    cat > "$B/sg_turs" <<'M'
+#!/bin/bash
+exit 0
+M
+    cat > "$B/sg_requests" <<'M'
+#!/bin/bash
+echo "Fixed format, current; Sense key: No Sense"
+M
+    chmod +x "$B"/*
+}
+
+case "$CMD" in
+create)
+    [ -e "$DIR" ] && [ ! -f "$DIR/.bric_vtl" ] && die "$DIR exists and is not a VTL — refusing"
+    [ "$((TAPES % 2))" = 0 ] || die "--tapes must be EVEN (tapes are written in pairs)"
+    mkdir -p "$DIR/slots" "$DIR/tapes"
+    write_mocks "$DIR"
+    echo "$DRIVES" > "$DIR/ndrives"
+    for d in $(seq 0 $((DRIVES-1))); do : > "$DIR/nst$d"; : > "$DIR/drive$d.pos"; done
+    : > "$DIR/sch0"
+    for i in $(seq 0 $((TAPES-1))); do
+        printf '%06dL9\n' $((START + i)) > "$DIR/slots/$((i+1))"
+    done
+    date -u +%Y-%m-%dT%H:%M:%SZ > "$DIR/.bric_vtl"
+    echo "VTL created: $DIR  ($TAPES tapes $(printf '%06d' "$START")L9.., $DRIVES drive(s), pairing even=PRIMARY)"
+    echo "Activate with:   eval \"\$($0 env $DIR)\""
+    ;;
+env)
+    [ -f "$DIR/.bric_vtl" ] || die "$DIR is not a VTL (run: $0 create $DIR)"
+    D="$(cd "$DIR" && pwd)"
+    ND="$(cat "$D/ndrives")"
+    echo "export PATH=\"$D/bin:\$PATH\""
+    echo "export BRIC_MOCK_LIB=\"$D\""
+    echo "export BRIC_TAPE_BACKEND=real"
+    echo "export BRIC_CHANGER=\"$D/sch0\""
+    drv_list=""
+    for d in $(seq 0 $((ND-1))); do echo "export BRIC_DRIVE$d=\"$D/nst$d\""; drv_list="$drv_list $d"; done
+    echo "export BRIC_TAPE_DRIVES=\"${drv_list# }\""
+    echo "export BRIC_TAPE_LOCK=\"$D/tape.lock\""
+    echo "export BRIC_CHANGER_LOCK=\"$D/changer.lock\""
+    echo "# VTL active: real-backend code paths, zero real cartridges. Deactivate: open a new shell."
+    ;;
+status)
+    [ -f "$DIR/.bric_vtl" ] || die "$DIR is not a VTL"
+    D="$(cd "$DIR" && pwd)"
+    BRIC_MOCK_LIB="$D" BRIC_CHANGER="$D/sch0" "$D/bin/mtx" -f "$D/sch0" status
+    echo "-- written content:"
+    for t in "$D"/tapes/*/; do
+        [ -d "$t" ] || continue
+        printf '  %s: %s file(s), %s bytes\n' "$(basename "$t")" \
+            "$(ls "$t"/f_* 2>/dev/null | wc -l | tr -d ' ')" \
+            "$(du -sb "$t" 2>/dev/null | cut -f1)"
+    done
+    ;;
+reset)
+    [ -f "$DIR/.bric_vtl" ] || die "$DIR is not a VTL"
+    rm -rf "$DIR/tapes"; mkdir -p "$DIR/tapes"
+    ND="$(cat "$DIR/ndrives")"
+    for d in $(seq 0 $((ND-1))); do
+        if [ -s "$DIR/drive$d.vt" ]; then  # put any loaded tape back in its slot
+            slot="$(cat "$DIR/drive$d.slot")"; cat "$DIR/drive$d.vt" > "$DIR/slots/$slot"
+            rm -f "$DIR/drive$d.vt" "$DIR/drive$d.slot"
+        fi
+        : > "$DIR/drive$d.pos"
+    done
+    echo "VTL reset: all tape content erased, cartridges back in slots, positions rewound."
+    ;;
+destroy)
+    [ -f "$DIR/.bric_vtl" ] || die "$DIR is not a VTL — refusing to remove"
+    if [ "$FORCE" != 1 ]; then
+        printf 'Remove the entire VTL at %s? [y/N] ' "$DIR"; read -r a
+        [ "$a" = y ] || { echo "aborted"; exit 1; }
+    fi
+    rm -rf "$DIR"; echo "VTL destroyed."
+    ;;
+*)
+    die "unknown command: $CMD (create|env|status|reset|destroy)"
+    ;;
+esac

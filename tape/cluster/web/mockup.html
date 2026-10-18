@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BRIC Archive — mockup</title>
+<!-- STATIC MOCKUP: no backend. Fake data + fake filesystem, only to preview and share the look.
+     Mirrors the layout of cluster/web/bric-web.py with the proposed System-status and Activity views. -->
+<style>
+:root{
+  --bg:#f4f6f9; --card:#ffffff; --fg:#1c2330; --mut:#6b7480; --line:#e6e9ef;
+  --acc:#2f5fd0; --acc2:#5b8cff; --ok:#0f8a43; --okbg:#e8f6ee; --run:#9a6700; --runbg:#fdf4e3;
+  --bad:#c0392b; --badbg:#fdecea; --idle:#7a8492; --shadow:0 1px 2px rgba(20,30,55,.04),0 6px 22px rgba(20,30,55,.06);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--fg);margin:0;background:var(--bg)}
+a{color:var(--acc)}
+.bar{position:sticky;top:0;z-index:5;background:rgba(255,255,255,.86);backdrop-filter:saturate(1.4) blur(8px);
+  border-bottom:1px solid var(--line);padding:12px 24px;display:flex;align-items:center;gap:16px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;letter-spacing:-.2px}
+.brand .logo{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--acc),var(--acc2));
+  display:grid;place-items:center;color:#fff;font-size:14px;box-shadow:var(--shadow)}
+.chip{display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--mut);background:#fff;
+  border:1px solid var(--line);border-radius:999px;padding:5px 11px}
+.chip b{color:var(--fg);font-variant-numeric:tabular-nums}
+.chip .dot{width:7px;height:7px;border-radius:50%;background:var(--ok)}
+.chip.warn{border-color:#f1c9c2;background:var(--badbg)} .chip.warn b{color:var(--bad)} .chip.warn .dot{background:var(--bad)}
+.spacer{margin-left:auto}
+main{max-width:1080px;margin:24px auto;padding:0 20px;display:grid;gap:20px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:820px){.grid2{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;box-shadow:var(--shadow)}
+.card h2{font-size:14px;margin:0 0 16px;letter-spacing:.02em;text-transform:uppercase;color:var(--mut)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media(max-width:820px){.stats{grid-template-columns:1fr}}
+.stat .top{display:flex;justify-content:space-between;align-items:baseline}
+.stat .lab{font-size:13px;color:var(--mut)}
+.stat .big{font-size:26px;font-weight:700;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
+.stat .sub{font-size:12px;color:var(--mut);margin-top:2px}
+.track{height:9px;background:#eef1f6;border-radius:6px;overflow:hidden;margin:10px 0 4px}
+.track>i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,var(--acc),var(--acc2));transition:width .6s}
+.track.warn>i{background:linear-gradient(90deg,#e0902a,#f0b54a)} .track.bad>i{background:linear-gradient(90deg,#d24a3a,#f06a58)}
+.pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.pill{font-size:12px;border-radius:999px;padding:2px 9px;background:#f1f3f7;color:var(--mut)}
+.pill.e{background:#eef1f6} .pill.p{background:var(--runbg);color:var(--run)} .pill.f{background:var(--okbg);color:var(--ok)}
+label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px}
+input[type=text]{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;font:inherit;background:#fff}
+input[type=text]:focus{outline:none;border-color:var(--acc2);box-shadow:0 0 0 3px rgba(91,140,255,.18)}
+.row{display:flex;gap:8px}.row input{flex:1}
+button{background:var(--acc);color:#fff;border:0;border-radius:9px;padding:10px 18px;font:inherit;font-weight:600;cursor:pointer;margin-top:14px}
+button:hover{background:#274fb0}
+button.sec{background:#fff;color:var(--acc);border:1px solid var(--acc)}button.sec:hover{background:#f3f6ff}
+.browse{margin-top:0;padding:0 14px;background:#fff;color:var(--acc);border:1px solid var(--line)}.browse:hover{background:#f3f6ff;border-color:var(--acc)}
+.hint{color:var(--mut);font-size:12px;margin-top:6px}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:10px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{color:var(--mut);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+tr:last-child td{border-bottom:0}
+.badge{font-size:12px;font-weight:600;padding:2px 10px;border-radius:999px;background:#eef1f6;color:var(--mut);white-space:nowrap}
+.badge.ok{background:var(--okbg);color:var(--ok)}.badge.run{background:var(--runbg);color:var(--run)}.badge.bad{background:var(--badbg);color:var(--bad)}
+.badge.idle{background:#eef1f6;color:var(--idle)}
+.mini{height:6px;width:120px;background:#eef1f6;border-radius:5px;overflow:hidden;display:inline-block;vertical-align:middle;margin-right:8px}
+.mini>i{display:block;height:100%;background:linear-gradient(90deg,var(--acc),var(--acc2))}
+.tag{font-size:11px;color:var(--mut);border:1px solid var(--line);border-radius:6px;padding:1px 6px}
+.flash{padding:12px 14px;border-radius:10px;font-size:14px;white-space:pre-wrap;display:none}
+.flash.ok{background:var(--okbg);color:#0b6a34;border:1px solid #bfe6cd}
+.flash.run{background:var(--runbg);color:#7a5200;border:1px solid #f0dcae}
+.flash.bad{background:var(--badbg);color:#a4271b;border:1px solid #f3c9c2}
+.note{font-size:12px;color:var(--mut);margin-top:10px}
+.modal{position:fixed;inset:0;background:rgba(15,22,40,.45);display:none;align-items:center;justify-content:center;z-index:20;padding:18px}
+.modal.open{display:flex}
+.dialog{background:#fff;border-radius:16px;width:min(640px,96vw);max-height:84vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(15,22,40,.3)}
+.dialog .dh{border-bottom:1px solid var(--line);padding:16px 20px}
+.dialog h3{margin:0;font-size:15px}.crumb{font-size:12px;color:var(--mut);margin-top:5px;word-break:break-all}
+.roots{display:flex;gap:7px;flex-wrap:wrap;padding:12px 20px;border-bottom:1px solid var(--line)}
+.rchip{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:4px 12px;background:#fafbfd;cursor:pointer}.rchip:hover{background:#f1f5ff;border-color:var(--acc2)}
+.flist{overflow:auto;padding:8px 12px}
+.it{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:9px;cursor:pointer}.it:hover{background:#f3f6ff}
+.it .ic{width:18px;text-align:center;opacity:.8}
+.df{display:flex;gap:10px;justify-content:space-between;align-items:center;padding:14px 20px;border-top:1px solid var(--line)}
+.cur{font-size:12px;color:var(--mut);font-family:ui-monospace,monospace;word-break:break-all}
+footer{max-width:1080px;margin:6px auto 48px;padding:0 20px;color:var(--mut);font-size:12px}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <div class="brand"><span class="logo">&#9636;</span> BRIC Archive</div>
+  <span class="chip"><span class="dot"></span> system healthy</span>
+  <span class="spacer"></span>
+  <span class="chip">user <b>vsz652</b></span>
+  <span class="chip" id="sess">session <b>&mdash;</b> left</span>
+</div>
+
+<main>
+  <div class="flash ok" id="flash"></div>
+
+  <div class="card">
+    <h2>System status</h2>
+    <div class="stats">
+      <div class="stat">
+        <div class="top"><span class="lab">Staging (QNAP, in-flight)</span><span class="tag" id="stag-pct"></span></div>
+        <div class="big" id="stag-big"></div>
+        <div class="track" id="stag-track"><i></i></div>
+        <div class="sub" id="stag-sub"></div>
+      </div>
+      <div class="stat">
+        <div class="top"><span class="lab">Tape pool</span><span class="tag" id="tape-pct"></span></div>
+        <div class="big" id="tape-big"></div>
+        <div class="track" id="tape-track"><i></i></div>
+        <div class="pills" id="tape-pills"></div>
+      </div>
+      <div class="stat">
+        <div class="top"><span class="lab">Active jobs</span><span class="tag" id="job-tag"></span></div>
+        <div class="big" id="job-big"></div>
+        <div class="sub" id="job-sub"></div>
+        <div class="pills" id="job-pills"></div>
+      </div>
+    </div>
+    <div class="note">Only <b id="prod-name">one backup</b> streams to the QNAP at a time (the producer
+      slot &mdash; the network is the bottleneck); tape writing of earlier chunks overlaps freely.
+      &ldquo;Staging&rdquo; is just the chunks currently in flight on the bus &mdash; bounded per run by
+      <span class="mono">max_inflight_chunks</span> and globally by <span class="mono">qnap_budget_bytes</span>,
+      never the whole dataset. Each blob is freed the instant it is verified on tape.</div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>New backup</h2>
+      <label for="p">Project name</label>
+      <input id="p" type="text" placeholder="e.g. mouse_rnaseq">
+      <label for="s">Folder to archive (path on the cluster)</label>
+      <div class="row">
+        <input id="s" type="text" placeholder="/projects/.../mouse_rnaseq">
+        <button class="browse" type="button" onclick="openBrowse('s')">Browse&hellip;</button>
+      </div>
+      <div class="hint">Must exist and be readable by you. It is encrypted with your key before it leaves the cluster.</div>
+      <button type="button" onclick="flash('Backup started.\\nOrchestrator job 481923 submitted on the \\'archive\\' partition. It reserves tape pairs, then produces chunks &mdash; this page updates as it runs.')">Start backup</button>
+    </div>
+
+    <div class="card">
+      <h2>Restore</h2>
+      <label for="rp">Project to restore</label>
+      <input id="rp" type="text" placeholder="e.g. mouse_rnaseq">
+      <label for="rd">Destination folder</label>
+      <div class="row">
+        <input id="rd" type="text" value="/home/vsz652/bric-restore">
+        <button class="browse" type="button" onclick="openBrowse('rd')">Browse&hellip;</button>
+      </div>
+      <label for="rf">Single file (optional, relative path)</label>
+      <input id="rf" type="text" placeholder="(empty = whole project)">
+      <button class="sec" type="button" onclick="startRestore()">Restore</button>
+      <div class="hint">A restore stages chunks back from tape, decrypts and verifies them &mdash; it can run
+        for a while. It is submitted as a job and runs even if you close this page; this opens a live
+        status view that updates on its own.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>System activity &mdash; backups &amp; restores in progress</h2>
+    <table>
+      <thead><tr><th>Project</th><th>Owner</th><th>Type</th><th>State</th><th>Progress</th><th>Reserved</th><th>Since</th></tr></thead>
+      <tbody id="activity"></tbody>
+    </table>
+    <div class="note">Shows runs currently holding staging/tape so you can see why the system is busy.
+      Owner names can be hidden if you prefer an anonymized view.</div>
+  </div>
+
+  <div class="card">
+    <h2>My backups</h2>
+    <table>
+      <thead><tr><th>Project / run</th><th>State</th><th>Progress</th><th>Size</th><th>Requested</th></tr></thead>
+      <tbody id="mine"></tbody>
+    </table>
+  </div>
+</main>
+
+<footer>Personal session (uid vsz652). Data is encrypted with your key before leaving the cluster.
+The actual archiving continues as a SLURM job even if you close this page.</footer>
+
+<div class="modal" id="modal"><div class="dialog">
+  <div class="dh"><h3>Choose a folder</h3><div class="crumb" id="crumb"></div></div>
+  <div class="roots" id="roots"></div>
+  <div class="flist" id="flist"></div>
+  <div class="df"><span class="cur" id="cur" data-path=""></span>
+    <span><button class="sec" type="button" onclick="closeBrowse()">Cancel</button>
+    <button type="button" onclick="chooseDir()">Use this folder</button></span></div>
+</div></div>
+
+<div class="modal" id="rmodal"><div class="dialog">
+  <div class="dh"><h3>Restore in progress</h3><div class="crumb" id="rcrumb"></div></div>
+  <div style="padding:16px 20px">
+    <p id="rstate" class="flash run" style="display:block;margin:0 0 12px">Starting the restore&hellip;</p>
+    <div class="hint">The restore runs as a job and continues even if you close this page. This view polls
+      its status and tails the log.</div>
+    <pre id="rlog" class="mono" style="white-space:pre-wrap;max-height:46vh;overflow:auto;background:#0b1020;color:#cbd5e1;padding:12px;border-radius:10px;margin-top:12px"></pre>
+  </div>
+  <div class="df"><span class="cur" id="rjob"></span>
+    <button class="sec" type="button" onclick="closeRestore()">Close</button></div>
+</div></div>
+
+<script>
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function flash(t){const f=document.getElementById('flash');f.textContent=t;f.style.display='block';window.scrollTo({top:0,behavior:'smooth'})}
+function setBar(id,pct){const t=document.getElementById(id);t.querySelector('i').style.width=Math.min(100,pct)+'%';
+  t.classList.toggle('warn',pct>=75&&pct<90);t.classList.toggle('bad',pct>=90)}
+
+const STAGING={used:23.6, budget:92.0};
+const TAPE={used:214.7, cap:720.0, empty:22, partial:12, full:6, pairsFree:9};
+const ACTIVE=[
+ {project:'mouse_rnaseq',owner:'vsz652',kind:'ARCHIVE',state:'PRODUCING',cls:'run',done:7,n:14,resv:'2.7 TiB',since:'18 min'},
+ {project:'cortex_atac', owner:'akh423', kind:'ARCHIVE',state:'DRAINING', cls:'run',done:9,n:9, resv:'1.8 TiB',since:'42 min'},
+ {project:'wgs_cohort',  owner:'mlf991', kind:'ARCHIVE',state:'RESERVED', cls:'idle',done:0,n:31,resv:'9.4 TiB',since:'2 min'},
+ {project:'spatial_2025',owner:'vsz652',kind:'RESTORE', cls:'run',state:'RESTORING',done:5,n:6,resv:'\u2014',since:'9 min'},
+ {project:'pilot_chip',  owner:'akh423', kind:'ARCHIVE',state:'RESERVED', cls:'idle',done:0,n:4, resv:'0.4 TiB',since:'1 min'},
+];
+const MINE=[
+ {project:'genome_wgs',  run:'genome_wgs__20260624T091000Z__0007', state:'CLOSED', cls:'ok', done:12,n:12,size:'8.40 TiB',at:'2026-06-24 09:10'},
+ {project:'mouse_rnaseq',run:'mouse_rnaseq__20260624T110200Z__0008',state:'PRODUCING',cls:'run',done:7,n:14,size:'3.10 TiB',at:'2026-06-24 11:02'},
+ {project:'pilot_atac',  run:'pilot_atac__20260624T104500Z__0006', state:'FAILED', cls:'bad', done:0,n:3, size:'0.90 TiB',at:'2026-06-24 10:45',err:'no tape pair with enough free space'},
+];
+
+function renderStatus(){
+  const producing=ACTIVE.filter(a=>a.kind==='ARCHIVE'&&a.state==='PRODUCING');
+  const sp=Math.round(100*STAGING.used/STAGING.budget);
+  document.getElementById('stag-big').textContent=STAGING.used.toFixed(1)+' TB';
+  document.getElementById('stag-sub').textContent='of '+STAGING.budget.toFixed(0)+' TB budget \u00b7 '+producing.length+(producing.length===1?' run producing':' runs producing');
+  const pn=document.getElementById('prod-name'); if(pn) pn.textContent=producing.length?producing[0].project:'no backup';
+  document.getElementById('stag-pct').textContent=sp+'%'; setBar('stag-track',sp);
+  const tp=Math.round(100*TAPE.used/TAPE.cap);
+  document.getElementById('tape-big').textContent=TAPE.used.toFixed(0)+' / '+TAPE.cap.toFixed(0)+' TB';
+  document.getElementById('tape-pct').textContent=tp+'%'; setBar('tape-track',tp);
+  document.getElementById('tape-pills').innerHTML=
+    '<span class="pill e">'+TAPE.empty+' empty</span><span class="pill p">'+TAPE.partial+' partial</span>'+
+    '<span class="pill f">'+TAPE.full+' full</span><span class="pill">'+TAPE.pairsFree+' pairs free onsite</span>';
+  const byState={};ACTIVE.forEach(a=>byState[a.state]=(byState[a.state]||0)+1);
+  document.getElementById('job-big').textContent=ACTIVE.length;
+  document.getElementById('job-tag').textContent='now';
+  document.getElementById('job-sub').textContent='backups & restores holding staging/tape';
+  document.getElementById('job-pills').innerHTML=Object.entries(byState)
+    .map(([k,v])=>'<span class="pill">'+v+' '+k.toLowerCase()+'</span>').join('');
+}
+function actRow(a){const pct=a.n?Math.round(100*a.done/a.n):0;
+ return '<tr><td><b>'+esc(a.project)+'</b></td><td class="mono">'+esc(a.owner)+'</td>'+
+  '<td><span class="tag">'+esc(a.kind)+'</span></td><td><span class="badge '+a.cls+'">'+esc(a.state)+'</span></td>'+
+  '<td><span class="mini"><i style="width:'+pct+'%"></i></span>'+a.done+'/'+a.n+'</td>'+
+  '<td>'+esc(a.resv)+'</td><td>'+esc(a.since)+'</td></tr>';}
+function mineRow(x){const pct=x.n?Math.round(100*x.done/x.n):0;
+ return '<tr><td><div><b>'+esc(x.project)+'</b></div><div class="mono">'+esc(x.run)+'</div></td>'+
+  '<td><span class="badge '+x.cls+'">'+esc(x.state)+'</span>'+(x.err?'<div class="hint">'+esc(x.err)+'</div>':'')+'</td>'+
+  '<td><span class="mini"><i style="width:'+pct+'%"></i></span>'+x.done+'/'+x.n+'</td>'+
+  '<td>'+esc(x.size)+'</td><td class="mono">'+esc(x.at)+'</td></tr>';}
+document.getElementById('activity').innerHTML=ACTIVE.map(actRow).join('');
+document.getElementById('mine').innerHTML=MINE.map(mineRow).join('');
+renderStatus();
+
+setInterval(()=>{const r=MINE.find(m=>m.state==='PRODUCING');
+  if(r&&r.done<r.n&&Math.random()<.4){r.done++;document.getElementById('mine').innerHTML=MINE.map(mineRow).join('');
+    STAGING.used=Math.min(STAGING.budget,STAGING.used+0.3);renderStatus();}},2500);
+
+let LEFT=4*3600+52*60;
+function fmt(s){const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),x=s%60;
+  return h>0?(h+'h '+String(m).padStart(2,'0')+'m'):(m+'m '+String(x).padStart(2,'0')+'s');}
+function tick(){const el=document.getElementById('sess');
+  if(LEFT<=0){el.innerHTML='session <b>expired</b>';el.classList.add('warn');return;}
+  el.querySelector('b').textContent=fmt(LEFT);el.classList.toggle('warn',LEFT<1800);LEFT--;}
+tick();setInterval(tick,1000);
+
+const FS={
+ '/':{dirs:['projects','datasets','home'],n:0},
+ '/projects':{dirs:['bricsoftware','lab-AUDIT','khodosevich'],n:1},
+ '/projects/lab-AUDIT':{dirs:['raw_data','processed','metadata'],n:3},
+ '/projects/lab-AUDIT/raw_data':{dirs:['run_2026_05','run_2026_06'],n:0},
+ '/projects/lab-AUDIT/processed':{dirs:['aligned','counts'],n:12},
+ '/projects/lab-AUDIT/metadata':{dirs:[],n:8},
+ '/projects/khodosevich':{dirs:['scRNA','spatial'],n:0},
+ '/projects/bricsoftware':{dirs:['apps','containers'],n:0},
+ '/datasets':{dirs:['lab-AUDIT','shared'],n:0},
+ '/datasets/lab-AUDIT':{dirs:['fastq'],n:40},
+ '/home':{dirs:['vsz652'],n:0},
+ '/home/vsz652':{dirs:['bric-restore','scripts'],n:5},
+};
+const ROOTS=['/home/vsz652','/projects','/datasets','/'];
+let BTARGET=null;
+function openBrowse(id){BTARGET=id;document.getElementById('modal').classList.add('open');
+  const v=document.getElementById(id).value;ls(v&&FS[v]?v:'/home/vsz652');}
+function closeBrowse(){document.getElementById('modal').classList.remove('open');}
+function parentOf(p){if(p==='/')return null;const q=p.replace(/\/$/,'');return q.slice(0,q.lastIndexOf('/'))||'/';}
+function ls(path){const d=FS[path]||{dirs:[],n:0};
+  document.getElementById('crumb').textContent=path;
+  const cur=document.getElementById('cur');cur.textContent=path;cur.dataset.path=path;
+  document.getElementById('roots').innerHTML=ROOTS.map(r=>'<span class="rchip" onclick="ls(\''+r+'\')">'+esc(r)+'</span>').join('');
+  let h='';const par=parentOf(path);
+  if(par!==null)h+='<div class="it" onclick="ls(\''+par+'\')"><span class="ic">\u21b0</span> .. (up)</div>';
+  h+=d.dirs.map(name=>{const np=(path==='/'?'':path)+'/'+name;return '<div class="it" onclick="ls(\''+np+'\')"><span class="ic">\ud83d\udcc1</span> '+esc(name)+'</div>'}).join('');
+  if(!d.dirs.length)h+='<div class="hint" style="padding:10px">No subfolders. '+d.n+' files here.</div>';
+  document.getElementById('flist').innerHTML=h;}
+function chooseDir(){const p=document.getElementById('cur').dataset.path;
+  if(BTARGET&&p)document.getElementById(BTARGET).value=p;closeBrowse();}
+
+// ---- async restore: mirrors the real /restore-status page (submit a job, poll status, tail log) ----
+let RTIMER=null;
+function closeRestore(){document.getElementById('rmodal').classList.remove('open');if(RTIMER){clearTimeout(RTIMER);RTIMER=null;}}
+function startRestore(){
+  const proj=(document.getElementById('rp').value||'mouse_rnaseq').trim();
+  const dest=(document.getElementById('rd').value||'/home/vsz652/bric-restore').trim();
+  const file=(document.getElementById('rf').value||'').trim();
+  const job='restore_'+new Date().toISOString().replace(/[-:T]/g,'').slice(0,15)+'Z_'+Math.random().toString(16).slice(2,10);
+  const m=document.getElementById('rmodal'), st=document.getElementById('rstate'), log=document.getElementById('rlog');
+  document.getElementById('rcrumb').textContent=proj+'  \u2192  '+dest+(file?('   ('+file+')'):'   (whole project)');
+  document.getElementById('rjob').textContent=job;
+  st.className='flash run';st.style.display='block';st.textContent='\u23f3 Restore submitted as a job\u2026';
+  log.textContent='';m.classList.add('open');
+  // The real backend submits `bric restore` (sbatch if available) and streams to a per-job log; here we
+  // just play that log back so you can preview the live view.
+  const steps=[
+    'restore '+job+' submitted',
+    'staging chunk 1/'+(file?'3':'14')+' from tape 000002L9',
+    'staging chunk 2 from tape 000002L9',
+    'staging chunk 3 from tape 000002L9',
+    'decrypt + verify (HMAC, then plaintext SHA-256)',
+    'writing files to '+dest,
+  ];
+  let i=0;
+  function step(){
+    if(i<steps.length){ log.textContent+=(log.textContent?'\n':'')+steps[i]; log.scrollTop=log.scrollHeight; i++;
+      st.textContent='\u23f3 Restoring\u2026 (staging from tape, decrypt, verify)';
+      RTIMER=setTimeout(step, 900);
+    } else {
+      log.textContent+='\nrestore complete and verified';
+      st.className='flash ok';st.textContent='\u2713 Restore complete and verified.';RTIMER=null;
+    }
+  }
+  step();
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,51 @@
+BRIC Archive 2.0 Review 30AE validation
+Date: 2026-09-03
+
+Baseline
+--------
+Built from the complete Review 30AD release tree.
+No database migration. On-tape format remains BRIC-FORMAT-V1.
+
+30AE changes validated locally
+------------------------------
+PASS: qnap_inflight_bytes retains GNU find -ignore_readdir_race.
+PASS: qnap_inflight_bytes no longer discards find stderr.
+PASS: transient global-budget probe failures pause and retry; producer does not immediately abort.
+PASS: successful probe resets the consecutive-failure state and allows the gate to proceed.
+PASS: persistent probe failures abort only after BRIC_QNAP_PROBE_MAX_FAILURES threshold.
+PASS: legacy bric-chunk contains the same bounded-retry budget policy.
+PASS: run_stream_gate_race.sh targeted regression test.
+PASS: run_all_tests.sh emits explicit [n/N] RUN and [n/N] PASS/FAIL progress.
+PASS: run_all_tests.sh rejects incomplete/role-filtered trees whose MANIFEST.sha256 does not verify.
+PASS: Bash syntax validation for release shell entry points.
+PASS: systemd-analyze verify for bric-tape-daemon.service.
+
+Important validation-environment note
+-------------------------------------
+This build container does not provide the native sqlite3 CLI. The targeted regression test was run
+with a local compatibility CLI only to exercise the shell/control-flow logic. It is NOT counted as a
+substitute for the full native integration suite.
+
+The full suite must be run on the deployment host from the COMPLETE EXTRACTED 30AE RELEASE TREE,
+not from /opt/bric2. bric-update is role-safe by design: on a BRIC_ROLE=slurm host it installs cluster
+paths but not the complete tape role, and vice versa. A full cross-role suite launched from such an
+installed tree produces misleading failures (for example missing tape/bin/bric-tape-import-inventory
+or stale cross-role tape scripts). Review 30AE detects this condition up front and exits with an
+explicit instruction instead.
+
+Required native gate before the next real smoke
+-----------------------------------------------
+From the extracted 30AE tarball on supekgate04fl (native sqlite3 3.45.1 available):
+
+    cd bric_archive_2_0_review30ae_qnap_probe_retry_test_progress_20260903
+    bash test/run_all_tests.sh --timeout 600
+
+The runner will display [n/N] progress for every selected test.
+
+Additional release checks
+-------------------------
+PASS: run_update.sh targeted updater regression test.
+PASS: complete-tree guard exits rc=2 on an intentionally incomplete role-filtered copy.
+PASS: final selected full-suite count is 57 tests (excluding run_all_tests.sh and real-tape smoke).
+PASS: 97 shell entry points/scripts pass syntax validation.
+PASS: release manifest contains exactly the release file set after final packaging preparation.

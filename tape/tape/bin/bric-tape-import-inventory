@@ -1,0 +1,359 @@
+#!/bin/bash
+# Import the complete physical barcode pairs currently visible to the real changer.
+# Existing tape history/ownership/usage is preserved; only physical slot and pairing metadata
+# are refreshed. New complete pairs are inserted EMPTY. Incomplete pairs are reported and skipped.
+set -euo pipefail
+IFS=$'\n\t'
+umask 077
+
+HERE="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+CONFIG="/etc/bric/bric.conf"
+MODE=dry-run
+STATUS_FILE=""
+CAPACITY_OVERRIDE=""
+KEEP_STOPPED=0
+
+usage() {
+    cat <<'USAGE'
+Usage:
+  bric-tape-import-inventory [--dry-run]
+  bric-tape-import-inventory --apply
+
+Options:
+  --config FILE        Runtime config. Default: /etc/bric/bric.conf.
+  --status-file FILE   Parse a captured `mtx status` instead of querying the changer.
+                       Intended for tests/offline review.
+  --capacity-tb N      Capacity assigned only to newly discovered tapes.
+                       Default: BRIC_TAPE_CAPACITY_TB or 18.0.
+  --dry-run            Show the exact catalog changes; default.
+  --apply              Stop the daemon, update the catalog transactionally, restart it.
+  --keep-daemon-stopped
+                       Do not restart a daemon that was active before --apply.
+
+Safety:
+  * requires BRIC_ROLE=tape and root;
+  * refuses while reservations/writes are active;
+  * preserves status, project, owner, used space, health and telemetry of existing tapes;
+  * never deletes or retires catalog-only/offsite media;
+  * skips physical barcodes whose configured sibling is absent;
+  * refuses to reinterpret an assigned or written tape under a different pair/role.
+USAGE
+}
+
+pre_die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --config) CONFIG="${2:-}"; shift 2;;
+        --status-file) STATUS_FILE="${2:-}"; shift 2;;
+        --capacity-tb) CAPACITY_OVERRIDE="${2:-}"; shift 2;;
+        --dry-run) MODE=dry-run; shift;;
+        --apply) MODE=apply; shift;;
+        --keep-daemon-stopped) KEEP_STOPPED=1; shift;;
+        -h|--help) usage; exit 0;;
+        *) pre_die "unknown option: $1";;
+    esac
+done
+case "$CONFIG" in /*) ;; *) pre_die "--config must be absolute";; esac
+if [ -n "$STATUS_FILE" ]; then case "$STATUS_FILE" in /*) ;; *) pre_die "--status-file must be absolute";; esac; fi
+
+# Administrative operations must not inherit stale BRIC_* overrides from root's shell.
+# The selected config is authoritative; explicit command options are held in non-BRIC variables.
+while IFS= read -r inherited; do
+    [ "$inherited" = BRIC_CONFIG ] || unset "$inherited"
+done < <(compgen -v | grep '^BRIC_' || true)
+export BRIC_CONFIG="$CONFIG"
+. "$HERE/../scripts/lib_common.sh"
+require_role tape
+. "$HERE/../scripts/lib_tape_io.sh"
+require_cmds sqlite3 awk sed sort grep cut uniq wc tr sha256sum flock install
+[ "${EUID:-$(id -u)}" -eq 0 ] || die "bric-tape-import-inventory must run as root"
+[ -s "$BRIC_TAPE_DB" ] || die "tape catalog missing or empty: $BRIC_TAPE_DB"
+[ "$MODE" = dry-run ] || [ "$MODE" = apply ] || die "invalid mode: $MODE"
+if [ -z "$STATUS_FILE" ]; then
+    [ "$BRIC_TAPE_BACKEND" = real ] || die "physical inventory import requires BRIC_TAPE_BACKEND=real"
+fi
+
+CAPACITY_TB="${CAPACITY_OVERRIDE:-${BRIC_TAPE_CAPACITY_TB:-18.0}}"
+awk -v n="$CAPACITY_TB" 'BEGIN{exit !(n ~ /^[0-9]+([.][0-9]+)?$/ && n > 0)}' \
+    || die "capacity must be a positive number (got '$CAPACITY_TB')"
+
+DB_PARITY="$(tcfg primary_parity)"
+FILE_PARITY="${BRIC_PRIMARY_PARITY:-}"
+case "$DB_PARITY" in even|odd) ;; '') :;; *) die "invalid primary_parity='$DB_PARITY' in tape catalog";; esac
+case "$FILE_PARITY" in even|odd) ;; '') :;; *) die "invalid BRIC_PRIMARY_PARITY='$FILE_PARITY' in $CONFIG";; esac
+if [ -n "$DB_PARITY" ] && [ -n "$FILE_PARITY" ] && [ "$DB_PARITY" != "$FILE_PARITY" ]; then
+    die "pairing conflict: catalog primary_parity=$DB_PARITY but $CONFIG has BRIC_PRIMARY_PARITY=$FILE_PARITY"
+fi
+PARITY_NAME="${FILE_PARITY:-${DB_PARITY:-}}"
+[ -n "$PARITY_NAME" ] || die "primary parity is unset; define BRIC_PRIMARY_PARITY=even|odd in $CONFIG"
+case "$PARITY_NAME" in even) PARITY=0;; odd) PARITY=1;; esac
+
+TMP="$(mktemp -d)"
+SERVICE_NAME="${BRIC_TAPE_DAEMON_SERVICE:-bric-tape-daemon.service}"
+SERVICE_WAS_ACTIVE=0
+SERVICE_STOPPED=0
+LOCKED=0
+ADMIN_SINGLETON_FDS=""
+ADMIN_WORK_FDS=""
+release_admin_locks() {
+    # The importer and daemon use the same singleton/work locks.  Release both before asking
+    # systemd to start the daemon; otherwise the new daemon immediately exits with "another
+    # daemon holds ..." while this EXIT trap is still running.
+    if [ "$LOCKED" -eq 1 ]; then
+        local IFS=, fd
+        for fd in $ADMIN_WORK_FDS; do flock -u "$fd" 2>/dev/null || true; done
+        for fd in $ADMIN_SINGLETON_FDS; do flock -u "$fd" 2>/dev/null || true; done
+        bric_tape_close_fd_csv "$ADMIN_WORK_FDS"
+        bric_tape_close_fd_csv "$ADMIN_SINGLETON_FDS"
+        ADMIN_WORK_FDS=""; ADMIN_SINGLETON_FDS=""; LOCKED=0
+    fi
+}
+finish() {
+    local rc=$? attempt daemon_active=0
+    trap - EXIT INT TERM
+    rm -rf "$TMP"
+    release_admin_locks
+    if [ "$SERVICE_STOPPED" -eq 1 ] && [ "$SERVICE_WAS_ACTIVE" -eq 1 ] && [ "$KEEP_STOPPED" -eq 0 ]; then
+        if systemctl start "$SERVICE_NAME" >/dev/null 2>&1; then
+            attempt=0
+            while [ "$attempt" -lt 10 ]; do
+                if systemctl is-active --quiet "$SERVICE_NAME"; then
+                    daemon_active=1
+                    break
+                fi
+                attempt=$((attempt+1))
+                sleep 1
+            done
+            if [ "$daemon_active" -ne 1 ]; then
+                printf 'ERROR: inventory import finished but the restarted tape daemon did not remain active\n' >&2
+                systemctl status "$SERVICE_NAME" --no-pager -l >&2 2>/dev/null || true
+                command -v journalctl >/dev/null 2>&1 && \
+                    journalctl -u "$SERVICE_NAME" -n 30 --no-pager >&2 2>/dev/null || true
+                [ "$rc" -ne 0 ] || rc=1
+            fi
+        else
+            printf 'ERROR: inventory import finished but the tape daemon could not be restarted\n' >&2
+            systemctl status "$SERVICE_NAME" --no-pager -l >&2 2>/dev/null || true
+            [ "$rc" -ne 0 ] || rc=1
+        fi
+    fi
+    exit "$rc"
+}
+trap finish EXIT INT TERM
+
+active_work_count() {
+    sqlite3 -batch -cmd '.timeout 60000' "$BRIC_TAPE_DB" "SELECT
+      (SELECT COUNT(*) FROM reservation WHERE state='GRANTED') +
+      (SELECT COUNT(*) FROM segments WHERE state IN ('WRITING','WRITTEN')) +
+      (SELECT COUNT(*) FROM tape_artifacts WHERE state='WRITING');"
+}
+
+if [ "$MODE" = apply ]; then
+    nactive="$(active_work_count 2>/dev/null || echo query-failed)"
+    [ "$nactive" != query-failed ] || die "cannot query active tape work in $BRIC_TAPE_DB"
+    [ "$nactive" = 0 ] || die "$nactive active reservation/write item(s) found; wait before importing inventory"
+    if [ "$SERVICE_NAME" != none ] && command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet "$SERVICE_NAME"; then
+        SERVICE_WAS_ACTIVE=1
+        systemctl stop "$SERVICE_NAME"
+        SERVICE_STOPPED=1
+    fi
+    LOCK_PATH="$BRIC_TAPE_LOCK"
+    WORK_LOCK_PATH="$BRIC_TAPE_WORK_LOCK"
+    case "$LOCK_PATH" in /*) ;; *) die "BRIC_TAPE_LOCK must be absolute: $LOCK_PATH";; esac
+    case "$WORK_LOCK_PATH" in /*) ;; *) die "BRIC_TAPE_WORK_LOCK must be absolute: $WORK_LOCK_PATH";; esac
+    singleton_paths=("$LOCK_PATH"); work_paths=("$WORK_LOCK_PATH"); seen="|$LOCK_PATH|"
+    while IFS= read -r p; do
+        [ -n "$p" ] || continue
+        case "$seen" in *"|$p|"*) continue;; esac
+        singleton_paths+=("$p"); seen="${seen}${p}|"
+    done < <(bric_tape_legacy_singleton_paths "$LOCK_PATH")
+    seen="|$WORK_LOCK_PATH|"
+    while IFS= read -r p; do
+        [ -n "$p" ] || continue
+        case "$seen" in *"|$p|"*) continue;; esac
+        work_paths+=("$p"); seen="${seen}${p}|"
+    done < <(bric_tape_legacy_work_paths "$LOCK_PATH")
+    ADMIN_SINGLETON_FDS=""; ADMIN_WORK_FDS=""
+    for p in "${singleton_paths[@]}"; do
+        bric_tape_open_lock_fd fd "$p"
+        if flock -n "$fd"; then ADMIN_SINGLETON_FDS="${ADMIN_SINGLETON_FDS:+$ADMIN_SINGLETON_FDS,}$fd"
+        else eval "exec ${fd}>&-" 2>/dev/null || true; die "tape daemon lock is still held: $p"; fi
+    done
+    for p in "${work_paths[@]}"; do
+        bric_tape_open_lock_fd fd "$p"
+        if flock -n "$fd"; then ADMIN_WORK_FDS="${ADMIN_WORK_FDS:+$ADMIN_WORK_FDS,}$fd"
+        else eval "exec ${fd}>&-" 2>/dev/null || true; die "tape work lock is still held: $p"; fi
+    done
+    LOCKED=1
+    nactive="$(active_work_count 2>/dev/null || echo query-failed)"
+    [ "$nactive" != query-failed ] || die "cannot re-query active tape work after stopping the daemon"
+    [ "$nactive" = 0 ] || die "$nactive tape work item(s) appeared during import fencing; catalog was not changed"
+fi
+
+if [ -n "$STATUS_FILE" ]; then
+    [ -r "$STATUS_FILE" ] || die "cannot read --status-file: $STATUS_FILE"
+    cat "$STATUS_FILE" > "$TMP/mtx.status"
+else
+    _status > "$TMP/mtx.status"
+fi
+
+# One line per physical cartridge: volumetag|home-slot|slot|drive. A loaded cartridge keeps
+# the source Storage Element reported by mtx as its home slot.
+sed -n -E \
+  -e 's/^Data Transfer Element [0-9]+:Full \(Storage Element ([0-9]+) Loaded\):VolumeTag *= *([A-Za-z0-9]+).*/\2|\1|drive/p' \
+  -e 's/^[[:space:]]*Storage Element ([0-9]+):Full[[:space:]]*:VolumeTag *= *([A-Za-z0-9]+).*/\2|\1|slot/p' \
+  "$TMP/mtx.status" | sort -t'|' -k1,1 > "$TMP/inventory.raw"
+[ -s "$TMP/inventory.raw" ] || die "mtx inventory contains no readable VolumeTags"
+cut -d'|' -f1 "$TMP/inventory.raw" > "$TMP/inventory.labels"
+
+# Detect duplicate labels before loading the associative map.
+cut -d'|' -f1 "$TMP/inventory.raw" | sort | uniq -d > "$TMP/duplicates"
+[ ! -s "$TMP/duplicates" ] || die "duplicate VolumeTag(s) reported by changer: $(tr '\n' ' ' < "$TMP/duplicates")"
+
+declare -A SLOT LOCATION ROLE PAIR SIB COMPLETE_PAIR
+BARCODES=()
+while IFS='|' read -r vt slot location; do
+    case "$vt" in [0-9][0-9][0-9][0-9][0-9][0-9]L[0-9]) ;; *) die "unsupported barcode format '$vt' (expected NNNNNNLn)";; esac
+    case "$slot" in ''|*[!0-9]*) die "invalid home slot '$slot' for $vt";; esac
+    SLOT["$vt"]="$slot"; LOCATION["$vt"]="$location"; BARCODES+=("$vt")
+done < "$TMP/inventory.raw"
+
+ORPHANS=()
+for vt in "${BARCODES[@]}"; do
+    num="${vt%%L*}"; gen="${vt#"$num"}"; n=$((10#$num))
+    if [ $((n % 2)) -eq "$PARITY" ]; then
+        role=PRIMARY; primary_num=$n; sibling_num=$((n+1))
+    else
+        role=BACKUP; primary_num=$((n-1)); sibling_num=$((n-1))
+    fi
+    [ "$primary_num" -ge 0 ] || { ORPHANS+=("$vt(no-valid-sibling)"); continue; }
+    sibling="$(printf '%06d%s' "$sibling_num" "$gen")"
+    pair=$(( (primary_num - PARITY) / 2 + 1 ))
+    ROLE["$vt"]="$role"; PAIR["$vt"]="$pair"; SIB["$vt"]="$sibling"
+    if [ -n "${SLOT[$sibling]:-}" ]; then
+        COMPLETE_PAIR["$pair"]=1
+    else
+        ORPHANS+=("$vt->$sibling")
+    fi
+done
+
+# Materialize each complete pair exactly once, PRIMARY then BACKUP.
+: > "$TMP/complete"
+for vt in "${BARCODES[@]}"; do
+    [ "${ROLE[$vt]:-}" = PRIMARY ] || continue
+    sib="${SIB[$vt]}"; [ -n "${SLOT[$sib]:-}" ] || continue
+    printf '%s|%s|PRIMARY|%s|%s\n' "$vt" "${SLOT[$vt]}" "${PAIR[$vt]}" "$sib" >> "$TMP/complete"
+    printf '%s|%s|BACKUP|%s|%s\n' "$sib" "${SLOT[$sib]}" "${PAIR[$vt]}" "$vt" >> "$TMP/complete"
+done
+sort -t'|' -k4,4n -k3,3r -k1,1 "$TMP/complete" -o "$TMP/complete"
+PHYSICAL_COUNT="${#BARCODES[@]}"
+PAIR_COUNT="${#COMPLETE_PAIR[@]}"
+COMPLETE_TAPE_COUNT="$(wc -l < "$TMP/complete" | tr -d ' ')"
+[ "$PAIR_COUNT" -gt 0 ] || die "no complete $PARITY_NAME-primary tape pairs are onsite"
+
+# Snapshot the catalog once. Per-tape sqlite process startup is needlessly expensive on large libraries.
+declare -A OLD_SLOT OLD_ROLE OLD_PAIR OLD_SIB OLD_STATUS OLD_PROJECT OLD_OWNER OLD_USED OLD_HISTORY
+sqlite3 -batch -separator '|' -cmd '.timeout 60000' "$BRIC_TAPE_DB" "SELECT t.volumetag,ifnull(t.slot,''),t.role,t.pair_number,t.paired_volumetag,t.status,
+       ifnull(t.project_name,''),ifnull(t.owner,''),t.used_tb,
+       (SELECT COUNT(*) FROM segments s WHERE s.volumetag=t.volumetag) +
+       (SELECT COUNT(*) FROM tape_artifacts a WHERE a.volumetag=t.volumetag)
+  FROM tapes t ORDER BY t.volumetag;" > "$TMP/catalog.snapshot"
+while IFS='|' read -r vt old_slot old_role old_pair old_sib old_status old_project old_owner old_used old_history; do
+    [ -n "$vt" ] || continue
+    OLD_SLOT["$vt"]="$old_slot"; OLD_ROLE["$vt"]="$old_role"; OLD_PAIR["$vt"]="$old_pair"
+    OLD_SIB["$vt"]="$old_sib"; OLD_STATUS["$vt"]="$old_status"; OLD_PROJECT["$vt"]="$old_project"
+    OLD_OWNER["$vt"]="$old_owner"; OLD_USED["$vt"]="$old_used"; OLD_HISTORY["$vt"]="$old_history"
+done < "$TMP/catalog.snapshot"
+
+# A pair number may not silently acquire a third catalog member. This catches stale synthetic
+# inventories (for example a non-existent 000000L9 left beside the real 000001/000002 pair).
+declare -A EXPECTED_PRIMARY EXPECTED_BACKUP
+while IFS='|' read -r vt _slot role pair _sibling; do
+    if [ "$role" = PRIMARY ]; then EXPECTED_PRIMARY["$pair"]="$vt"; else EXPECTED_BACKUP["$pair"]="$vt"; fi
+done < "$TMP/complete"
+while IFS='|' read -r old_vt _old_slot _old_role old_pair _old_sib old_status _rest; do
+    [ -n "$old_vt" ] || continue
+    [ "$old_status" = RETIRED ] && continue
+    [ -n "${EXPECTED_PRIMARY[$old_pair]:-}" ] || continue
+    if [ "$old_vt" != "${EXPECTED_PRIMARY[$old_pair]}" ] && [ "$old_vt" != "${EXPECTED_BACKUP[$old_pair]}" ]; then
+        die "catalog pair $old_pair contains unexpected member $old_vt; expected ${EXPECTED_PRIMARY[$old_pair]}/${EXPECTED_BACKUP[$old_pair]}. Audit/retire the stale row before import"
+    fi
+done < "$TMP/catalog.snapshot"
+
+ADD=0; REFRESH=0; IDENTICAL=0
+: > "$TMP/apply.sql"
+printf 'BEGIN IMMEDIATE;\n' >> "$TMP/apply.sql"
+printf "INSERT INTO config(key,value) VALUES('primary_parity','%s') ON CONFLICT(key) DO UPDATE SET value=excluded.value;\n" "$PARITY_NAME" >> "$TMP/apply.sql"
+
+while IFS='|' read -r vt slot role pair sibling; do
+    qvt="$(sql_quote "$vt")"; qsib="$(sql_quote "$sibling")"
+    if [ -z "${OLD_ROLE[$vt]+x}" ]; then
+        printf "INSERT INTO tapes(volumetag,slot,role,pair_number,paired_volumetag,capacity_tb,used_tb,status,health,last_scan) VALUES('%s',%s,'%s',%s,'%s',%s,0.0,'EMPTY','OK',datetime('now'));\n" \
+            "$qvt" "$slot" "$role" "$pair" "$qsib" "$CAPACITY_TB" >> "$TMP/apply.sql"
+        printf 'ADD     pair=%-3s %-7s %-8s slot=%s\n' "$pair" "$vt" "$role" "$slot"
+        ADD=$((ADD+1))
+        continue
+    fi
+    old_slot="${OLD_SLOT[$vt]}"; old_role="${OLD_ROLE[$vt]}"; old_pair="${OLD_PAIR[$vt]}"
+    old_sib="${OLD_SIB[$vt]}"; old_status="${OLD_STATUS[$vt]}"; old_project="${OLD_PROJECT[$vt]}"
+    old_owner="${OLD_OWNER[$vt]}"; old_used="${OLD_USED[$vt]}"; history_count="${OLD_HISTORY[$vt]}"
+    if [ "$old_role" != "$role" ] || [ "$old_pair" != "$pair" ] || [ "$old_sib" != "$sibling" ]; then
+        if [ "${history_count:-0}" -gt 0 ] || [ -n "$old_project" ] || [ -n "$old_owner" ] || [ "$old_status" != EMPTY ] || awk -v u="${old_used:-0}" 'BEGIN{exit !(u>0)}'; then
+            die "$vt is already assigned/written as role=$old_role pair=$old_pair sibling=$old_sib; refusing reinterpretation as role=$role pair=$pair sibling=$sibling"
+        fi
+    fi
+    printf "UPDATE tapes SET slot=%s,role='%s',pair_number=%s,paired_volumetag='%s',last_scan=datetime('now') WHERE volumetag='%s';\n" \
+        "$slot" "$role" "$pair" "$qsib" "$qvt" >> "$TMP/apply.sql"
+    if [ "$old_slot" = "$slot" ] && [ "$old_role" = "$role" ] && [ "$old_pair" = "$pair" ] && [ "$old_sib" = "$sibling" ]; then
+        IDENTICAL=$((IDENTICAL+1))
+    else
+        printf 'REFRESH pair=%-3s %-7s %-8s slot=%s (was slot=%s role=%s pair=%s)\n' \
+            "$pair" "$vt" "$role" "$slot" "${old_slot:-NULL}" "$old_role" "$old_pair"
+        REFRESH=$((REFRESH+1))
+    fi
+done < "$TMP/complete"
+
+printf "INSERT INTO audit_log(actor,action,object,result,detail) VALUES('root','INVENTORY_IMPORT','%s','OK','mode=%s physical=%s complete_pairs=%s added=%s refreshed=%s orphans=%s parity=%s');\n" \
+    "$(sql_quote "$BRIC_CHANGER")" "$MODE" "$PHYSICAL_COUNT" "$PAIR_COUNT" "$ADD" "$REFRESH" "${#ORPHANS[@]}" "$PARITY_NAME" >> "$TMP/apply.sql"
+printf 'COMMIT;\n' >> "$TMP/apply.sql"
+
+CATALOG_ONLY="$(while IFS='|' read -r vt _rest; do
+    [ -n "$vt" ] || continue
+    [ "${OLD_STATUS[$vt]:-}" = RETIRED ] && continue
+    grep -Fqx "$vt" "$TMP/inventory.labels" || printf '%s\n' "$vt"
+done < "$TMP/catalog.snapshot")"
+
+printf '\n== physical tape inventory ==\n'
+printf '  changer:          %s\n' "$BRIC_CHANGER"
+printf '  pairing:          %s barcodes are PRIMARY; BACKUP=PRIMARY+1\n' "$PARITY_NAME"
+printf '  physical labels:  %s\n' "$PHYSICAL_COUNT"
+printf '  complete pairs:   %s (%s tapes)\n' "$PAIR_COUNT" "$COMPLETE_TAPE_COUNT"
+printf '  new catalog rows: %s\n' "$ADD"
+printf '  refreshed rows:   %s\n' "$REFRESH"
+printf '  unchanged rows:   %s\n' "$IDENTICAL"
+if [ "${#ORPHANS[@]}" -gt 0 ]; then
+    printf '  skipped orphans:  %s\n' "${#ORPHANS[@]}"
+    printf '    %s\n' "${ORPHANS[@]}"
+fi
+if [ -n "$CATALOG_ONLY" ]; then
+    printf '  catalog-only/offsite rows preserved:\n'
+    printf '    %s\n' $CATALOG_ONLY
+fi
+
+if [ "$MODE" = dry-run ]; then
+    printf '\nDRY-RUN: no catalog changes made. Re-run with --apply.\n'
+    exit 0
+fi
+
+STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+BACKUP="${BRIC_TAPE_DB}.before-inventory-import.${STAMP}"
+sqlite3 "$BRIC_TAPE_DB" ".backup '$BACKUP'"
+chmod 0600 "$BACKUP"
+sqlite3 -batch -cmd '.timeout 60000' "$BRIC_TAPE_DB" < "$TMP/apply.sql"
+[ "$(sqlite3 "$BRIC_TAPE_DB" 'PRAGMA integrity_check;')" = ok ] || die "catalog integrity_check failed after import; backup is $BACKUP"
+
+printf '\nInventory import complete\n'
+printf '  catalog backup: %s\n' "$BACKUP"
+printf '  catalog tapes:  %s\n' "$(sqlite3 "$BRIC_TAPE_DB" 'SELECT COUNT(*) FROM tapes;')"
+printf '  usable pairs:   %s\n' "$(sqlite3 "$BRIC_TAPE_DB" "SELECT COUNT(*) FROM (SELECT pair_number FROM tapes WHERE status!='RETIRED' AND health!='BAD' GROUP BY pair_number HAVING COUNT(*)=2 AND SUM(role='PRIMARY')=1 AND SUM(role='BACKUP')=1);")"
+printf '  next check:     BRIC_CONFIG=%s %s/bric-library-preflight\n' "$CONFIG" "$HERE"

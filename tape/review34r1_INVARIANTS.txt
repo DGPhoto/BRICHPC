@@ -1,0 +1,10 @@
+BRIC Archive 2.0 — Review 34R1 invariants
+
+- on_tape_format: BRIC-FORMAT-V1 (unchanged)
+- database_migration: files-v34-mode-metadata (unchanged from Review 34)
+- tape/**: recursively byte-identical to Review 33R3 final; 10/10 files identical
+- no per-piece TAR wrapping introduced
+- UID/GID ownership restore policy unchanged (--no-same-owner; no chown introduced)
+- Review 34 schema columns unchanged; 34R1 is a gate-fix release, not a new schema migration
+- regular-file special-bit policy: preserve 0777; deliberately clear setuid/setgid/sticky on both TAR_PART and LARGE_FILE_CHUNK; directory sticky metadata is not globally stripped
+- configured restore journal base: shared sticky 1777 base; actual <base>/<uid> journal roots remain strict mode 0700, caller-owned, local-filesystem only

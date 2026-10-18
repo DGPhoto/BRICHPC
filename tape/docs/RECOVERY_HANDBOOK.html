@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BRIC Archive 2.0 — Long-Term Recovery Document (BRIC-FORMAT-V1)</title>
+<!--
+  THIS FILE IS DELIBERATELY SELF-CONTAINED.
+  No external fonts, images, scripts or stylesheets: it must render identically when opened
+  from a local file, offline, in any browser, decades from now. If you are reading the raw
+  HTML because no browser is available: every section is plain readable text; code blocks
+  are inside <pre> tags; the glossary is at the very end.
+
+  Document generated 2026-07-08 against BRIC Archive 2.0, Review-8 codebase (23/23 tests).
+  Authoritative sources: the source tree itself and ARCHITECTURE.md. Where this document and
+  the code disagree, THE CODE ON THE TAPE'S RECOVERY KIT WINS.
+-->
+<style>
+  :root{
+    --ink:#1c2430;          /* body text: deep archival ink */
+    --paper:#f6f7f5;        /* page: cool paper */
+    --panel:#ffffff;
+    --line:#c9cfc9;
+    --teal:#0e6b5c;         /* LTO-9 cartridge green-teal: section accents, links */
+    --teal-soft:#e3efec;
+    --amber:#8a5a00;        /* warnings */
+    --amber-bg:#fdf3dd;
+    --red:#8c2f22;          /* emergency */
+    --red-bg:#fbeeea;
+    --code-bg:#20262e;
+    --code-ink:#e8ecef;
+    --mono:ui-monospace,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace;
+    --serif:Charter,'Bitstream Charter','Source Serif Pro',Georgia,'Times New Roman',serif;
+    --sans:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+  }
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--paper);color:var(--ink);font:17px/1.65 var(--serif)}
+  header.cover{background:var(--ink);color:#eef1ee;padding:56px 24px 40px;border-bottom:6px solid var(--teal)}
+  .wrap{max-width:920px;margin:0 auto;padding:0 24px}
+  header .fmt{font:700 13px/1 var(--mono);letter-spacing:.18em;color:#9fd4c8;text-transform:uppercase}
+  header h1{font:700 40px/1.15 var(--serif);margin:.35em 0 .2em}
+  header p.sub{font-family:var(--sans);font-size:15px;color:#c4ccc9;max-width:60ch;margin:.2em 0}
+  header .meta{font:12px/1.7 var(--mono);color:#8fa09b;margin-top:18px}
+  main{padding:8px 0 80px}
+  h2{font:700 27px/1.25 var(--serif);margin:2.2em 0 .5em;padding-top:.6em;border-top:3px solid var(--teal)}
+  h2 .no{font:700 13px/1 var(--mono);color:var(--teal);display:block;letter-spacing:.14em;margin-bottom:.5em}
+  h3{font:700 20px/1.3 var(--serif);margin:1.6em 0 .4em}
+  h4{font:700 16px/1.3 var(--sans);margin:1.4em 0 .3em}
+  p{margin:.6em 0}
+  code,kbd{font:14.5px/1.5 var(--mono);background:#e9ece9;padding:.08em .35em;border-radius:3px}
+  pre{background:var(--code-bg);color:var(--code-ink);padding:16px 18px;border-radius:6px;overflow-x:auto;font:13.5px/1.55 var(--mono)}
+  pre code{background:none;padding:0;color:inherit;font-size:inherit}
+  pre .c{color:#7fa89d}  /* comments in code blocks */
+  table{border-collapse:collapse;width:100%;margin:1em 0;font-family:var(--sans);font-size:14.5px}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:var(--teal-soft);font-weight:700}
+  .emergency{background:var(--red-bg);border:2px solid var(--red);border-radius:8px;padding:18px 22px;margin:26px 0}
+  .emergency h2{border:none;margin:.1em 0 .4em;padding:0;color:var(--red)}
+  .warn{background:var(--amber-bg);border-left:5px solid var(--amber);padding:12px 16px;margin:1em 0;font-family:var(--sans);font-size:15px}
+  .note{background:var(--teal-soft);border-left:5px solid var(--teal);padding:12px 16px;margin:1em 0;font-family:var(--sans);font-size:15px}
+  .why{background:var(--panel);border:1px solid var(--line);border-left:5px solid var(--teal);padding:12px 16px;margin:1em 0}
+  .why b:first-child{font-family:var(--sans);color:var(--teal)}
+  nav.toc{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:18px 24px;margin:30px 0;font-family:var(--sans);font-size:15px;columns:2;column-gap:40px}
+  nav.toc a{display:block;color:var(--ink);text-decoration:none;padding:2px 0}
+  nav.toc a:hover{color:var(--teal)}
+  a{color:var(--teal)}
+  /* Glossary terms: dotted underline, CSS-only hover/focus tooltip, and a link to the glossary. */
+  a.g{color:inherit;text-decoration:underline dotted var(--teal) 1.5px;text-underline-offset:3px;position:relative;cursor:help}
+  a.g::after{
+    content:attr(data-d);position:absolute;left:0;bottom:135%;z-index:9;width:44ch;max-width:70vw;
+    background:var(--ink);color:#eef1ee;font:13px/1.5 var(--sans);padding:10px 12px;border-radius:6px;
+    box-shadow:0 3px 14px rgba(0,0,0,.25);opacity:0;visibility:hidden;transition:opacity .12s;pointer-events:none
+  }
+  a.g:hover::after,a.g:focus::after{opacity:1;visibility:visible}
+  dl.gloss dt{font:700 16px/1.3 var(--sans);margin-top:1.1em;color:var(--teal)}
+  dl.gloss dd{margin:0.15em 0 0 0}
+  .tape{font:13px/1.5 var(--mono);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px 16px;overflow-x:auto;white-space:pre}
+  .kv{font-family:var(--sans);font-size:14.5px}
+  .kv td:first-child{font-family:var(--mono);white-space:nowrap;background:#f0f2f0}
+  footer{border-top:3px solid var(--teal);margin-top:60px;padding:20px 0;font:13px/1.6 var(--mono);color:#5a6660}
+  @media print{
+    body{font-size:11.5pt;background:#fff}
+    header.cover{background:#fff;color:#000;border-bottom:3pt solid #000}
+    header .fmt,header .meta{color:#333}
+    pre{background:#f2f2f2;color:#000;border:1pt solid #999}
+    a{color:#000}
+    a.g::after{display:none}
+    nav.toc{columns:2}
+    .emergency{border-width:3pt}
+    h2{page-break-after:avoid}
+    pre,table{page-break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+
+<header class="cover">
+  <div class="wrap">
+    <div class="fmt">BRIC-FORMAT-V1 · PERSISTENT FORMAT GENERATION 1</div>
+    <h1>BRIC Archive 2.0<br>Long-Term Recovery Document</h1>
+    <p class="sub">How to recover the scientific data on these tapes — with nothing but the tapes,
+    a key, and standard tools. Architecture, on-tape format, cryptography, recovery procedures,
+    and the reasoning behind every design decision.</p>
+    <p class="sub"><b>If you found LTO tape cartridges and you need the data on them, start with
+    Section 0 immediately below. Everything you need is explained from zero.</b></p>
+    <div class="meta">
+      Origin: BRIC (Biotech Research &amp; Innovation Centre), University of Copenhagen, Denmark ·
+      Document written 2026-07-08 · Codebase: BRIC Archive 2.0, Review-8<br>
+      Data domain: genomic / life-science research datasets · Media: LTO-9 cartridges, written in pairs
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<nav class="toc" aria-label="Table of contents">
+  <a href="#s0">0 · Emergency start: you found tapes</a>
+  <a href="#s1">1 · What this system is (the thesis)</a>
+  <a href="#s2">2 · The physical layer: tapes and pairs</a>
+  <a href="#s3">3 · What is on a tape (BRIC-FORMAT-V1)</a>
+  <a href="#s4">4 · The table of contents on tape (TOC)</a>
+  <a href="#s5">5 · Cryptography: keys, recipes, escrow</a>
+  <a href="#s6">6 · Recovery A: with the BRIC scripts</a>
+  <a href="#s7">7 · Recovery B: fully manual, no BRIC software</a>
+  <a href="#s8">8 · Recovery C: break-glass with the master key</a>
+  <a href="#s9">9 · The living system (how tapes got written)</a>
+  <a href="#s10">10 · The invariants</a>
+  <a href="#s11">11 · Design decisions and why</a>
+  <a href="#s12">12 · Failure modes and degradations</a>
+  <a href="#s13">13 · Verifying a recovery</a>
+  <a href="#s14">14 · Glossary</a>
+</nav>
+
+<!-- ============================================================ 0 EMERGENCY -->
+<section id="s0">
+<div class="emergency">
+<h2>0 · Emergency start — you found tapes and need the data</h2>
+<p><b>You need exactly two things:</b></p>
+<ol>
+  <li><b>The tapes.</b> Ideally both tapes of each <a class="g" href="#g-pair" data-d="Tapes are written in pairs: every chunk of data exists on two cartridges. The even-numbered barcode is the PRIMARY (kept on site), the odd one (PRIMARY+1) is the BACKUP (moved off site when full). Either tape of a pair alone can be enough.">pair</a>, but <i>one</i> tape of a pair usually holds a complete copy of everything.</li>
+  <li><b>One key.</b> Either the project owner's <a class="g" href="#g-userkey" data-d="A short secret string (32 random bytes, base64-encoded, one line of text) given to each data owner at registration. It decrypts that owner's data and per-project catalog. Nothing else is needed.">user key</a> (a single line of base64 text, e.g. from a file named <code>&lt;username&gt;_user_key.txt</code>), <b>or</b> the institution <a class="g" href="#g-masterkey" data-d="A second one-line secret held by the institution. It cannot decrypt data directly; it unwraps the authenticated user-key escrow carried by each project's tapes. This is the break-glass path.">master key</a> (same shape). The master key unlocks copies of all user keys — see <a href="#s8">Section 8</a>.</li>
+</ol>
+<p><b>You also need hardware and software</b> that were deliberately chosen to still exist decades later:
+an LTO tape drive able to read <a class="g" href="#g-lto" data-d="Linear Tape-Open: the open, multi-vendor magnetic tape standard. These cartridges are LTO-9 (18 TB native). LTO drives generally read at least one generation back; if LTO-9-capable drives are scarce in your era, any surviving LTO-9 or LTO-10 drive should read them.">LTO-9</a> media,
+and a Unix-like system with <code>dd</code>, <code>mt</code>, <code>tar</code>, <code>openssl</code>,
+<code>sha256sum</code> and <code>sqlite3</code>. Nothing proprietary. No BRIC software is required
+(<a href="#s7">Section 7</a> is the fully manual procedure), though each tape carries a small
+plaintext recovery kit including a ready-made script.</p>
+<p><b>The 60-second summary of what you will do:</b></p>
+<ol>
+  <li>Read the <b>last text file</b> on the tape: it is a plaintext index (the <a class="g" href="#g-toc" data-d="Table Of Contents: a small plain-text file appended to the tape after every successful archiving run. It lists every data chunk and catalog on that tape with its tape-file number and SHA-256. The LAST valid TOC on a tape is the authoritative one.">TOC</a>) telling you which tape-file number holds what.</li>
+  <li>Pull <code>catalog_project.enc</code> off the tape, decrypt it with a key derived from the user key: it is a plain SQL text dump — the complete map of every archived file.</li>
+  <li>For each data <a class="g" href="#g-chunk" data-d="The unit of archiving: roughly 128 GB of data, either a tar stream of many whole files (TAR_PART) or a byte-range slice of one enormous file (LARGE_FILE_CHUNK). Each chunk is independently encrypted, authenticated and restorable.">chunk</a> you need: read it off the tape, <b>verify its HMAC first</b>, then decrypt and unpack.</li>
+</ol>
+<p>Everything below teaches you enough to do this even if all you have is this document, the tapes, and a key.</p>
+</div>
+</section>
+
+<!-- ============================================================ 1 THESIS -->
+<section id="s1">
+<h2><span class="no">SECTION 1</span>What this system is (the thesis)</h2>
+<p>BRIC Archive 2.0 is a <b>cold archive</b>, not a backup system. The distinction drives everything:</p>
+<ul>
+  <li>A <b>backup</b> protects a live system and assumes the infrastructure that made it still exists when you restore.</li>
+  <li>An <b>archive</b> assumes the opposite. The design promise, verbatim from the architecture document, is:
+  <i>the genomic data must be recoverable 10–15 years from now from the tapes and the user key alone</i> —
+  without the compute cluster, without the central catalog database, without the archiving daemon,
+  without the staging storage, and without BRIC or the university necessarily existing anymore.</li>
+</ul>
+<p>Every other property of the system — the on-tape catalogs, the plaintext recovery kit, the pinned
+cryptographic parameters, the self-describing chunks — is the <i>intrinsic cost of that promise</i>.
+The system was built and reviewed under an explicit rule: any feature that does not serve the promise
+or answer a concretely observed operational failure is a candidate for removal, not an addition.</p>
+<div class="why"><b>Why it matters to you, the recoverer:</b> the system was designed for exactly your
+situation. There are three independent ways in (Sections 6, 7, 8), redundant copies of both the data
+and the maps to the data, and no step that requires software more exotic than <code>openssl</code> and
+<code>tar</code>.</div>
+</section>
+
+<!-- ============================================================ 2 PHYSICAL -->
+<section id="s2">
+<h2><span class="no">SECTION 2</span>The physical layer: tapes, pairs, and how to read them</h2>
+
+<h3>2.1 The cartridges</h3>
+<p>The media are <b>LTO-9</b> cartridges, 18 TB native capacity each, labelled with 6-digit
+<a class="g" href="#g-volumetag" data-d="The 8-character barcode label on a cartridge, e.g. 000042L9: six digits plus the LTO generation suffix. The digits encode the tape's role via parity (even = PRIMARY).">barcodes</a>
+of the form <code>NNNNNNL9</code>. The barcode is not decorative — its <b>parity encodes the tape's role</b>:</p>
+<table>
+<tr><th>Barcode parity</th><th>Role</th><th>Location policy</th><th>Pairing rule</th></tr>
+<tr><td><b>Even</b> (…0, …2, …4)</td><td>PRIMARY</td><td>Kept on site (in the library)</td><td rowspan="2">BACKUP barcode = PRIMARY barcode + 1.<br>Example: <code>000042L9</code> (PRIMARY) pairs with <code>000043L9</code> (BACKUP).</td></tr>
+<tr><td><b>Odd</b> (…1, …3, …5)</td><td>BACKUP</td><td>Moved off site when full</td></tr>
+</table>
+<div class="warn"><b>Configuration note:</b> the parity convention is a configuration value
+(<code>primary_parity=even</code> in the tape catalog's <code>config</code> table). Even = PRIMARY is
+the production convention this document assumes. If a rebuilt catalog derives pairings that contradict
+the physical labels you observe, trust the physical inventory and the TOCs, not the derivation.</div>
+
+<h3>2.2 Two copies of everything</h3>
+<p>Every chunk was written <b>twice</b>: once to the PRIMARY tape, once to its BACKUP partner,
+each write independently read back and verified against the chunk's SHA-256 before being recorded.
+The two tapes of a pair are therefore near-mirrors of each other for the data they carry
+(their file numbering can differ — always trust each tape's own TOC). Consequences for you:</p>
+<ul>
+  <li>If one tape of a pair is lost, damaged, or unreadable, <b>the other one alone is normally sufficient</b>.</li>
+  <li>All recovery procedures in this document try PRIMARY first and fall back to BACKUP per chunk —
+  a partially damaged pair can still yield a complete recovery ("auto-healing").</li>
+</ul>
+
+<h3>2.3 How data is laid out physically</h3>
+<p>A tape is a <b>sequence of tape files separated by <a class="g" href="#g-filemark" data-d="A hardware end-of-file marker written on the tape itself. In BRIC on Linux it is emitted when dd closes the non-rewinding tape device after writing. A dd read stops at it; 'mt fsf N' skips N of them.">filemarks</a></b> — this is the native structure of
+magnetic tape, older and more durable than any filesystem:</p>
+<div class="tape">┌────────┬─FM─┬────────┬─FM─┬────────┬─FM─┬───────────────┬─FM─┬───────────────┬─FM─┬──────┬─FM─┬─ EOD
+│ file 1 │    │ file 2 │    │ file 3 │    │ file 4        │    │ file 5        │    │ ...  │    │
+│ chunk  │    │ chunk  │    │ chunk  │    │ catalog_      │    │ catalog_      │    │ kit  │    │ TAPE_TOC.txt
+│ blob   │    │ blob   │    │ blob   │    │ project.enc   │    │ system.enc    │    │ files│    │ (last file)
+└────────┴────┴────────┴────┴────────┴────┴───────────────┴────┴───────────────┴────┴──────┴────┴──────────────
+  FM = filemark (hardware end-of-file marker)      EOD = end of data (the append point)</div>
+<p>Key physical facts, all of which you need for manual reading:</p>
+<table class="kv">
+<tr><td>Block size</td><td><b>262144 bytes (256 KiB)</b>, written in <a class="g" href="#g-varblock" data-d="A tape drive mode (mt setblk 0) where each write() becomes one tape block of exactly that size, and each read() returns exactly one block. It makes dd with a matching bs= the natural way to stream files to and from tape.">variable-block mode</a> (<code>mt setblk 0</code>). Read with <code>dd bs=262144</code>.</td></tr>
+<tr><td>One file = one object</td><td>Each tape file is exactly one object: one encrypted chunk blob, or one catalog, or one kit file, or one TOC. A single <code>dd</code> stream; closing the Linux non-rewind tape device emits the one flushing filemark. Do not add a second <code>mt weof</code>.</td></tr>
+<tr><td>File numbering</td><td>1-based sequential position. "File number 7" means: rewind, skip 6 filemarks (<code>mt fsf 6</code>), read.</td></tr>
+<tr><td>Append-only</td><td>Nothing on a tape is ever rewritten or erased. New data and new indexes are only appended at <a class="g" href="#g-eod" data-d="End Of Data: the position after the last written block on a tape, where the drive lands with 'mt eod'. All writes append here; nothing earlier is ever modified.">EOD</a>. Whatever was true on the tape yesterday is still physically there today.</td></tr>
+<tr><td>Multi-project, multi-run</td><td>A tape can hold chunks of several archiving <a class="g" href="#g-run" data-d="One complete execution of 'archive this project directory now'. Identified by a run_id like myproject__20260708T101500Z__0003 (project, UTC timestamp, counter). A project archived several times has several runs, possibly on the same tapes.">runs</a> and (in principle) several projects; the catalogs and TOC tell them apart.</td></tr>
+</table>
+
+<h3>2.4 Reading the drive: the three commands you need</h3>
+<pre><code><span class="c"># The library changer is driven by mtx (a standard SCSI media-changer tool), the drive by mt.</span>
+<span class="c"># /dev/sg* = the changer's SCSI device; /dev/nst0 = the drive (n = non-rewinding: essential).</span>
+
+mtx -f /dev/sgX status                 <span class="c"># inventory: which barcode sits in which slot</span>
+mtx -f /dev/sgX load  SLOT 0           <span class="c"># move cartridge from SLOT into drive 0</span>
+mtx -f /dev/sgX unload SLOT 0          <span class="c"># put it back</span>
+
+mt -f /dev/nst0 setblk 0               <span class="c"># variable-block mode (always do this first)</span>
+mt -f /dev/nst0 rewind                 <span class="c"># go to file 1</span>
+mt -f /dev/nst0 fsf N                  <span class="c"># skip forward N filemarks (to file N+1)</span>
+mt -f /dev/nst0 eod                    <span class="c"># go to end of data (the append point)</span>
+
+dd if=/dev/nst0 of=out.bin bs=262144   <span class="c"># read ONE tape file (stops at the filemark)</span></code></pre>
+<div class="note">If you have no library, a standalone LTO drive works: insert cartridges by hand and
+skip the <code>mtx</code> steps. If you have no drive at all, note that the LTO consortium's
+compatibility rule has historically been "a drive reads at least one generation back" — LTO-9 media
+should be readable in LTO-9 and LTO-10 drives. If you are far enough in the future that no such drive
+survives, data-recovery firms and computer museums maintain working units; the format below is fully
+documented so any raw block-level read of the tape can be reassembled.</div>
+</section>
+
+<!-- ============================================================ 3 FORMAT -->
+<section id="s3">
+<h2><span class="no">SECTION 3</span>What is on a tape — BRIC-FORMAT-V1, object by object</h2>
+
+<h3>3.1 Chunk blobs (the data itself)</h3>
+<p>The unit of archiving is the <b>chunk</b>: a target of 128 GB of source data, encrypted as one
+opaque blob. There are two kinds, distinguished only in the catalog (the blobs look identical):</p>
+<table>
+<tr><th>Kind</th><th>Contents before encryption</th><th>How it is restored</th></tr>
+<tr><td><code>TAR_PART</code></td><td>A standard <a class="g" href="#g-tar" data-d="The POSIX tape archive format, produced by GNU tar. A TAR_PART chunk decrypts to a plain tar stream; 'tar -x' unpacks it. Files are always whole inside a TAR_PART — never split across two of them.">tar</a> stream of <b>whole files</b> (many small/medium files packed together until 128 GB). Files are never split between two TAR_PARTs. The final TAR_PART of a run is the <a class="g" href="#g-metadata-chunk" data-d="The last chunk of every run: all directories (including empty ones) with their permissions and mtimes, plus symlinks. Always restored LAST, because its permissions can be restrictive (read-only frozen datasets)."><b>metadata chunk</b></a>: all directories (including empty ones), directory permissions and mtimes, and symlinks.</td><td>Decrypt, pipe to <code>tar&nbsp;-x</code>.</td></tr>
+<tr><td><code>LARGE_FILE_CHUNK</code></td><td>A raw <b>byte-range slice</b> of one single file larger than the chunk target (common for genomic files: BAM, FASTQ). The catalog records the file it belongs to (<code>big_rel_path</code>), the slice's position (<code>chunk_index</code>, 1-based, and <code>offset_bytes</code>) and the total number of slices.</td><td>Decrypt each slice, concatenate in <code>chunk_index</code> order.</td></tr>
+</table>
+
+<h3>3.2 The encryption envelope of every blob</h3>
+<p>Every chunk blob and both catalogs use <b>one identical, deliberately pinned recipe</b> — the exact
+OpenSSL command line is part of the format definition:</p>
+<pre><code><span class="c"># producing side (what was run in 2026):</span>
+tar -c ... | openssl enc -aes-256-cbc -pbkdf2 -iter 10000 -salt -pass file:PASSFILE  &gt; chunk_0001.enc
+<span class="c"># therefore the recovering side is, for all time:</span>
+openssl enc -d -aes-256-cbc -pbkdf2 -iter 10000 -pass file:PASSFILE -in chunk_0001.enc | tar -x</code></pre>
+<table class="kv">
+<tr><td>cipher</td><td><code>aes-256-cbc</code> — AES, 256-bit key, <a class="g" href="#g-cbc" data-d="Cipher Block Chaining: a classic AES mode. It provides confidentiality only, no built-in integrity — which is why every blob also carries an HMAC that MUST be verified before decrypting (Encrypt-then-MAC).">CBC mode</a>. Integrity is provided <i>externally</i> by the HMAC (next row), never by the cipher.</td></tr>
+<tr><td>KDF</td><td><a class="g" href="#g-pbkdf2" data-d="Password-Based Key Derivation Function 2: stretches the passphrase and the salt into the actual AES key and IV. The iteration count (10000) is pinned explicitly so a future OpenSSL changing its default cannot make old blobs unopenable.">PBKDF2</a>, <b>iteration count 10000, explicit</b>. The digest is SHA-256.</td></tr>
+<tr><td>salt</td><td>8 random bytes, <b>embedded in the blob itself</b> in OpenSSL's standard <code>Salted__</code> header (first 16 bytes of every blob: the ASCII <code>Salted__</code> magic + 8 salt bytes). Nothing about the salt needs to be stored anywhere else.</td></tr>
+<tr><td>MAC</td><td><a class="g" href="#g-hmac" data-d="Hash-based Message Authentication Code (here HMAC-SHA256): a keyed checksum over the ciphertext. Only someone holding the HMAC key can produce a valid one, so it proves the blob is authentic and untampered. It is ALWAYS verified before decryption.">HMAC-SHA256</a> computed over the <b>ciphertext</b> (<a class="g" href="#g-etm" data-d="Encrypt-then-MAC: encrypt first, then authenticate the ciphertext. The verifier checks the MAC before ever running the decryption, so tampered or corrupted input is rejected without touching the cipher or tar — closing both tampering and decompression/path attacks at once.">Encrypt-then-MAC</a>). The expected value for each chunk is stored in the catalog column <code>chunks.payload_hmac</code>. <b>Verify before decrypting, always.</b></td></tr>
+<tr><td>content hash</td><td>SHA-256 of the ciphertext in <code>chunks.payload_sha256</code>, and in the on-tape TOC — a keyless integrity check usable even before you have any key.</td></tr>
+</table>
+<div class="why"><b>Why CBC + HMAC and not an all-in-one AEAD mode like AES-GCM:</b>
+the <code>openssl enc</code> command-line tool — the one tool most likely to exist unchanged on any
+Unix system decades from now — does not support GCM. CBC-with-explicit-external-HMAC is the composition
+that (a) any generation of OpenSSL ≥ 1.1.1 performs identically, (b) can be verified and even
+re-implemented by hand from this document, and (c) is cryptographically sound as long as the MAC is
+checked <i>first</i>, which every reader in this system does. All parameters are pinned in the command
+line, recorded per-chunk in the catalog, and repeated in the plaintext kit on every tape, so a future
+BRIC-FORMAT-V2 could change them while V1 tapes remain forever openable.</div>
+
+<h3>3.3 The recovery artifacts appended at every close</h3>
+<p>When a run finishes, the following files are appended to <b>every tape the project touches</b>,
+in this order, followed by a fresh TOC as the very last file:</p>
+<table>
+<tr><th>#</th><th>File</th><th>Encrypted with</th><th>What it is</th></tr>
+<tr><td>1</td><td><code>catalog_project.enc</code></td><td>the owner's <b>user key</b></td><td>The complete map of this project: an SQL text dump of the tables <code>projects</code>, <code>runs</code>, <code>chunks</code>, <code>files</code>, <code>project_tapes</code>, plus a <a class="g" href="#g-placement" data-d="The table mapping every chunk copy to its physical location: run, chunk number, PRIMARY/BACKUP role, tape barcode, and tape-file number. With it and the key, no other index is needed."><code>placement</code></a> table (<code>run_id, chunk_no, copy_role, volumetag, file_number</code>) that says <i>exactly which tape file holds which chunk copy</i>. Once decrypted it is human-readable SQL; load it into <code>sqlite3</code> or even read it with your eyes.</td></tr>
+<tr><td>2</td><td><code>user_key_escrow.v1</code></td><td>already wrapped with the institution <b>master key</b></td><td>A small project-bound text envelope containing the owner's authenticated <code>v2:&lt;hmac&gt;:&lt;ciphertext&gt;</code> escrow. It is ciphertext only: the user job copies it from the cluster catalog without ever reading the master key. An administrator with the master can unwrap it and then open <code>catalog_project.enc</code>.</td></tr>
+<tr><td>3</td><td><code>restore_from_tape.sh</code></td><td>— plaintext —</td><td>A minimal, dependency-free shell script that HMAC-verifies and decrypts one chunk blob given the user key. It is the executable form of Section 7.</td></tr>
+<tr><td>4</td><td><code>README_RECOVERY.txt</code></td><td>— plaintext —</td><td>A condensed version of this document: format name, pinned crypto parameters, the key-derivation recipe, and the verify-then-decrypt commands.</td></tr>
+<tr><td>5</td><td><code>schema.sql</code></td><td>— plaintext —</td><td>The catalog schema, so the SQL dumps can be rebuilt into a live database even if the schema is otherwise lost.</td></tr>
+<tr><td>6</td><td><code>TAPE_TOC.txt</code></td><td>— plaintext —</td><td>The cumulative index of this tape (Section 4). Always the last file after a close.</td></tr>
+</table>
+<div class="why"><b>Why this separation:</b> the data owner recovers with their personal key and
+nothing else. The institution recovers a lost personal key from the small authenticated escrow, but
+the master key never enters a user-owned Slurm job and never reaches the tape server. The plaintext
+scripts/schema make the format self-describing. Legacy tapes may contain <code>catalog_system.enc</code>;
+the DR tool keeps that read path solely for backward compatibility.</div>
+</section>
+
+<!-- ============================================================ 4 TOC -->
+<section id="s4">
+<h2><span class="no">SECTION 4</span>The table of contents on tape (TOC)</h2>
+<p>The TOC is a small plain-text file with a fixed, deliberately parser-friendly grammar. Its header
+line is the magic string that identifies it:</p>
+<pre><code># BRIC tape TOC v1
+volumetag=000042L9
+run_id=mouseproj__20260708T101500Z__0003
+project=mouseproj
+file|kind|run_id|chunk_no|copy_role|filename|sha256
+1|CHUNK|mouseproj__20260708T101500Z__0003|1|PRIMARY||3a92f0c1…&lt;64 hex chars&gt;
+2|CHUNK|mouseproj__20260708T101500Z__0003|2|PRIMARY||b81d77e4…
+7|ARTIFACT|mouseproj__20260708T101500Z__0003|||catalog_project.enc|9c01ab52…
+8|ARTIFACT|mouseproj__20260708T101500Z__0003|||user_key_escrow.v1|44e0d9f3…
+9|ARTIFACT|mouseproj__20260708T101500Z__0003|||restore_from_tape.sh|…
+10|ARTIFACT|mouseproj__20260708T101500Z__0003|||README_RECOVERY.txt|…
+11|ARTIFACT|mouseproj__20260708T101500Z__0003|||schema.sql|…</code></pre>
+<p>Rules you can rely on:</p>
+<ul>
+  <li><b>Data lines match</b> <code>^[0-9]+|</code>; everything else is header. Fields are pipe-separated,
+  7 per line. <code>CHUNK</code> lines leave <code>filename</code> empty; <code>ARTIFACT</code> lines
+  leave <code>chunk_no</code> and <code>copy_role</code> empty.</li>
+  <li>The TOC is <b>cumulative</b>: each new TOC lists <i>every</i> verified chunk and artifact on the
+  tape, across all runs, not just the latest run. <b>The last valid TOC on a tape supersedes all earlier
+  ones</b> — that is the whole indexing model ("latest TOC wins").</li>
+  <li>The first column is the <b>tape file number</b>: your <code>mt fsf</code> target.</li>
+  <li>The last column is the <b>SHA-256 of that tape file's content</b> — verify every read against it.</li>
+  <li>The TOC <b>never contains a user path or filename from inside the data</b>. That privacy boundary is
+  enforced at write time: file names live only inside the encrypted project catalog.</li>
+</ul>
+<h3>4.1 Finding the latest TOC</h3>
+<p>After a clean close the TOC is simply the last file before EOD. But a later run may have appended
+chunk blobs <i>after</i> the last TOC before being interrupted — so the robust procedure, and the one
+the recovery tooling implements, is: <b>scan backwards from EOD toward file 1; the first file whose
+first line is <code># BRIC tape TOC v1</code> is the authoritative TOC.</b> Sniff each candidate by
+its first 256 KiB block only (candidates that are not TOCs are giant chunk blobs; do not read them
+whole). If a TOC's header is unreadable or corrupted, keep scanning backwards: an earlier TOC is
+still valid for everything it lists — you lose only what was archived after it.</p>
+</section>
+
+<!-- ============================================================ 5 CRYPTO -->
+<section id="s5">
+<h2><span class="no">SECTION 5</span>Cryptography: keys, derivation, escrow</h2>
+
+<h3>5.1 The two secrets</h3>
+<table>
+<tr><th>Secret</th><th>Shape</th><th>Unlocks</th></tr>
+<tr><td><b>User key</b> (one per data owner)</td><td>One line of text: 32 random bytes, base64-encoded (44 characters ending in <code>=</code>). Issued at registration; the owner keeps their own copy.</td><td>That owner's chunk blobs and <code>catalog_project.enc</code>.</td></tr>
+<tr><td><b>Master key</b> (one per institution)</td><td>Same shape, held only by administrators/offline custody.</td><td>Authenticated <code>user_key_escrow.v1</code> artifacts and catalog escrows. It never decrypts data directly and is never needed by normal backup jobs.</td></tr>
+</table>
+
+<h3>5.2 Deriving the working keys — do this by hand</h3>
+<p>From one user key, <b>two purpose-bound working keys</b> are derived with nothing more exotic than
+<code>sha256sum</code>. The suffixes are literal ASCII, no spaces, no newline before the suffix:</p>
+<pre><code>USER_KEY='&lt;the one-line base64 secret&gt;'
+ENC_PASS=$(printf '%s:encryption'     "$USER_KEY" | sha256sum | awk '{print $1}')
+HMAC_KEY=$(printf '%s:authentication' "$USER_KEY" | sha256sum | awk '{print $1}')</code></pre>
+<ul>
+<li><code>ENC_PASS</code> (64 hex chars) is the <b>passphrase</b> given to <code>openssl enc</code> via
+<code>-pass file:</code> — note it is a passphrase fed to PBKDF2, not the raw AES key itself.</li>
+<li><code>HMAC_KEY</code> (64 hex chars) is the key for <code>openssl dgst -sha256 -hmac</code>.</li>
+</ul>
+<div class="why"><b>Why domain-separated SHA-256 instead of a fancier KDF here:</b> the derivation
+must be reproducible <i>by hand, from memory of this one paragraph, on any machine</i>. Two different
+suffixes guarantee the encryption passphrase and the authentication key can never be confused or
+substituted for one another, and <code>sha256sum</code> is the single most universally available
+cryptographic tool in existence. The actual key stretching happens afterwards inside PBKDF2.</div>
+
+<h3>5.3 Key escrow (the break-glass copy of user keys)</h3>
+<p>At registration, each user key is wrapped with the master key (<a class="g" href="#g-escrow" data-d="Key escrow: an encrypted, HMAC-authenticated copy of a user key, unlockable only with the institution master key. It is what makes break-glass recovery possible when a user key is lost.">key escrow</a>) and stored in the system catalog
+column <code>users.key_escrow</code> in this exact format:</p>
+<pre><code>v2:&lt;hmac_hex&gt;:&lt;ciphertext_base64&gt;
+
+<span class="c"># where:</span>
+ciphertext_base64 = openssl enc -aes-256-cbc -pbkdf2 -iter 10000 -a -A -salt -pass file:master.key   &lt; user_key
+hmac_hex          = HMAC-SHA256 over the base64 STRING, keyed with sha256hex(MASTER_KEY + ":escrow-auth")</code></pre>
+<p>The cluster stores this value in <code>users.key_escrow</code>. At project close the ordinary user
+job copies that already-encrypted value into <code>user_key_escrow.v1</code> together with the project
+and owner identifiers. No master-key operation happens in the user job. The artifact itself is
+hashed in the tape TOC; admin recovery also verifies project/owner binding against the decrypted
+project catalog.</p>
+<p>To unwrap (given the master key in <code>master.key</code>):</p>
+<pre><code>ESCROW='v2:...'                                   <span class="c"># decoded from user_key_escrow.v1 (or from legacy catalog_system)</span>
+HK=$(printf '%s:escrow-auth' "$(cat master.key)" | sha256sum | awk '{print $1}')
+HM=${ESCROW#v2:}; HM=${HM%%:*}                    <span class="c"># the stored hmac</span>
+CT=${ESCROW#v2:*:}                                <span class="c"># the base64 ciphertext</span>
+test "$(printf '%s' "$CT" | openssl dgst -sha256 -hmac "$HK" | awk '{print $NF}')" = "$HM" \
+  || { echo "escrow TAMPERED/CORRUPT — stop"; exit 1; }
+printf '%s' "$CT" | openssl enc -d -aes-256-cbc -pbkdf2 -iter 10000 -a -A -pass file:master.key
+<span class="c"># output = the user key, one line</span></code></pre>
+<div class="warn">Legacy escrows from before format <code>v2</code> are bare multi-line base64 without
+the <code>v2:</code> prefix and without an HMAC; decrypt them with the same command but <code>-a</code>
+instead of <code>-a -A</code>, accepting that they are unauthenticated. The escrow only exists for a
+user if <code>require_user_escrow=1</code> was active at that user's registration — the enforcement of
+this at registration time is what makes break-glass recovery possible at all.</div>
+
+<h3>5.4 What is deliberately NOT protected</h3>
+<p>Honesty about the threat model, so you don't look for guarantees that were never made:
+the plaintext TOC and kit files are integrity-covered by SHA-256 (in the TOC and, for the TOC itself,
+in the catalog databases) but not by any key — an adversary with <i>write access to the physical
+tapes</i> could forge them. The system's threats were media decay, infrastructure loss and key loss,
+not a tape-forging adversary; the encrypted layers (blobs, catalogs, escrow) are the ones with keyed
+authentication.</p>
+</section>
+
+<!-- ============================================================ 6 RECOVERY A -->
+<section id="s6">
+<h2><span class="no">SECTION 6</span>Recovery path A — with the BRIC scripts (recommended)</h2>
+<p>If you have the BRIC source tree (from the institution's repositories, from an admin machine, or
+reconstructed from the kit files), the <a class="g" href="#g-dr" data-d="Disaster Recovery: rebuilding the data from tapes plus one key alone — no databases, no daemon, no network, no surviving infrastructure of any kind.">disaster-recovery</a> tool does everything in this document
+automatically. It needs <b>no database, no daemon, no network</b> — only the tapes and one key:</p>
+<pre><code><span class="c"># Whole project, user key path:</span>
+cluster/scripts/bric-dr-from-tapes.sh \
+    --project  MYPROJECT \
+    --user-key-file /path/to/user_key.txt \
+    --dest     /recovery/output \
+    [--tapelib /path/to/simulated/library]      <span class="c"># omit on a real drive/library</span>
+
+<span class="c"># One single file only:</span>
+bric-dr-from-tapes.sh --project MYPROJECT --user-key-file KEY --dest OUT --file 'raw/sample_007.bam'
+
+<span class="c"># Break-glass (no user key; institution master key instead):</span>
+bric-dr-from-tapes.sh --project MYPROJECT --master-key-file /path/to/master.key --dest OUT</code></pre>
+<div class="warn"><b>Scripted DR bundle dependency.</b> Keep <code>cluster/scripts/lib_restore_txn.sh</code> and <code>cluster/libexec/bric-file-metadata</code> with <code>bric-dr-from-tapes.sh</code>. The scripted DR tool sources it to provide crash-safe destination permission handling. The fully manual recovery path in Section 7 does not depend on this helper.</div>
+<p>What it does, in order (so you can supervise it): scans every tape backwards from EOD for the
+latest valid TOC (sniffing candidates by their first block); locates and SHA-verifies
+<code>catalog_project.enc</code> against the TOC before decrypting it; loads the catalog; then for
+every chunk of every run (runs in chronological order — the latest version of a file wins), reads the
+PRIMARY copy, verifies SHA-256 and HMAC, falls back to the BACKUP copy on any failure, decrypts,
+unpacks tar parts and reassembles large files in slice order, restores the directory-metadata chunk
+last, and finally re-verifies every recovered file against its recorded plaintext SHA-256. It refuses
+to decrypt anything whose HMAC does not verify.</p>
+<div class="note">The related tool <code>bric-tape-rebuild-catalog.sh</code> reconstructs the tape
+server's operational database from the tapes alone (same TOC scan) — needed only if you intend to
+<i>resume operating</i> the system, not to recover data. Run it with <code>--verify</code> before ever
+writing to rebuilt tapes.</div>
+</section>
+<!-- ============================================================ 7 MANUAL -->
+<section id="s7">
+<h2><span class="no">SECTION 7</span>Recovery path B — fully manual, no BRIC software at all</h2>
+<p>This is the path the whole system was designed to make possible. Tools required:
+<code>mt</code>, <code>mtx</code> (library only), <code>dd</code>, <code>sha256sum</code>,
+<code>openssl</code>, <code>tar</code>, <code>sqlite3</code>, <code>awk</code>. Work on a machine
+with enough scratch disk for at least one chunk (~1 TB) plus your recovered data.</p>
+
+<h3>Step 1 — Inventory and mount</h3>
+<pre><code>mtx -f /dev/sg3 status                      <span class="c"># note which slots hold which barcodes</span>
+mtx -f /dev/sg3 load 12 0                   <span class="c"># load the PRIMARY (even barcode) of your pair</span>
+mt  -f /dev/nst0 setblk 0</code></pre>
+
+<h3>Step 2 — Find the latest TOC (backward scan)</h3>
+<pre><code><span class="c"># Count how many files the tape holds by seeking to EOD, then probe backwards.</span>
+<span class="c"># Sniff each candidate by ONE block only — non-TOC candidates are ~1 TB blobs.</span>
+mt -f /dev/nst0 rewind
+N=&lt;highest file number&gt;                     <span class="c"># if unknown: probe forward with fsf until EOD</span>
+for n in $(seq "$N" -1 1); do
+    mt -f /dev/nst0 rewind
+    [ "$n" -gt 1 ] &amp;&amp; mt -f /dev/nst0 fsf $((n-1))
+    dd if=/dev/nst0 of=/tmp/sniff bs=262144 count=1 2&gt;/dev/null
+    if [ "$(head -1 /tmp/sniff | tr -d '\0')" = "# BRIC tape TOC v1" ]; then
+        mt -f /dev/nst0 rewind; [ "$n" -gt 1 ] &amp;&amp; mt -f /dev/nst0 fsf $((n-1))
+        dd if=/dev/nst0 of=TOC.txt bs=262144 2&gt;/dev/null
+        echo "TOC is tape file $n"; break
+    fi
+done</code></pre>
+
+<h3>Step 3 — Pull and decrypt the project catalog</h3>
+<pre><code><span class="c"># From TOC.txt, read the ARTIFACT line for catalog_project.enc: its file number and sha256.</span>
+awk -F'|' '$2=="ARTIFACT" &amp;&amp; $6=="catalog_project.enc" {print $1, $7}' TOC.txt
+<span class="c"># -&gt; e.g.:  14  9c01ab52…      read tape file 14:</span>
+mt -f /dev/nst0 rewind; mt -f /dev/nst0 fsf 13
+dd if=/dev/nst0 of=catalog_project.enc bs=262144 2&gt;/dev/null
+sha256sum catalog_project.enc               <span class="c"># MUST equal the TOC's sha — else use the other tape</span>
+
+USER_KEY='&lt;the owner’s one-line secret&gt;'
+ENC_PASS=$(printf '%s:encryption'     "$USER_KEY" | sha256sum | awk '{print $1}')
+HMAC_KEY=$(printf '%s:authentication' "$USER_KEY" | sha256sum | awk '{print $1}')
+printf '%s' "$ENC_PASS" &gt; pass.txt &amp;&amp; chmod 600 pass.txt
+
+openssl enc -d -aes-256-cbc -pbkdf2 -iter 10000 -pass file:pass.txt \
+        -in catalog_project.enc -out catalog_project.sql
+<span class="c"># catalog_project.sql is PLAIN TEXT — you can literally read it. Load it:</span>
+sqlite3 cat.db &lt; catalog_project.sql</code></pre>
+<div class="warn">If <code>openssl</code> prints <code>bad decrypt</code>: wrong key, or the recipe was
+typed with a wrong parameter (the iteration count and <code>-pbkdf2</code> are mandatory), or the file
+failed its SHA check and is corrupt — try the same artifact from the partner tape.</div>
+
+<h3>Step 4 — Map your data</h3>
+<pre><code><span class="c"># What files exist, and in which run? (a project archived twice has two runs; the LATEST run</span>
+<span class="c"># holds the newest version of any file present in both)</span>
+sqlite3 cat.db "SELECT run_id FROM runs ORDER BY run_id;"          <span class="c"># lexicographic == chronological</span>
+sqlite3 cat.db "SELECT rel_path, size_bytes, sha256_plain FROM files WHERE run_id='&lt;RUN&gt;';"
+
+<span class="c"># For each chunk of that run: what kind, and WHERE is it on tape?</span>
+sqlite3 cat.db "SELECT c.chunk_no, c.type, c.chunk_index, c.big_rel_path, c.payload_sha256, c.payload_hmac,
+                       p.copy_role, p.volumetag, p.file_number
+                FROM chunks c JOIN placement p
+                  ON p.run_id=c.run_id AND p.chunk_no=c.chunk_no
+                WHERE c.run_id='&lt;RUN&gt;' ORDER BY c.chunk_no, p.copy_role DESC;"</code></pre>
+<p>(The <code>placement</code> table and the TOC agree; use whichever is more convenient. The TOC of
+<i>each</i> tape is authoritative for file numbers on <i>that</i> tape.)</p>
+
+<h3>Step 5 — For every chunk: read, verify, decrypt, place</h3>
+<pre><code><span class="c"># -- read the chunk’s PRIMARY copy (from placement: volumetag + file_number) --</span>
+mt -f /dev/nst0 rewind; mt -f /dev/nst0 fsf $((FILE_NUMBER-1))
+dd if=/dev/nst0 of=blob.enc bs=262144 2&gt;/dev/null
+
+<span class="c">#  -- verify BEFORE decrypting (both checks; on ANY failure, retry with the BACKUP copy) --</span>
+test "$(sha256sum blob.enc | awk '{print $1}')" = "$PAYLOAD_SHA256"   || { echo corrupt; try backup; }
+test "$(openssl dgst -sha256 -hmac "$HMAC_KEY" blob.enc | awk '{print $NF}')" = "$PAYLOAD_HMAC" \
+                                                                      || { echo tampered; try backup; }
+<span class="c"># -- decrypt and place --</span>
+<span class="c"># TAR_PART:</span>
+openssl enc -d -aes-256-cbc -pbkdf2 -iter 10000 -pass file:pass.txt -in blob.enc \
+  | tar -C /recovery/out -xp --no-same-owner --delay-directory-restore -f -
+<span class="c"># LARGE_FILE_CHUNK (slices of one big file; chunk_index=1 first, then append in order):</span>
+openssl enc -d -aes-256-cbc -pbkdf2 -iter 10000 -pass file:pass.txt -in blob.enc \
+  &gt;&gt; "/recovery/out/$BIG_REL_PATH"        <span class="c"># truncate the file first when chunk_index==1</span></code></pre>
+<div class="warn"><b>Order matters, for one reason:</b> the final TAR_PART of every run is the
+<b>metadata chunk</b> — it restores directory permissions, which may be restrictive (read-only
+"frozen" dataset directories are common in genomics). Extract it <b>last</b>, after every large file
+has been written into its directory, or the writes will fail with <code>Permission denied</code> for
+any non-root user. Processing chunks in ascending <code>chunk_no</code> order and doing the metadata
+chunk at the very end satisfies this automatically. If a project has several runs, process runs in
+ascending <code>run_id</code> order so the newest version of each file wins.</div>
+
+<h3>Step 6 — Verify (Section 13)</h3>
+<pre><code>cd /recovery/out
+sqlite3 ../cat.db "SELECT rel_path, sha256_plain FROM files WHERE run_id='&lt;RUN&gt;' AND sha256_plain!='';" \
+| while IFS='|' read -r rel want; do
+    got=$(sha256sum "$rel" | awk '{print $1}')
+    [ "$got" = "$want" ] || echo "MISMATCH: $rel"
+done</code></pre>
+<p>No output = every recovered file is bit-identical to what was archived.</p>
+</section>
+
+<!-- ============================================================ 8 BREAK GLASS -->
+<section id="s8">
+<h2><span class="no">SECTION 8</span>Recovery path C — break-glass with the master key</h2>
+<p>Use this when no user key survives but the institution master key does. It is path B plus one
+preliminary stage:</p>
+<ol>
+  <li>From the latest valid TOC, pull <code>user_key_escrow.v1</code> and verify its SHA-256 against
+  the TOC. Confirm the magic header, <code>project=</code> and <code>owner=</code> fields.</li>
+  <li>Base64-decode <code>escrow_b64=</code>. The result is the exact
+  <code>v2:&lt;hmac&gt;:&lt;ciphertext&gt;</code> value described in Section 5.3.</li>
+  <li>Verify the escrow HMAC first, then unwrap it with <code>master.key</code>. The output is the user
+  key: continue from Section 7 step 3. After decrypting <code>catalog_project.enc</code>, confirm that
+  its project owner equals the owner declared in the escrow artifact.</li>
+</ol>
+<p>The supplied <code>bric-dr-from-tapes.sh --master-key-file ...</code> performs all of these checks.
+For legacy tapes only, if no <code>user_key_escrow.v1</code> exists, it falls back to the historical
+<code>catalog_system.enc</code> path.</p>
+<div class="warn">An empty <code>key_escrow</code> means that user registered while escrow enforcement
+(<code>require_user_escrow=1</code>) was off — for that user there is <b>no</b> break-glass path; only
+their own key opens their data. This is by design: escrow is an institutional policy choice, and the
+system refuses to pretend a recovery path exists when it does not.</div>
+</section>
+
+<!-- ============================================================ 9 LIVING SYSTEM -->
+<section id="s9">
+<h2><span class="no">SECTION 9</span>The living system — how the tapes got written</h2>
+<p>You do not need this section to recover data. It exists so a future maintainer (or a curious
+recoverer) understands the machine that produced what is on the tapes, and can judge whether the
+tapes are complete.</p>
+
+<h3>9.1 Topology</h3>
+<div class="tape">   HPC CLUSTER (Slurm)                          TAPE SERVER ("brictape")
+ ┌──────────────────────────┐                 ┌──────────────────────────────┐
+ │ bric-plan     (planner)  │                 │ bric-tape-daemon             │
+ │ bric-chunk ×N (producers)│    shared       │   pass 1: reservations       │
+ │ bric-finalize            │◄──"the bus"────►│   pass 2: drain chunks→tape  │
+ │ bric-close   (catalogs)  │   QNAP NAS      │   pass 3: close (catalogs,   │
+ │ bric-restore             │   (NFS export)   │           TOC)               │
+ └────────────┬─────────────┘                 └──────────────┬───────────────┘
+              │ reads                                        │ writes
+        Isilon NFS (source data)                   HPE MSL3040 library, LTO-9 drives</div>
+<p>The two servers never talk over a network protocol of their own. They communicate <b>only through
+files on a shared directory</b> (the <a class="g" href="#g-bus" data-d="The shared QNAP directory through which the cluster and the tape server exchange chunk blobs and small marker files. All coordination is file renames and file creation — no sockets, no RPC.">bus</a>):
+the cluster drops encrypted blobs and small signed <a class="g" href="#g-marker" data-d="A tiny text file on the bus whose NAME encodes state (chunk_0001.READY, .CLAIMED, .DONE, .ERROR, run.ABORTED…) and whose content carries a few key=value fields, optionally ECDSA-P-256-signed. State transitions are file renames.">marker files</a>;
+the <a class="g" href="#g-daemon" data-d="bric-tape-daemon: the single long-running process on the tape server. It claims chunks from the bus, writes and read-back-verifies both tape copies, and seals runs with catalogs and a TOC.">tape daemon</a> claims work by <b>atomically renaming</b> a marker (<code>.READY → .CLAIMED</code>) —
+one winner, no distributed locks — writes the blob to both tapes of the pair, verifies each copy by
+reading it back, and publishes a <code>.DONE</code> receipt.</p>
+
+<h3>9.2 One archiving run, end to end</h3>
+<ol>
+  <li><b>Plan</b> (<code>bric-plan</code>): walk the source tree, pack whole files into 128 GB
+  TAR_PART chunks, slice oversized files into LARGE_FILE_CHUNKs, put all directories/symlinks/
+  permissions into a final metadata chunk. Record every file's size, mtime and (later) SHA-256.
+  Reserve tape capacity with the daemon; exactly one active run per project is enforced by a
+  conditional transactional insert.</li>
+  <li><b>Produce</b> (<code>bric-chunk</code>, parallel Slurm array): for each chunk,
+  re-check the source is unchanged (the <a class="g" href="#g-quiescence" data-d="The rule that the source directory must not change between planning and production. Enforced: size+mtime of every file are recorded at plan time and re-verified before AND after each chunk is produced; any drift aborts the run rather than writing a mixed-version copy.">quiescence guard</a>),
+  stream <code>tar|openssl</code> (or <code>dd|openssl</code>) to the bus, compute SHA-256 and HMAC,
+  re-check the source again, then publish the signed <code>.READY</code> marker. A sliding window
+  bounds how many blobs sit on the bus at once.</li>
+  <li><b>Drain</b> (daemon): claim → write PRIMARY → read back and verify → write BACKUP → verify →
+  <code>.DONE</code> → delete the blob from the bus. A crash at any point is safe: interrupted writes
+  are abandoned (their tape space honestly accounted as orphaned) and the chunk is re-claimed; a copy
+  that already verified is reused, not rewritten.</li>
+  <li><b>Close</b> (<code>bric-finalize</code> + <code>bric-close</code> + daemon pass 3): when every
+  chunk is DONE, the cluster builds and encrypts both catalogs and the plaintext kit, hands them to
+  the daemon with a signed manifest; the daemon appends every artifact to every tape the project
+  touches, verifies each by read-back against the manifest, and finally appends the fresh cumulative
+  TOC. Only then is the run CLOSED.</li>
+</ol>
+
+<h3>9.3 The two state machines</h3>
+<pre><code>run    PLANNING → RESERVED → PRODUCING → DRAINING → CLOSING → CLOSED
+                   └→ DENIED (no reservation)     FAILED / CANCELLED / *_ABORTED (signed)
+
+chunk  (bus markers)   PRODUCED → READY → CLAIMED → DONE     (ERROR on failure)
+       (tape segments) WRITING → VERIFIED                    (ABANDONED on crash recovery)</code></pre>
+
+<h3>9.4 Operational tooling you may find references to</h3>
+<table>
+<tr><th>Command</th><th>Purpose</th></tr>
+<tr><td><code>bric backup / status / list / restore</code></td><td>The operator/PI-facing CLI on the cluster.</td></tr>
+<tr><td><code>bric-dr-from-tapes.sh</code></td><td>Disaster recovery from tapes + one key (Section 6). Standalone by design.</td></tr>
+<tr><td><code>bric-tape-rebuild-catalog.sh</code></td><td>Rebuild the tape server's database from the tapes' TOCs (to resume operations).</td></tr>
+<tr><td><code>bric-setup-user / bric-register-user</code></td><td>Root onboarding of a real OS/AD user, installation of the personal key in the user home, and authenticated institutional escrow. The master remains administrative.</td></tr>
+<tr><td><code>test/run_all_tests.sh</code></td><td>The full end-to-end test suite runner (simulation backend, no hardware): backup/restore/DR, crash recovery, fault injection, security, notifications, configuration.</td></tr>
+</table>
+</section>
+
+<!-- ============================================================ 10 INVARIANTS -->
+<section id="s10">
+<h2><span class="no">SECTION 10</span>The invariants — the nine load-bearing guarantees</h2>
+<p>All correctness rests on these. They are few on purpose; break one and the system is broken
+regardless of everything else. (This is the contract every code change was reviewed against.)</p>
+<table>
+<tr><th>#</th><th>Invariant</th><th>Meaning</th></tr>
+<tr><td>1</td><td>Claim = atomic rename</td><td>Taking a chunk off the bus is a POSIX <code>rename()</code>: exactly one winner, no locks. (Requires the shared filesystem to provide atomic rename and coherent cross-host visibility — verified for the deployed NFS export, not guaranteed on arbitrary network filesystems.)</td></tr>
+<tr><td>2</td><td>One active run per project</td><td>Enforced transactionally; two concurrent backups of one project cannot coexist.</td></tr>
+<tr><td>3</td><td>Every chunk is independently verifiable and decryptable</td><td>Ciphertext + SHA-256 + HMAC + the key-derivation recipe travel together. A chunk opens and proves itself with the tapes and the key alone. <b>This is the invariant that makes the thesis true.</b></td></tr>
+<tr><td>4</td><td>Tapes are append-only and multi-project</td><td>Indexes are never rewritten, only appended; the latest valid TOC (found scanning back from EOD) wins.</td></tr>
+<tr><td>5</td><td>Double copy PRIMARY + BACKUP</td><td>Every chunk on both tapes of a pair (even = PRIMARY onsite, odd = BACKUP offsite-when-full); readers fall back per chunk.</td></tr>
+<tr><td>6</td><td>Encrypt-then-MAC, verify before decrypt</td><td>No blob or catalog is ever fed to openssl/tar before its integrity check passes.</td></tr>
+<tr><td>7</td><td>Singleton daemon + crash recovery</td><td>One daemon at a time (flock); on start, interrupted writes are abandoned and re-done; a verified surviving copy is reused. No data loss, no duplicates.</td></tr>
+<tr><td>8</td><td>The central catalog is not the only truth</td><td>Every tape carries its own recovery kit and encrypted catalogs; the operational database is reconstructible from the tapes; the data is recoverable with no database at all.</td></tr>
+<tr><td>9</td><td>The format is fixed and versioned</td><td>BRIC-FORMAT-V1: crypto parameters pinned in the command line, recorded per chunk and in the kit, so a future V2 can evolve without making V1 tapes unreadable.</td></tr>
+</table>
+</section>
+
+<!-- ============================================================ 11 DECISIONS -->
+<section id="s11">
+<h2><span class="no">SECTION 11</span>Design decisions, and why each was made</h2>
+<p>Recorded so a future maintainer does not "fix" something that is load-bearing.</p>
+
+<div class="why"><b>Why LTO tape at all.</b> Multi-decade shelf life at rest, no power required, an
+open multi-vendor standard with a published roadmap, ~30-year media rating, and a cost per TB an
+order of magnitude below spinning disk for cold data. Cloud storage was rejected as the primary copy
+because the promise must survive the institution's contracts and vendors.</div>
+
+<div class="why"><b>Why "archive, not backup" shapes everything.</b> Backups optimize restore speed
+into a living system; archives optimize recoverability into an unknown future. Hence: self-describing
+tapes, hand-reproducible cryptography, plaintext kits, and no dependency of the recovery path on any
+BRIC component.</div>
+
+<div class="why"><b>Why two full copies instead of parity/erasure coding.</b> A mirrored pair is
+recoverable with zero mathematics and zero software: read the other tape. Erasure schemes save media
+but make recovery depend on the very tooling the thesis says may no longer exist.</div>
+
+<div class="why"><b>Why the barcode-parity convention (even = PRIMARY).</b> The pairing must be
+derivable from the physical label alone, so a rebuilt catalog — or a human with a printed inventory —
+can reconstruct pairs without any database. One parity had to be chosen; even-PRIMARY is set in
+config (<code>primary_parity</code>) and asserted by tests.</div>
+
+<div class="why"><b>Why append-only tapes.</b> Rewriting risks the one thing an archive cannot afford:
+destroying old truth to record new. Appending means every past state is still physically present;
+the cost — orphaned space from interrupted writes — is honestly accounted and accepted.</div>
+
+<div class="why"><b>Why AES-256-CBC + external HMAC instead of AES-GCM.</b> Explained in Section 3.2:
+<code>openssl enc</code>, the most future-proof tool available, does not do GCM; CBC+HMAC
+(Encrypt-then-MAC, MAC checked first) is equally sound and hand-verifiable. PBKDF2 iterations are
+pinned at 10000 — the historical OpenSSL default — precisely so that both very old and very new
+OpenSSL builds produce identical results.</div>
+
+<div class="why"><b>Why key derivation is sha256(key + ":purpose").</b> It must be reproducible from
+one memorized sentence on any machine (Section 5.2). Domain separation (":encryption" vs
+":authentication") prevents key confusion; PBKDF2 does the stretching afterwards.</div>
+
+<div class="why"><b>Why 128 GB chunks.</b> Large enough that LTO-9 drives stream at full speed
+(tape hates small files), small enough that one chunk fits on scratch disk during verification and
+that a single bad spot on tape costs one chunk, not one tape. 18 TB tape − 0.30 TB headroom fits roughly 138
+full 128 GB chunks per cartridge; the headroom guarantees room for the close artifacts and end-of-media margin.</div>
+
+<div class="why"><b>Why whole files inside TAR_PARTs (never split across chunks).</b> A single lost
+or corrupted chunk then costs only the files inside it, each of which is either fully present or
+fully absent — no half-files to detect. Only files bigger than a whole chunk are sliced, and those
+slices are trivial byte-range concatenation.</div>
+
+<div class="why"><b>Why the metadata chunk is last.</b> Directory permissions may be restrictive
+(read-only frozen datasets). Applying them after all file writes means restoration works for
+non-root users. This ordering is load-bearing in every restore path — do not reorder it.</div>
+
+<div class="why"><b>Why SQLite + SQL text dumps for catalogs.</b> A single-file, zero-server database
+whose on-disk format has been stable for 20+ years — and the on-tape catalogs are not even binary
+SQLite but <i>plain SQL text</i>: readable with human eyes if all else fails, reloadable into any
+future SQLite (schema shipped alongside as <code>schema.sql</code>).</div>
+
+<div class="why"><b>Why Bash + coreutils + OpenSSL and not a modern language.</b> The recovery-path
+question is not "what is nicest to write" but "what will still run, unmodified, on whatever Unix
+exists in 15 years". tar, dd, mt, awk, sha256sum and openssl are the safest such bet. (The operational
+side pays a real cost for this choice in review effort — accepted deliberately.)</div>
+
+<div class="why"><b>Any OpenSSL 1.1.1 or later recovers these tapes — no specific version, no
+module.</b> Every encryption parameter is pinned in the recipe itself (<code>-aes-256-cbc -pbkdf2
+-iter 10000 -salt</code>), so a blob written under one OpenSSL opens under any other that is given
+those parameters. Verified in both directions between 1.1.1 and 3.x. The production nodes run
+OpenSSL 3.x (loaded via an environment module) for day-to-day <em>operations</em> — bus-marker
+signing needs a working <code>openssl dgst</code> — but that module is an operational convenience,
+<b>never a prerequisite for recovery</b>. If you are reading this to recover data, do not hunt for
+a particular OpenSSL build or a module: use whatever <code>openssl</code> the system has.</div>
+
+<div class="why"><b>Why a file bus with rename-claims instead of a network service.</b> No daemons to
+version, no protocols to keep compatible, no auth infrastructure; the concurrency primitive is POSIX
+rename atomicity, which is inspectable with <code>ls</code>. The trade-off — the shared filesystem
+must actually honor the POSIX properties — is documented and was verified for the deployed hardware.</div>
+
+<div class="why"><b>Why the TOC contains no user file names.</b> The TOC is plaintext on the tape;
+a stranger holding the cartridge learns only chunk counts, run identifiers and hashes. All names
+live inside the user-key-encrypted project catalog. Enforced with a write-time guard, not just policy.</div>
+
+<div class="why"><b>Why the quiescence guard exists (size+mtime, not inode).</b> Slices of one large
+file may be produced hours apart by different jobs; a source mutating in between would land on tape
+as a silent mix of versions detectable only years later. Recording size+mtime at planning and
+re-verifying before <i>and after</i> each production turns that into an immediate abort. The inode is
+deliberately excluded: it legitimately changes under snapshots and storage migrations and would only
+generate false alarms.</div>
+
+<div class="why"><b>Why hard links are NOT deduplicated.</b> Handling links across independently
+encrypted chunks would couple chunks together, breaking invariant 3. The cost is tape space
+(each link archived as an independent file) — space is cheaper than coupling.</div>
+
+<div class="why"><b>Why "never a second implementation of the same thing".</b> Two almost-equal code
+paths diverge, and the bug is born where they diverge — this project removed a duplicate restore
+script after exactly that incident, and later found a real identifier-format divergence between the
+daemon and the catalog rebuilder. The one accepted duplication is the DR tool's self-contained
+escrow-unwrap, because DR must run with zero infrastructure; it is flagged to be modified in
+lockstep with the canonical copy.</div>
+
+<div class="why"><b>Why optional hardening defaults to OFF.</b> ECDSA P-256 signing of bus markers and
+replay protection exist for a hostile-peer-on-the-share threat model. They default off
+(<code>require_bus_signing=0</code>) so they do not tax the mental model of deployments without that
+threat. The rule generalizes: hardening must never complicate the recovery story.</div>
+
+<div class="why"><b>Why every feature must attach to an invariant or an observed failure.</b> The
+long-term risk of this system was judged to be complexity, not code: an innocent-looking change
+breaking an invariant elsewhere years later. The extension rule makes every addition justify its
+cognitive cost — and makes unattached code a removal candidate by construction.</div>
+</section>
+
+<!-- ============================================================ 12 FAILURES -->
+<section id="s12">
+<h2><span class="no">SECTION 12</span>Failure modes and graceful degradations</h2>
+<table>
+<tr><th>Situation</th><th>What still works, and how</th></tr>
+<tr><td>One tape of a pair lost / destroyed / unreadable</td><td>Full recovery from the other tape. Every chunk and every catalog exists on both.</td></tr>
+<tr><td>A chunk copy fails its SHA/HMAC on one tape</td><td>Per-chunk fallback to the partner tape ("auto-healing"). Only if BOTH copies of the SAME chunk are bad is that chunk lost — and then only the whole files inside that one chunk.</td></tr>
+<tr><td>The last TOC's header is corrupted</td><td>The backward scan skips it and uses the previous TOC (TOCs are cumulative). You lose visibility only of what was archived after that older TOC — and only if the partner tape's TOC is also gone.</td></tr>
+<tr><td>A TOC's header is intact but its body is damaged</td><td>Malformed lines are skipped silently — entries can vanish without an error. Mitigations: the partner tape's own TOC, and the <a class="g" href="#g-placement" data-d="The table inside the encrypted project catalog mapping each chunk copy to a tape and tape-file number — an independent, key-protected second source for everything the TOC says.">placement table</a> inside the encrypted project catalog, an independent second source for the same mapping (and each catalog's SHA-256 is recorded in the partner tape's TOC). A self-checksummed TOC trailer is deferred to FORMAT-V2.</td></tr>
+<tr><td>A later run was writing when disaster struck</td><td>Its chunk blobs sit after the last TOC; the backward scan walks past them. The interrupted run is simply absent; every closed run is fully recoverable.</td></tr>
+<tr><td>Both operational databases lost (cluster + tape server)</td><td>By design, irrelevant to data recovery (Sections 6–8). To resume <i>operating</i>: <code>bric-tape-rebuild-catalog.sh --verify</code> reconstructs the tape database from the TOCs; tests assert a rebuilt catalog is operationally indistinguishable.</td></tr>
+<tr><td>User key lost</td><td>Break-glass via master key + escrow (Section 8) — if and only if escrow was enforced at that user's registration.</td></tr>
+<tr><td>Master key lost</td><td>User-key recovery of each project still works (Section 7). Only the institutional break-glass path is gone; user-key recovery remains intact.</td></tr>
+<tr><td>BOTH keys lost</td><td><b>The data is gone.</b> AES-256 with a 256-bit random secret has no shortcut. This is stated plainly because the keys are the single true point of failure: guard the key escrow and the master key with institutional seriousness.</td></tr>
+<tr><td>"bad decrypt" from openssl</td><td>Wrong key, wrong derivation (check the literal suffixes and that <code>-pbkdf2 -iter 10000</code> are present), or corrupt input (check the SHA first — that is why it exists).</td></tr>
+<tr><td>Recovered file fails its plaintext SHA-256</td><td>For a large file: one slice came from a bad copy — redo just that slice from the partner tape. For a TAR_PART file: re-extract that chunk from the partner copy. If a source was modified during archiving in the pre-guard era, the mix is detected here.</td></tr>
+<tr><td>LTO-9 drives extinct in your era</td><td>The format needs only: position to file N, stream 256 KiB blocks until filemark. Any future device or service that can produce a raw dump of tape files can feed Section 7. Migrate media proactively every ~10 years while drives are common.</td></tr>
+</table>
+</section>
+
+<!-- ============================================================ 13 VERIFY -->
+<section id="s13">
+<h2><span class="no">SECTION 13</span>Verifying a recovery — the chain of proof</h2>
+<p>The format carries four independent layers of proof. A recovery is complete when all four pass:</p>
+<ol>
+  <li><b>Tape-file integrity</b>: SHA-256 of each raw tape file equals its TOC entry (keyless — anyone can check).</li>
+  <li><b>Authenticity</b>: HMAC-SHA256 of each blob equals <code>chunks.payload_hmac</code> (proves it was produced by the key holder and untouched since).</li>
+  <li><b>Decryption success</b>: OpenSSL padding + tar structural validity (weak alone; meaningful after 1–2 pass).</li>
+  <li><b>End-to-end content</b>: SHA-256 of every recovered file equals <code>files.sha256_plain</code>, recorded at archive time from the original data. This is the proof that matters: <i>bit-identical to what the scientist archived</i>.</li>
+</ol>
+<p>Never skip layer 2 to save time, and never treat layer 3 alone as success.</p>
+</section>
+
+<!-- ============================================================ 14 GLOSSARY -->
+<section id="s14">
+<h2><span class="no">SECTION 14</span>Glossary</h2>
+<p>Terms are also explained in hover tooltips throughout the document (dotted underlines). Here they
+are in full, alphabetically.</p>
+<dl class="gloss">
+<dt id="g-appendonly">Append-only</dt><dd>A medium or policy where data is only ever added after the existing end, never modified or deleted in place. All BRIC tapes are append-only: history is physically preserved.</dd>
+<dt id="g-blob">Blob</dt><dd>An opaque encrypted file — here, the on-tape/on-bus form of a chunk: <code>Salted__</code> header + AES-256-CBC ciphertext.</dd>
+<dt id="g-breakglass">Break-glass</dt><dd>An emergency recovery path meant for exceptional use: the institution's master key unlocking an escrowed copy of a user key (Section 8).</dd>
+<dt id="g-bus">Bus (QNAP bus)</dt><dd>The shared network directory through which the cluster and the tape server exchange chunk blobs and marker files. All coordination is file creation and atomic renames — no sockets, no RPC. Hosted on a QNAP NAS over NFS in the deployed system.</dd>
+<dt id="g-cbc">CBC (Cipher Block Chaining)</dt><dd>A classic AES mode providing confidentiality only. Integrity comes from the separate HMAC, verified first (Encrypt-then-MAC).</dd>
+<dt id="g-chunk">Chunk</dt><dd>The unit of archiving (128 GB): either a tar stream of whole files (TAR_PART) or a byte-range slice of one oversized file (LARGE_FILE_CHUNK). Independently encrypted, authenticated and restorable — the heart of invariant 3.</dd>
+<dt id="g-catalog">Catalog</dt><dd>The database describing what was archived and where. New tapes carry the user-key-encrypted project catalog, a small master-wrapped user-key escrow, and the plaintext schema/recovery kit. Legacy tapes may also contain a master-encrypted whole-system catalog.</dd>
+<dt id="g-daemon">Daemon (bric-tape-daemon)</dt><dd>The single long-running process on the tape server that claims chunks from the bus, writes and verifies both tape copies, and seals runs with catalogs and a TOC.</dd>
+<dt id="g-dr">DR (Disaster Recovery)</dt><dd>Recovering data from the tapes and one key alone, with no databases, daemons or infrastructure. The scripted form is <code>bric-dr-from-tapes.sh</code>; the manual form is Section 7.</dd>
+<dt id="g-eod">EOD (End Of Data)</dt><dd>The position after the last written block on a tape (<code>mt eod</code>). All writes append here.</dd>
+<dt id="g-escrow">Escrow (key escrow)</dt><dd>An encrypted, HMAC-authenticated copy of a user key, wrapped with the master key and stored in <code>users.key_escrow</code> (format <code>v2:&lt;hmac&gt;:&lt;base64&gt;</code>). New closes copy this ciphertext into project-bound <code>user_key_escrow.v1</code>; no master operation occurs in the user job.</dd>
+<dt id="g-etm">Encrypt-then-MAC</dt><dd>Encrypt first, then compute a MAC over the ciphertext; verifiers check the MAC before decrypting. The composition used for every blob and escrow in this system.</dd>
+<dt id="g-filemark">Filemark</dt><dd>A hardware end-of-file marker separating tape files. In BRIC on Linux it is written automatically when <code>dd</code> closes the non-rewinding tape device after a write; an extra <code>mt weof</code> must not be added. <code>dd</code> reads stop at it; <code>mt fsf N</code> skips N of them.</dd>
+<dt id="g-hmac">HMAC (HMAC-SHA256)</dt><dd>A keyed checksum: only a key holder can produce a valid one, so it proves both integrity and authenticity. Computed here over ciphertexts and verified before any decryption.</dd>
+<dt id="g-isilon">Isilon</dt><dd>The NFS storage cluster holding the live source data in the original deployment. Irrelevant to recovery.</dd>
+<dt id="g-lto">LTO (Linear Tape-Open)</dt><dd>The open, multi-vendor magnetic tape standard. These cartridges are LTO-9: 18 TB native, ~30-year media rating. Drives read at least one generation back.</dd>
+<dt id="g-marker">Marker</dt><dd>A tiny text file on the bus whose name encodes state (<code>chunk_0001.READY</code>, <code>.CLAIMED</code>, <code>.DONE</code>, <code>.ERROR</code>, <code>run.ABORTED</code>…) and whose content carries key=value fields, optionally ECDSA-P-256-signed (format BRIC-MARKER-V1). State transitions are atomic file renames.</dd>
+<dt id="g-masterkey">Master key</dt><dd>The institution's one-line secret (32 random bytes, base64), kept administrative/offline. It unwraps authenticated user-key escrows and cannot decrypt data directly. New user jobs never read it; <code>catalog_system.enc</code> is a legacy format only.</dd>
+<dt id="g-metadata-chunk">Metadata chunk</dt><dd>The final TAR_PART of every run: all directories (including empty ones) with their permissions and mtimes, plus symlinks. Always restored LAST, because its permissions may be restrictive.</dd>
+<dt id="g-pair">Pair (tape pair)</dt><dd>Two cartridges written as mirrors: the even-barcode PRIMARY (onsite) and the odd-barcode BACKUP = PRIMARY+1 (offsite when full). Either alone normally suffices for recovery.</dd>
+<dt id="g-pbkdf2">PBKDF2</dt><dd>Password-Based Key Derivation Function 2: stretches a passphrase and salt into the AES key and IV. Iteration count pinned at 10000 in every command line, forever.</dd>
+<dt id="g-placement">Placement</dt><dd>The table inside the project catalog mapping each chunk copy to a tape and tape-file number: <code>run_id, chunk_no, copy_role, volumetag, file_number</code>.</dd>
+<dt id="g-primary">PRIMARY / BACKUP</dt><dd>The two roles of a tape pair: PRIMARY (even barcode, onsite) is written and read first; BACKUP (odd, offsite when full) is the per-chunk fallback.</dd>
+<dt id="g-quiescence">Quiescence (source quiescence)</dt><dd>The requirement that source data not change between planning and production. Enforced by recording size+mtime at planning and re-verifying before and after each chunk is produced; drift aborts the run.</dd>
+<dt id="g-run">Run</dt><dd>One complete execution of "archive this project now", identified as <code>&lt;project&gt;__&lt;UTC timestamp&gt;__&lt;counter&gt;</code> (e.g. <code>mouseproj__20260708T101500Z__0003</code>). Lexicographic order equals chronological order — a property recovery relies on when the same file exists in several runs (latest wins).</dd>
+<dt id="g-salt">Salt</dt><dd>8 random bytes mixed into PBKDF2 so identical plaintexts encrypt differently. Embedded in each blob's <code>Salted__</code> header; never needs separate storage.</dd>
+<dt id="g-segment">Segment / seg_id</dt><dd>One physical copy of one chunk on one tape, identified as <code>&lt;run_id&gt;__c&lt;chunk zero-padded to 4&gt;__&lt;PRIMARY|BACKUP&gt;</code> in the tape database. States: WRITING → VERIFIED (or ABANDONED after a crash).</dd>
+<dt id="g-sha256">SHA-256</dt><dd>The cryptographic hash used everywhere: tape-file integrity (in the TOC), plaintext file identity (<code>files.sha256_plain</code>), key derivation, and inside HMAC.</dd>
+<dt id="g-slurm">SLURM</dt><dd>The HPC batch scheduler that ran chunk producers in parallel on the cluster. Irrelevant to recovery.</dd>
+<dt id="g-tar">tar</dt><dd>The POSIX tape-archive format (GNU tar). TAR_PART chunks decrypt to plain tar streams; extraction uses <code>-xp --no-same-owner --delay-directory-restore</code> and never <code>-P</code> (path-traversal safety).</dd>
+<dt id="g-toc">TOC (TAPE_TOC.txt)</dt><dd>The cumulative plaintext index appended to a tape after every close: header <code># BRIC tape TOC v1</code> plus pipe-separated lines mapping tape-file numbers to chunks/artifacts and their SHA-256 (Section 4). The last valid TOC on a tape wins.</dd>
+<dt id="g-userkey">User key</dt><dd>A data owner's one-line secret (32 random bytes, base64), issued at registration. With it, that owner's data is recoverable from the tapes alone, forever.</dd>
+<dt id="g-varblock">Variable-block mode</dt><dd>The drive mode (<code>mt setblk 0</code>) in which each write() is one tape block. This archive uses 262144-byte (256 KiB) blocks: always read with <code>dd bs=262144</code>.</dd>
+<dt id="g-volumetag">Volumetag / barcode</dt><dd>The cartridge's 8-character label, <code>NNNNNNL9</code>. Even digits = PRIMARY, odd = BACKUP (= PRIMARY+1). The database and TOC identify tapes by it.</dd>
+<dt id="g-wal">WAL</dt><dd>SQLite's Write-Ahead Logging journal mode, used by the operational databases for crash safety. Irrelevant to the on-tape format.</dd>
+</dl>
+</section>
+
+<footer>
+BRIC Archive 2.0 · BRIC-FORMAT-V1 · Recovery Handbook · generated 2026-07-08 from the Review-8 codebase.<br>
+Where this document and the code disagree, the code in the on-tape recovery kit is authoritative.
+If you recovered scientific data with this document decades after it was written: it worked as designed.
+</footer>
+
+</main>
+</body>
+</html>

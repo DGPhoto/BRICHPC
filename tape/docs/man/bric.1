@@ -1,0 +1,432 @@
+.TH BRIC 1 "July 2026" "BRIC Archive 2.0" "User Commands"
+.SH NAME
+bric \- create, inspect, search, monitor and restore encrypted BRIC tape archives
+.SH SYNOPSIS
+.B bric backup
+.I PROJECT SOURCE
+.RI [ --as " LOGICAL_ROOT" ]
+.RI [ --force ]
+.RI [ --wait ]
+.br
+.B bric restore
+.I PROJECT DEST
+.RI [ --file " REL" ]
+.RI [ --run " RUN_ID" ]
+.RI [ --wait ]
+.br
+.B bric status
+.RI [ --project " PROJECT" ]
+.br
+.B bric list
+.RI [ --long ]
+.RI [ --all ]
+.br
+.B bric contents
+.I PROJECT
+.RI [ --run " RUN_ID" ]
+.RI [ --history ]
+.RI [ --type " TYPE" ]
+.RI [ --long ]
+.RI [ --limit " N" ]
+.RI [ --offset " N" ]
+.br
+.B bric find
+.I PROJECT QUERY
+.RI [ --run " RUN_ID" ]
+.RI [ --history ]
+.RI [ --type " TYPE" ]
+.RI [ --long ]
+.RI [ --limit " N" ]
+.RI [ --offset " N" ]
+.br
+.B bric exclusions
+PROJECT [--run RUN_ID]
+.br
+.B bric jobs
+.br
+.B bric log
+.RI [ JOB_ID | PID ]
+.br
+.B bric cancel
+.IR JOB_ID | PID
+.br
+.B bric version
+.br
+.B bric help
+.RI [ COMMAND ]
+.SH DESCRIPTION
+.B bric
+is the user-facing command for the BRIC encrypted tape archive system.
+It loads the site configuration and personal archive environment automatically,
+performs operational preflight checks for backup and restore, and dispatches the
+requested operation.
+.PP
+In local mode, backup and restore run as detached background jobs by default.
+The command returns a job identifier, PID and log path.  Use
+.BR "bric jobs" ,
+.BR "bric log" ,
+and
+.B "bric cancel"
+to manage these jobs.  The
+.B --wait
+option keeps backup or restore in the foreground.
+.PP
+The short positional forms shown in SYNOPSIS are intended for normal use.
+Equivalent long forms are also accepted:
+.PP
+.nf
+bric backup  --project NAME --source DIR [--as LOGICAL_ROOT] [--exclude RELPATH ...] [--source-change-policy strict|record] [--force] [--wait]
+bric restore --project NAME --dest DIR [--file REL] [--run RUN_ID] [--require-destination-verify] [--wait]
+.fi
+.SH COMMANDS
+.TP
+.BR "backup " "PROJECT SOURCE" " [--as LOGICAL_ROOT] [--exclude RELPATH ...] [--source-change-policy strict|record] [--force] [--wait]"
+Create an encrypted archive backup of
+.IR SOURCE
+under the logical project name
+.IR PROJECT .
+In local mode the operation is detached unless
+.B --wait
+is supplied.  The source is read by GNU tar and catalogued while it is archived;
+there is no separate full per-file planning scan.  Before reservation BRIC validates source readability. By default every unreadable or untraversable
+included path is reported as a warning and the preflight then fails, so no tape is reserved. With
+.B --force
+BRIC skips only precisely identified unreadable paths, logs every omission and records each one in
+the encrypted project catalog with reason force-unreadable. The independent
+.B --exclude RELPATH
+option is an intentional operator-selected scope exclusion applied before readability checking and
+recorded with reason user-declared; it is not a permission failure and does not require --force.
+Unknown traversal/I/O failures remain fatal. Source changes detected by GNU tar are fatal by default; explicit
+.B --source-change-policy record
+accepts only FILE_CHANGED_DURING_READ diagnostics and stores them in the encrypted project catalog.
+.PP
+.B --as LOGICAL_ROOT
+sets the stable single-component logical root used by catalog browsing and single-file restore. If omitted, BRIC uses the basename of the declared source path. The root is catalog metadata only: TAR member names and the on-tape format are unchanged. The root must be one NFC path component of at most 255 bytes; slash, comma, control characters, `.' and `..' are rejected. Reusing a root for a different or unknown canonical source in the same project is rejected before tape reservation.
+.TP
+.BR "restore " "PROJECT DEST" " [--file REL] [--run RUN_ID] [--require-destination-verify] [--wait]"
+Restore a project into
+.IR DEST .
+Without
+.B --run
+and without
+.B --file
+BRIC selects the latest CLOSED run, preserving the historical full-restore behavior. With
+.B --file
+use LOGICAL_ROOT/RELATIVE_PATH to select the newest CLOSED run containing that logical key; BRIC restores the physical run-relative member below DEST/LOGICAL_ROOT. With an explicit
+.B --run
+BRIC accepts both the logical form and the historical bare run-relative path. An ambiguous bare automatic lookup is rejected. In local mode the operation is
+detached unless
+.B --wait
+is supplied.
+.TP
+.BR "status" " [--project PROJECT]"
+Show recent archive runs, their lifecycle state, chunk counts, completed chunks
+and total size.  Active local runs also display live file, byte and chunk
+progress.  Without
+.B --project
+only runs owned by the current user are shown.
+.TP
+.BR "list" " [--long] [--all]"
+List archived projects.  The
+.B --long
+form includes run count and assigned tape barcodes.  The
+.B --all
+option includes projects owned by other users when catalog permissions allow it.
+.TP
+.BR "contents " "PROJECT" " [--run RUN_ID] [--history] [--type TYPE] [--long] [--limit N] [--offset N]"
+List the logical namespace formed from all CLOSED backups of
+.IR PROJECT .
+Entries are keyed as LOGICAL_ROOT/RELATIVE_PATH; for duplicate keys the newest CLOSED run containing the path wins. Files found only in older runs remain visible because there are no tombstones, so the union is not a filesystem snapshot. No tape is mounted or read; the information comes from the cluster catalog.
+Use
+.B --history
+to show every version with its run id, or
+.B --run
+to select one exact CLOSED run,
+.B --type
+to restrict results to
+.BR all ,
+.BR file ,
+.BR dir
+or
+.BR link ,
+and
+.B --long
+to include type, byte size and UTC modification time.  The default limit is
+1000 entries.  A normal user may inspect only projects owned by that user.
+.TP
+.BR "find " "PROJECT QUERY" " [--run RUN_ID] [--history] [--type TYPE] [--long] [--limit N] [--offset N]"
+Search case-insensitively for
+.I QUERY
+anywhere in the complete logical path. By default all CLOSED runs participate and the newest version wins per logical key; --history shows all versions and --run selects one exact CLOSED run. No tape is read. The default limit is 200 matches.  Spaces and shell
+metacharacters in the query should be quoted.
+.TP
+.BR "exclusions " "PROJECT" " [--run RUN_ID]"
+Show explicit source subtrees intentionally omitted from the selected CLOSED run. No tape is read.
+.TP
+.BR "source-changes " "PROJECT" " [--run RUN_ID]"
+Show source-consistency semantics and recorded FILE_CHANGED_DURING_READ diagnostics for a CLOSED run.
+No tape is read. Paths are displayed using GNU tar escape quoting when required.
+
+.TP
+.B jobs
+List local background jobs.  Output includes job identifier, PID, state,
+action, project and start/end timestamps.
+.TP
+.BR "log" " [JOB_ID|PID]"
+Follow the last 80 lines of a local background job log.  With no argument, use
+the newest recorded job.  The command follows new output until interrupted,
+typically with Ctrl-C.
+.TP
+.BR "cancel" " JOB_ID|PID"
+Request termination of a running local background job and its process group.
+The archive run is then recorded as cancelled or failed according to the point
+at which termination occurred.
+.TP
+.B version
+Show the authoritative installed release marker from /opt/bric2/RELEASE.
+.TP
+.BR "help" " [COMMAND]"
+Show general help or command-specific help.  The forms
+.B "bric COMMAND --help"
+and
+.B "bric --help COMMAND"
+and
+.B "bric COMMAND help"
+are equivalent. Help and malformed-command validation occur before operational preflight or background job creation.
+.SH OPTIONS
+.TP
+.B --force
+For backup only, continue after preflight finds precisely identified unreadable paths. Such paths
+are excluded from that run, logged completely, and cataloged as force-unreadable omissions. This is
+not equivalent to --skip-preflight and does not suppress unclassified traversal or I/O errors.
+.TP
+.B --wait
+Run backup or restore in the foreground and return only when the operation
+finishes or fails.
+.TP
+.BI "--project " PROJECT
+Select a project by logical name.
+.TP
+.BI "--source " DIR
+Specify the source directory for a backup.
+.TP
+.BI "--dest " DIR
+Specify the restore destination directory.
+.TP
+.BI "--file " REL
+Restore only one path relative to the archived project root.
+.TP
+.BI "--run " RUN_ID
+Select a specific archive run instead of automatic latest-CLOSED selection.
+For
+.B restore ,
+.B contents
+and
+.B find
+the selected run must belong to the named project; catalog browsing accepts only
+.B CLOSED
+runs.
+.TP
+.BI "--query " TEXT
+Specify the search text for the long form of
+.BR "bric find" .
+.TP
+.B --long
+Show extended columns with
+.BR "bric list" ,
+.B "bric contents"
+or
+.BR "bric find" .
+.TP
+.BI "--type " TYPE
+Filter catalog browsing to
+.BR all ,
+.BR file ,
+.BR dir
+or
+.BR link .
+.TP
+.BI "--limit " N
+Limit the number of catalog paths printed.  A value of zero disables the limit.
+Defaults are 1000 for
+.B contents
+and 200 for
+.BR find .
+.TP
+.BI "--offset " N
+Skip the first
+.I N
+matching catalog entries, for pagination.
+.TP
+.B --all
+Include all visible projects with
+.BR "bric list" .
+.TP
+.B --skip-preflight
+Advanced diagnostic option accepted before
+.B backup
+or
+.BR restore .
+It bypasses operational safety checks and is discouraged for normal use.
+.SH RUN STATES
+.TP
+.B PLANNING
+The run has been created and initial tape capacity is being reserved.  In the
+tar-driven local pipeline this is not a full source-tree scan.
+.TP
+.B RESERVED
+Initial PRIMARY and BACKUP tape capacity has been reserved.  The run may be
+waiting for the producer slot.
+.TP
+.B PRODUCING
+BRIC is reading the source with tar, creating encrypted chunks and publishing
+them to the QNAP bus.
+.TP
+.B DRAINING
+Source reading has finished.  BRIC is waiting for every chunk to be written and
+verified on both PRIMARY and BACKUP media.
+.TP
+.B CLOSING
+BRIC is writing and verifying the encrypted catalog, escrow and recovery
+artifacts used to close the media set.
+.TP
+.B CLOSED
+The backup completed successfully and both tape copies and closing artifacts
+were confirmed.
+.TP
+.B DENIED
+The initial reservation was refused before production began.
+.TP
+.B FAILED
+The run stopped because of an operational, filesystem, cryptographic, bus,
+tape or verification error.
+.TP
+.B CANCELLED
+The run was explicitly cancelled and reached the cancellation terminal state.
+.SH BACKGROUND JOB STATES
+.TP
+.B RUNNING
+The detached supervisor PID is alive.
+.TP
+.B FINISHED
+The detached command exited successfully.
+.TP
+.B FAILED
+The detached command exited unsuccessfully.  Inspect its log and
+.B "bric status"
+for the archive run result.
+.SH FILES
+.TP
+.I ~/.bric/env.sh
+Per-user BRIC environment loaded automatically by the command wrapper.
+.TP
+.I ~/.bric/pids/*.meta
+Private metadata for local background jobs, including PID, state and log path.
+.TP
+.I /var/log/bric/users/USER/jobs/*.log
+Centralized stdout/stderr logs for local background backup and restore jobs; ~/.bric/log is the emergency fallback.
+.TP
+.I ~/.bric/*_user_key.txt
+Personal archive key provisioned by the BRIC administrator.  Users must not
+remove, replace or share this file.
+.TP
+.I /etc/bric/bric.conf
+Site runtime configuration, when the default location is used.
+.TP
+.I /opt/bric2/RELEASE
+Authoritative installed review and release metadata.
+.SH ENVIRONMENT
+.TP
+.B BRIC_RUN_MODE
+Selects
+.B local
+or
+.B slurm
+execution as configured by the site administrator.
+.TP
+.B BRIC_USER_ENV_FILE
+Overrides the per-user environment file path.  The default is
+.IR ~/.bric/env.sh .
+.TP
+.B BRIC_PID_DIR
+Overrides the local background-job metadata directory.
+.TP
+.B BRIC_BACKGROUND_LOGDIR
+Overrides the local background-job log directory.
+.TP
+.B BRIC_CONFIG
+Overrides the site configuration path.  The special value
+.B none
+disables configuration-file loading and is intended for tests or administration.
+.SH EXIT STATUS
+.B bric
+returns zero when a synchronous command succeeds or when a detached local job
+is successfully started.  A non-zero status indicates invalid arguments,
+preflight failure, dispatch failure or failure of a foreground operation.
+The final result of a detached operation must be checked with
+.BR "bric jobs" ,
+.BR "bric status"
+or
+.BR "bric log" .
+.SH EXAMPLES
+Start a backup in the default background mode:
+.PP
+.nf
+bric backup mouse_rnaseq /projects/lab/mouse_rnaseq
+.fi
+.PP
+Inspect active runs and local jobs:
+.PP
+.nf
+bric status
+bric jobs
+.fi
+.PP
+Follow a job log by job identifier:
+.PP
+.nf
+bric log backup.mouse_rnaseq.20260728T184852Z.2452031
+.fi
+.PP
+List the project logical namespace without reading tape:
+.PP
+.nf
+bric contents mouse_rnaseq --type file --long
+bric contents mouse_rnaseq --history --long
+.fi
+.PP
+Search archived paths case-insensitively:
+.PP
+.nf
+bric find mouse_rnaseq sample01.bam
+bric find mouse_rnaseq "raw/2026" --run mouse_rnaseq__20260728T184855Z__0001
+.fi
+.PP
+Restore a complete project in the foreground:
+.PP
+.nf
+bric restore mouse_rnaseq /restore/mouse_rnaseq --wait
+.fi
+.PP
+Restore one file through its logical path, or use the historical bare path with an explicit run:
+.PP
+.nf
+bric restore mouse_rnaseq /restore/one \
+    --file mouse_rnaseq/raw/sample01.bam --wait
+bric restore mouse_rnaseq /restore/one \
+    --file raw/sample01.bam \
+    --run mouse_rnaseq__20260728T184855Z__0001 --wait
+.fi
+.SH NOTES
+A successful detached start does not mean the archive has completed.  A backup
+is complete only when its run state is
+.BR CLOSED .
+.PP
+Tape hardware preflight is performed on the tape-server host and is not a
+substitute for the cluster-side preflight shown by the user command.
+.SH SEE ALSO
+.BR tar (1),
+.BR openssl (1),
+.BR sqlite3 (1),
+.BR sbatch (1),
+.BR squeue (1)

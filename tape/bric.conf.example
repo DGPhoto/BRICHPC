@@ -1,0 +1,178 @@
+# =====================================================================================
+# BRIC Archive 2.0 — central configuration file
+#
+# INSTALL:   sudo install -d /etc/bric && sudo cp bric.conf.example /etc/bric/bric.conf
+#            sudo chown root:root /etc/bric/bric.conf && sudo chmod 644 /etc/bric/bric.conf
+# LOCATION:  /etc/bric/bric.conf on BOTH machines (supekgate cluster side, brictape tape side).
+#            Each side simply ignores the other side's variables. An alternate path can be
+#            forced with BRIC_CONFIG=/path/to/file; BRIC_CONFIG=none disables loading
+#            (the test suite uses this for hermeticity).
+#
+# PRECEDENCE: THE ENVIRONMENT ALWAYS WINS. This file only fills in variables that are not
+#            already set — explicit exports, systemd Environment= lines, and one-off shell
+#            overrides all take priority over what is written here.
+#
+# FORMAT:    only lines of the form BRIC_NAME=value are honored (optional quotes allowed).
+#            The file is parsed, never executed: it cannot run code. BRIC_FAULT_* keys are
+#            refused by design — fault injection must never be persistable.
+#
+# Everything is shown at its DEFAULT and commented out: uncomment only what you change.
+# =====================================================================================
+
+# Install ONE role-specific file as /etc/bric/bric.conf:
+#   config/bric-slurm.conf.example on supekgate
+#   config/bric-tape.conf.example  on brictape
+# The combined reference below documents all variables, but BRIC_ROLE must identify the host.
+
+# ----------------------------------------------------------------- CLUSTER SIDE (supekgate)
+## Identity & paths
+#BRIC_ROLE=slurm                           # mandatory role for the gate/Slurm host
+#BRIC_HOME=/projects/bricsoftware/apps/bric2/cluster   # cluster-side installation root
+#BRIC_DB=/projects/bricsoftware/apps/bric2/cluster/db/cluster_catalog.db  # cluster catalog (SQLite)
+#BRIC_SQL_INIT=/projects/bricsoftware/apps/bric2/cluster/sql/cluster_init.sql
+# Key separation:
+# - leave BRIC_KEYS unset in the system-wide Slurm config; normal users use ~/.bric automatically;
+# - root/admin commands may set BRIC_ADMIN_KEYS=/root/.bric or BRIC_MASTER_KEY_FILE=/secure/master.key;
+# - bric-setup-user.sh writes BRIC_USER_KEY_FILE into each user's ~/.bric/env.sh.
+#BRIC_RUNSTATE=<dir of BRIC_DB>/runstate     # transient planning state (member lists)
+#BRIC_USER=                                  # default owner; empty = whoami of the caller
+#BRIC_MODULE_INIT=/etc/profile.d/modules.sh # sourced by non-interactive sbatch scripts if needed
+#BRIC_OPENSSL_MIN_MAJOR=3                   # keep current OpenSSL if major >= this
+#BRIC_SLURM_OPENSSL_MODULE=openssl/3.5.7    # preferred candidate; module-avail fallback is automatic
+BRIC_COMMAND_LINK=/usr/local/bin/bric
+BRIC_ACTIVATE_USER_LINK=/usr/local/sbin/bric-activate-user
+BRIC_UPDATE_LINK=/usr/local/sbin/bric-update
+
+## The bus (shared QNAP directory, cluster-side mount)
+#BRIC_QNAP=/mnt/data/bric                    # bus root as seen from the cluster
+#BRIC_QNAP_MNT=/mnt/data                     # exact NFS mount point verified at startup
+#BRIC_REQUIRE_NFS_BUS=1                      # fail closed if mount is absent or not NFS
+                                             #   (must be an actual mount, not just a dir)
+#BRIC_ISILON_MNT=/mnt/isilon                 # source-data mountpoint checked at startup
+
+## Run behaviour & timeouts (seconds unless stated)
+BRIC_RUN_MODE=local                          # temporary supekgate mode; switch to slurm when compute NFS is ready
+#BRIC_LOCAL_TMPDIR=/var/tmp/bric             # cluster-local scratch for keys/plaintext catalogs; NEVER QNAP/NFS
+#BRIC_SLURM_LOGDIR=/var/log/bric/slurm
+#BRIC_LOG_DIR=/var/log/bric                 # system/root primary
+#BRIC_LOG_FALLBACK_DIR=/projects/bricsoftware/apps/bric2/log/supekgate
+                                             # writable shared-NFS fallback when /var/log is unavailable
+#BRIC_LOG_CAPTURE_STDIO=1                    # copy stdout/stderr to per-process raw logs
+#BRIC_LOG_GROUP=bric                         # system/operator log group
+#BRIC_USER_LOG_ROOT=/var/log/bric/users       # isolated central per-user logs
+#BRIC_LOG_ADMIN_GROUP=bric                    # admin readers for all per-user logs
+#BRIC_REQUIRE_LOGGING=1                      # refuse to run if primary and fallback are both unavailable
+#BRIC_LOG_MAX_MESSAGE=4000                   # maximum structured message length
+#BRIC_CHUNK_TARGET_BYTES=128000000000        # 128 GB decimal chunk target (restore-latency bounded default)
+#BRIC_MAX_CONCURRENT_PRODUCERS=1             # run-level slots; each local run already has internal workers
+#BRIC_STREAM_PARALLEL_WORKERS=4              # parallel data workers inside ONE project/run
+#BRIC_STREAM_WORKER_CHUNK_BYTES=128000000000 # per-worker chunk target (128 GB); segment target remains hard cap
+#BRIC_TAR_BLOCKING_FACTOR=8192                # GNU tar record = 4 MiB; 512-byte units
+#BRIC_SPARSE_MIN_HOLE_BYTES=67108864        # isolate sparse file only when holes total at least 64 MiB
+#BRIC_SPARSE_MAX_ALLOCATED_PERCENT=75       # or allocated bytes are <=75% of logical size
+#BRIC_CHUNK_RETRIES=3                        # produce attempts per chunk before ERROR
+#BRIC_RESERVE_TIMEOUT=600                    # wait for tape reservation
+#BRIC_DRAIN_TIMEOUT=259200                   # wait for all chunks on tape (3 days)
+#BRIC_CLOSE_TIMEOUT=3600                     # wait for catalogs+TOC sealing
+#BRIC_RESTORE_QUEUE_TIMEOUT=86400             # max wait before tape daemon starts signed progress (24h queue allowance)
+#BRIC_RESTORE_INACTIVITY_TIMEOUT=1800         # fail only after 30m with no signed progress once active
+#BRIC_RESTORE_TIMEOUT=3600                    # legacy compatibility override for both waits; normally leave unset
+#BRIC_PRODUCER_WAIT=600                      # sliding-window wait for bus space
+#BRIC_PRODUCER_POLL=5                        # sliding-window poll interval
+#BRIC_POLL=5                                 # generic cluster-side marker poll interval
+
+## Notifications (Review-12) — mail is OPT-IN; the event log is always written
+#BRIC_NOTIFY_MAIL=off                        # off | auto  (auto = send if mail/sendmail exists)
+#BRIC_MAIL_DOMAIN=ku.dk                      # owner address = <owner>@this
+#BRIC_NOTIFY_LOG=/var/log/bric/notifications.log    # root-readable event log (7 pipe-separated fields)
+                                             # prerequisite once, as root:
+                                             #   groupadd -f bric; install -d -m 2775 -o root -g bric /var/log/bric
+
+## Bus hardening (optional, default off — see ARCHITECTURE "l'opzionale resta opzionale")
+#BRIC_REQUIRE_SIGNING=0                      # 1 = require ECDSA-P-256-signed markers
+#BRIC_BUS_SIGN_KEY=/opt/bric/keys/bus_ecdsa_p256.pem
+#BRIC_BUS_VERIFY_KEY=/opt/bric/keys/bus_ecdsa_p256.pub
+
+## Web restore service
+#BRIC_WEB_TOKEN=                             # bearer token for the async restore endpoint
+#BRIC_WEB_WALLTIME=86400                     # max lifetime of an async restore job
+
+# ----------------------------------------------------------------- TAPE SIDE (brictape)
+## Identity & paths
+#BRIC_ROLE=tape                            # mandatory role for the physical tape host
+#BRIC_TAPE_HOME=/opt/bric2/tape
+#BRIC_TAPE_DB=/opt/bric2/tape/db/tape_catalog.db
+#BRIC_TAPE_SQL_INIT=/opt/bric2/tape/sql/tape_init.sql
+#BRIC_LOG_DIR=/var/log/bric
+#BRIC_LOG_FALLBACK_DIR=/mnt/data/bric/.system/log/brictape
+#BRIC_LOG_CAPTURE_STDIO=1
+#BRIC_LOG_GROUP=bric
+#BRIC_REQUIRE_LOGGING=1
+#BRIC_LOG_MAX_MESSAGE=4000
+#BRIC_TAPE_LOCK=/var/lock/bric_tape.lock      # canonical daemon singleton (31C+); absolute path
+#BRIC_TAPE_WORK_LOCK=/var/lock/bric_tape.lock.work # generation fence inherited by tape workers;
+                                             # 31C also fences known /tmp and /run legacy namespaces
+#BRIC_CHANGER_LOCK=/run/bric/changer.lock  # serializes only changer inventory/load/unload
+#BRIC_DRIVE_LOCK_PREFIX=/run/bric/drive.lock. # independent full-operation lock per drive
+#BRIC_DRIVE_READY_TIMEOUT=900             # common load/spin-up/readiness timeout
+#BRIC_DRIVE_UNLOAD_TIMEOUT=900            # common eject + robotic unload timeout
+#BRIC_DRIVE_READY_TIMEOUT_0=900           # optional override for drive element 0
+#BRIC_DRIVE_READY_TIMEOUT_1=1800          # optional override for a slower drive element 1
+#BRIC_DRIVE_UNLOAD_TIMEOUT_0=900          # optional override for drive element 0
+#BRIC_DRIVE_UNLOAD_TIMEOUT_1=1200         # optional override for a slower eject on drive 1
+#BRIC_DRIVE_COMMAND_TIMEOUT=600           # timeout for one mt/mtx control command
+#BRIC_DRIVE_STATUS_TIMEOUT=30             # timeout for one readiness/inventory probe
+#BRIC_TAPE_IO_TIMEOUT=21600               # common timeout for one dd tape stream (6 hours)
+#BRIC_TAPE_IO_TIMEOUT_0=21600              # optional per-drive stream override
+#BRIC_TAPE_IO_TIMEOUT_1=25200              # optional slower-drive stream override
+#BRIC_DRIVE_POLL_SECONDS=2
+#BRIC_UNLOAD_ON_COMPLETE=1                # CLOSED/STAGED only after configured drives are empty
+
+## Backend & hardware (production MSL3040 device map shown)
+#BRIC_TAPE_BACKEND=real                      # real | sim (sim = directory-based library)
+#BRIC_CHANGER=/dev/sg4                       # medium changer SCSI device
+#BRIC_DRIVE0=/dev/nst0                       # drive element 0 (non-rewinding node)
+#BRIC_DRIVE1=/dev/nst1                       # drive element 1
+#BRIC_TAPE_DRIVES=0 1                        # space-separated drive elements to use
+#BRIC_PARALLEL_DRIVES=2                      # write PRIMARY/BACKUP concurrently on drive 0 and 1
+#BRIC_TAPE_BLOCK=262144                      # tape block size (bytes) — PART OF THE FORMAT:
+                                             # never change on a library with written tapes
+#BRIC_TAPELIB=/opt/bric/tapelib              # sim backend only: the fake library directory
+#BRIC_TAPE_STAGE_READ_BLOCK=4194304          # QNAP staging input read size; tape output stays BRIC_TAPE_BLOCK
+#BRIC_TAPE_VERIFY_POSITION_MODE=adaptive     # adaptive | relative | absolute
+#BRIC_TAPE_BSFM_BYTES_PER_SEC=210000000      # site calibration from physical measurements
+#BRIC_TAPE_REWIND_MILLISECONDS=46000         # site calibration
+#BRIC_TAPE_FSF_MILLISECONDS_PER_FILE=400     # site calibration
+
+
+## Capacity model
+#BRIC_TAPE_CAPACITY_TB=18.0                  # LTO-9 native capacity
+#BRIC_TAPE_HEADROOM_TB=0.30                  # reserved margin (close artifacts + EOM safety)
+#BRIC_PRIMARY_PARITY=even                    # even barcodes = PRIMARY/onsite (VERIFY against
+                                             # the PHYSICAL labels before the first run!)
+#BRIC_TAPE_EXCLUSIVITY=project               # tape ownership model
+#BRIC_CLAIM_TTL_HOURS=6                      # CLAIMED markers older than this are re-claimed
+#BRIC_POLL_SECONDS=10                        # daemon pass interval
+#BRIC_RESTORE_PROGRESS_INTERVAL=30            # signed progress heartbeat while staging a chunk
+#BRIC_RESTORE_CONSUME_TIMEOUT=21600           # progressive READY->CONSUMED backpressure timeout (6h)
+
+## Safety hatches (use knowingly, prefer per-invocation env over persisting here)
+#BRIC_SKIP_HW_CHECK=                         # 1 = skip the per-operation hardware gate
+                                             # (troubleshooting sessions only; logged)
+
+# ----------------------------------------------------------------- NOT FOR THIS FILE
+# Per-invocation variables (BRIC_RUN_ID, BRIC_PROJECT, BRIC_SOURCE), setup-time variables
+# (BRIC_INSTALL, BRIC_GEN_BUS_KEYS, BRIC_BARCODE_*, BRIC_USERS*, BRIC_TAPE_COUNT,
+# BRIC_SITE_ENV, BRIC_SSH_GATEWAY) and BRIC_FAULT_* fault-injection hooks do not belong in a
+# persistent config; BRIC_FAULT_* lines are actively refused by the loader.
+
+# User command documentation installed by bric-setup.sh --role slurm
+BRIC_MAN_DIR=/usr/local/share/man/man1
+
+# Cluster-side transient QNAP bus retention. 0 removes terminal run directories after signed receipts
+# are committed to the catalog; set 1 temporarily when collecting forensic/debug artifacts.
+BRIC_KEEP_TERMINAL_BUS=0
+BRIC_ABORT_ACK_TIMEOUT=120
+
+# Tape host only: root-only importer for real changer inventory (Review 30X+)
+#BRIC_TAPE_IMPORT_LINK=/usr/local/sbin/bric-tape-import-inventory

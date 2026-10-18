@@ -1,0 +1,47 @@
+Only in /mnt/data/bric33r3_work: CHANGES_REVIEW33R3_GATE_CLOSURE.md
+Only in /mnt/data/bric33r3_work: CLAUDE_REVIEW_BRIEF_33R3.md
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/MANIFEST.sha256 and /mnt/data/bric33r3_work/MANIFEST.sha256 differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/README.md and /mnt/data/bric33r3_work/README.md differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/RELEASE and /mnt/data/bric33r3_work/RELEASE differ
+Only in /mnt/data/bric33r3_work: REVIEW33R3_CHANGED_VS_REVIEW33R2.txt
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/cluster/scripts/lib_restore_txn.sh and /mnt/data/bric33r3_work/cluster/scripts/lib_restore_txn.sh differ
+Only in /mnt/data/bric33r3_work: review33r3_INVARIANTS.txt
+Only in /mnt/data/bric33r3_work: review33r3_VALIDATION.txt
+Only in /mnt/data/bric33r3_work/test: lib_test_daemon.sh
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_32b5_logical_restore.sh and /mnt/data/bric33r3_work/test/run_32b5_logical_restore.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_33_crash_recovery_e2e.sh and /mnt/data/bric33r3_work/test/run_33_crash_recovery_e2e.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_33_restore_txn.sh and /mnt/data/bric33r3_work/test/run_33_restore_txn.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_33_restrictive_dir_e2e.sh and /mnt/data/bric33r3_work/test/run_33_restrictive_dir_e2e.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_all_tests.sh and /mnt/data/bric33r3_work/test/run_all_tests.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_audit_health.sh and /mnt/data/bric33r3_work/test/run_audit_health.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_bus_signing.sh and /mnt/data/bric33r3_work/test/run_bus_signing.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_close_faultinj.sh and /mnt/data/bric33r3_work/test/run_close_faultinj.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_close_hardening.sh and /mnt/data/bric33r3_work/test/run_close_hardening.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_config_file.sh and /mnt/data/bric33r3_work/test/run_config_file.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_daemon_crash.sh and /mnt/data/bric33r3_work/test/run_daemon_crash.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_dr_e2e.sh and /mnt/data/bric33r3_work/test/run_dr_e2e.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_escrow.sh and /mnt/data/bric33r3_work/test/run_escrow.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_job_lifecycle.sh and /mnt/data/bric33r3_work/test/run_job_lifecycle.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_local_abort.sh and /mnt/data/bric33r3_work/test/run_local_abort.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_local_e2e.sh and /mnt/data/bric33r3_work/test/run_local_e2e.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_multi_pair_transition.sh and /mnt/data/bric33r3_work/test/run_multi_pair_transition.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_notifications.sh and /mnt/data/bric33r3_work/test/run_notifications.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_parallel_drives.sh and /mnt/data/bric33r3_work/test/run_parallel_drives.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_partial_pair_resume.sh and /mnt/data/bric33r3_work/test/run_partial_pair_resume.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_posix.sh and /mnt/data/bric33r3_work/test/run_posix.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_real_e2e.sh and /mnt/data/bric33r3_work/test/run_real_e2e.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_register_user.sh and /mnt/data/bric33r3_work/test/run_register_user.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_require_signing.sh and /mnt/data/bric33r3_work/test/run_require_signing.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_resilience_continuity.sh and /mnt/data/bric33r3_work/test/run_resilience_continuity.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_restore_fallback.sh and /mnt/data/bric33r3_work/test/run_restore_fallback.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_restore_progressive.sh and /mnt/data/bric33r3_work/test/run_restore_progressive.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_security.sh and /mnt/data/bric33r3_work/test/run_security.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_setup_e2e.sh and /mnt/data/bric33r3_work/test/run_setup_e2e.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_stream_reservation.sh and /mnt/data/bric33r3_work/test/run_stream_reservation.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_tape_rebuild.sh and /mnt/data/bric33r3_work/test/run_tape_rebuild.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_tape_singleton_migration.sh and /mnt/data/bric33r3_work/test/run_tape_singleton_migration.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_update_legacy_daemon.sh and /mnt/data/bric33r3_work/test/run_update_legacy_daemon.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_user_activation.sh and /mnt/data/bric33r3_work/test/run_user_activation.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_verify_failure_attribution.sh and /mnt/data/bric33r3_work/test/run_verify_failure_attribution.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_vtl.sh and /mnt/data/bric33r3_work/test/run_vtl.sh differ
+Files /mnt/data/_r33r2_extract/bric_archive_2_0_review33r2_restore_txn_gate_20261008/test/run_written_recovery.sh and /mnt/data/bric33r3_work/test/run_written_recovery.sh differ

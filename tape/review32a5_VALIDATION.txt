@@ -1,0 +1,30 @@
+BRIC Archive 2.0 Review 32A5 targeted validation — 2026-09-09
+State: candidate; native sqlite3 gate pending.
+
+CHANGE CLASS
+- Test-contract correction only.
+- Production data path unchanged from Review 32A4.
+- BRIC-FORMAT-V1 unchanged.
+- Database migration unchanged.
+
+STATIC VALIDATION
+PASS bash -n test/run_local_e2e.sh
+PASS inspected close contract: bric-close.sh calls bus_cleanup_run_dir after signed CLOSED
+PASS inspected cleanup contract: BRIC_KEEP_TERMINAL_BUS=0 removes terminal run directory
+PASS inspected tape daemon: signed close artifacts must be VERIFIED on every project tape before TOC/CLOSED
+PASS inspected tape catalog schema: close artifacts live in tape_artifacts
+
+LOCAL EXECUTION LIMITATION
+The ChatGPT container used to build this candidate has no sqlite3 CLI installed.
+Attempting test/run_local_e2e.sh stopped immediately at catalog initialization with:
+
+    test/run_local_e2e.sh: line 36: sqlite3: command not found
+
+No runtime PASS is claimed from that environment.
+
+REQUIRED NATIVE VALIDATION
+1. test/run_local_e2e.sh
+2. test/run_dr_e2e.sh
+3. test/run_parallel_target_policy.sh
+4. test/run_single_run_parallel.sh
+5. full test/run_all_tests.sh

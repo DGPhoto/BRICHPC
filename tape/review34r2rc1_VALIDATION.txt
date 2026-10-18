@@ -1,0 +1,43 @@
+BRIC Archive 2.0 — Review 34R2rc1 local validation
+Date: 2026-10-14
+Baseline: Review 34R1 candidate SHA-256 02e768ba19791ad2959c97793612abd27273b8d292f496513291d15c45bfbb20
+
+SCOPE
+- Emergency B3 payload-safe recovery candidate.
+- No database migration change.
+- No on-tape format change.
+- No tape daemon / tape writer change intended.
+- Exact TAR_PART ACL/xattr fidelity is deliberately NOT claimed by the degraded recovery path.
+
+PASS (local/container)
+- bash syntax sweep: 123 candidate shell/slurm entrypoints/scripts PASS.
+- CGO_ENABLED=0 static build: bric-file-metadata.
+- go vet: bric-file-metadata.go and bric-tar-stream.go.
+- helper portability test after explicit 34R2rc1 version update.
+- existing test/run_tar_stream.sh.
+- test/run_update.sh: PASS after manifest regeneration.
+- test/run_update_legacy_daemon.sh: PASS after manifest regeneration.
+- new test/run_34r2_b3_payload_safe_recovery.sh:
+  * degraded TAR_PART path uses --no-xattrs --no-acls;
+  * CLI/Slurm flag propagation;
+  * deterministic helper continues after unsupported xattr only under explicit degradation;
+  * mode + mtime + supported user.* metadata still apply;
+  * strict helper remains fail-closed;
+  * journal ignores synthesized base-only getfacl output;
+  * directory relaxation contains effective write/unlink canary.
+- focused capability-probe smoke test on the local container filesystem.
+
+PARTIAL / NOT CLAIMED
+- complete native 82-test gate: not executed in this container.
+- native sqlite3/acl/attr integration environment equivalent to production: not available.
+- test/run_posix.sh cannot execute in this container because native sqlite3 is missing (rc 127 at sqlite3 invocation).
+- test/run_34_file_metadata_fidelity.sh reports SKIP because native sqlite3 is missing; no metadata-E2E PASS claim is made.
+- full run_33_restore_txn.sh: attempted through a compatibility sqlite3 shim, progressed through multiple transaction/security cases, but did not complete within the local execution window; no PASS claim is made.
+- real Isilon/OneFS capability result (B3c): pending field probe.
+- raw system.nfs4_acl same-blob write on the field mount: pending.
+- exact POSIX/NFSv4 ACL + user.* restoration for TAR_PART: pending final 34R2 metadata second-pass implementation.
+- two clean native full-suite passes: required before promotion.
+
+OPERATIONAL STATUS
+- Candidate may be used for an explicitly degraded recovery test into a NEW/EMPTY destination after normal change-control checks and only when no tape run is active.
+- A degraded recovery must retain its persisted DEGRADED metadata-fidelity verdict; it must never be presented as exact metadata restoration.

@@ -1,0 +1,45 @@
+BRIC Archive 2.0 Review 31D2 validation
+=========================================
+
+review=31D2
+release_id=2.0-review31D2
+build_date=2026-09-07
+database_migration=none-v31d2-test-harness-only
+on_tape_format=BRIC-FORMAT-V1
+
+Review 31D2 supersedes the rejected/un-deployed 31D and 31D1 candidates. Production daemon/verifier
+semantics are those of 31D1; this point release corrects native-gate harness contracts, VTL stdout
+stream emulation, WRITTEN crash-test process scope, and test-runner presentation.
+
+Required native gate
+--------------------
+Run from a CLEAN extraction on supekgate04fl with the native host toolchain (including sqlite3):
+
+  sha256sum -c MANIFEST.sha256
+  bash test/run_all_tests.sh --timeout 600
+
+Expected: 64 selected tests, 64 OK, 0 FAIL.
+Interactive terminals show OK in green and FAIL in red; NO_COLOR disables ANSI colors.
+
+Critical focused tests
+----------------------
+Before the full gate, the four tests that failed in the 31D1 native run may be run explicitly:
+
+  bash test/run_real_e2e.sh
+  bash test/run_verify_failure_attribution.sh
+  bash test/run_vtl.sh
+  bash test/run_written_recovery.sh
+
+Expected: all four exit 0.
+
+Critical policy assertions retained from 31D1
+---------------------------------------------
+- rc 20 transport/local verify failure: physical append accounted; media telemetry unchanged.
+- rc 21 clean byte-count mismatch: media/read-path failure. Immediate write -> write_errors + SUSPECT;
+  periodic reverify -> read_errors + BAD.
+- rc 22 exact-size SHA mismatch: same media penalty semantics as corruption.
+- No segment-sized readback tempfile is used by tape verification.
+- Structured event paths rotate by event UTC day and logging failover is observable.
+- VTL and real-backend mocks support both tape-read command forms: with of=DEST and stdout streaming.
+
+Do not install or perform real-tape writes until the native 64/64 gate passes.

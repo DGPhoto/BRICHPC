@@ -1,0 +1,7 @@
+Review 34 invariants
+PASS on_tape_format=BRIC-FORMAT-V1
+PASS database_migration=files-v34-mode-metadata (intentional new additive catalog migration)
+PASS tape/** byte-identical to Review 33R3 final
+PASS no UID/GID restoration introduced
+PASS LARGE_FILE_CHUNK remains raw encrypted payload pieces; no per-piece tar wrapping introduced
+PASS legacy mode/ACL/xattr are not fabricated; only historical mtime is recoverable

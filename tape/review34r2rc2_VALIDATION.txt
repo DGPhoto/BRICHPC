@@ -1,0 +1,37 @@
+BRIC Archive 2.0 — Review 34R2rc2 focused validation
+Date: 2026-10-15
+Baseline: Review 34R2rc1 emergency recovery candidate
+
+RC1 INDEPENDENT NATIVE GATE CONTEXT (reported by Claude)
+- complete native suite on rc1: 82 OK / 1 FAIL in 3065s
+- sole failure: run_33_restore_txn.sh, traced to D1 TAB/IFS empty-field collapse
+- independent unprivileged recovery simulation: LARGE_FILE_CHUNK + TAR_PART payload byte-identical,
+  zero regression empty files, CHECKSUM-MISMATCH=0, MISSING=0; rc1 false-failed only on D2 metadata order
+
+RC2 LOCAL PASS
+- clean MANIFEST.sha256 verification
+- bash syntax sweep: all shell entrypoints/scripts PASS
+- CGO_ENABLED=0 static bric-file-metadata build; version BRIC file-metadata 34R2rc2
+- go vet cluster/libexec/bric-file-metadata.go
+- test/run_update.sh PASS
+- test/run_update_legacy_daemon.sh PASS
+- test/run_helper_portability.sh PASS
+- test/run_tar_stream.sh PASS
+- test/run_34r2_b3_payload_safe_recovery.sh PASS
+  * degraded TAR_PART path forces --no-xattrs --no-acls
+  * CLI/Slurm flag propagation present
+  * unprivileged final mode 0444 + user.* + unsupported system.nfs4_acl:
+      helper rc=4, final mode=0444, archived mtime restored, user.* preserved
+  * strict helper remains fail-closed
+  * synthesized base POSIX ACL not journaled
+  * D1: empty ACL + non-empty xattr tuple preserves field positions with 0x1f separator
+  * directory relaxation create/unlink canary passes
+- tape/** vs rc1: byte-identical, 10/10 files
+- database_migration=files-v34-mode-metadata unchanged
+- on_tape_format=BRIC-FORMAT-V1 unchanged
+
+NOT CLAIMED BY THIS LOCAL GATE
+- complete native 83-test suite on rc2 (the environment lacks the native sqlite3/acl/attr CLI set)
+- real OneFS/NFS ACL write capability B3c; this requires the morning capability probe on the actual destination
+
+Release state: candidate.  rc2 supersedes rc1 for the emergency degraded recovery path.

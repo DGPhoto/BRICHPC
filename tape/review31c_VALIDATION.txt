@@ -1,0 +1,87 @@
+BRIC Archive 2.0 Review 31C validation
+=====================================
+Build date: 2026-09-04
+Release: 2.0-review31C
+On-tape format: BRIC-FORMAT-V1 (unchanged)
+
+Scope
+-----
+- immediate post-append readback fast path: EOD verification -> bsfm 2 -> absolute file-number
+  post-condition, with automatic rewind+fsf fallback;
+- restore/reverify/sniff/arbitrary reads remain absolute;
+- cross-generation singleton/work-fence migration across /var/lock, historical /tmp and /run names;
+- updater refuses any surviving tape daemon independent of repository path before changing files;
+- tape PROCESS_START records script/repo/review/release_id provenance;
+- no database schema migration and no on-tape format change.
+
+Real hardware evidence supplied from brictape
+---------------------------------------------
+HPE MSL3040, two LTO-9 drives, exact ciphertext file size 2,668,058,144 bytes.
+
+Drive carrying 000001L9, file #379:
+- old rewind+fsf positioning from EOD: ~55.29 s
+- bsfm 2: 12.46 / 12.48 s
+- read: ~11.95 s
+- physical readback byte count: 2,668,058,144 exactly
+
+Drive carrying 000002L9, file #378:
+- old path normalized to EOD: ~54.6 s
+- bsfm 2: 12.86 s
+- read: ~11.92 s
+- physical readback byte count: 2,668,058,144 exactly
+
+Observed result:
+- positioning ~4.3x faster;
+- complete immediate positioning+read ~2.7x faster;
+- nst1 bsfm repeatability ~0.16%; cross-drive bsfm agreement within ~3%;
+- mt tell / MTIOCPOS returned I/O error, so LOCATE/tell/seek is excluded.
+
+Legacy Review30E near miss
+--------------------------
+A Review30E daemon from an extracted tree survived across later releases because its singleton namespace
+predated the current systemd namespace. Follow-up checks found no observed BRIC activity from those PIDs:
+no local BRIC event/process log, no QNAP fallback log, no residual chunk_*.CLAIMED, and no open nst device
+before termination. Review31C treats the episode as a migration-fencing near miss and closes both directions
+of the namespace transition.
+
+Local build validation
+----------------------
+PASS: shell syntax on release shell scripts
+PASS: systemd-analyze verify tape/systemd/bric-tape-daemon.service
+PASS: test/run_real_backend_mock.sh
+      - immediate bsfm2 fast path
+      - byte-identical readback
+      - successful wrong landing detected
+      - rewind+fsf fallback
+      - arbitrary reads remain absolute
+PASS: test/run_tape_singleton_migration.sh
+      - legacy singleton refusal
+      - legacy work-fence recovery barrier
+      - canonical + historical lock set
+      - historical configured namespace fences 31C canonical namespace
+      - PROCESS_START provenance
+      - relative lock rejection
+PASS: test/run_update_legacy_daemon.sh
+PASS: test/run_update.sh
+PASS: test/run_logging.sh
+PASS: test/run_helper_portability.sh
+PASS: test/run_cli_help_man.sh
+PASS: test/run_tape_inventory_import.sh
+
+Important local limitation
+--------------------------
+The build container does not provide the native sqlite3 CLI used on supekgate04fl. SQLite-dependent local
+checks use a small Python sqlite compatibility shim only for SQL/control-flow coverage. This is not claimed
+to be equivalent to the native full release gate. A full-suite attempt was therefore not accepted as a
+release result: timeout-sensitive historical tests run far more slowly in this container; a Review31B1
+control showed the same delay through reservation and first-chunk completion as Review31C.
+
+Required release gate before installation
+-----------------------------------------
+Run from a COMPLETE EXTRACTED Review31C release tree on supekgate04fl with native sqlite3:
+
+  sha256sum -c MANIFEST.sha256
+  bash test/run_all_tests.sh --timeout 600
+
+Expected selection count: 61 tests.
+Do not install Review31C or run real media smoke unless the native suite reports 61 passed, 0 failed.

@@ -1,0 +1,15 @@
+Review 33R3 invariants — 2026-10-09
+
+Baseline verified directly: bric_archive_2_0_review32b5r2_final_20261007.tar.gz
+Baseline SHA-256: 46874ddae77cd32fa1a9fee0ecae26b0e136b413c4f78bdd56bddbdfeda3748b
+
+PASS byte-identical protected producer files:
+  cluster/scripts/bric-stream-backup.sh
+  cluster/scripts/bric-stream-parallel-produce.sh
+  cluster/scripts/bric-chunk.sh
+  cluster/libexec/bric-tar-stream
+  cluster/libexec/bric-tar-stream.go
+PASS tape/** recursively byte-identical to final 32B5R2
+PASS on_tape_format=BRIC-FORMAT-V1
+PASS database_migration=config-v32b5-logical-namespace
+PASS suite discovery: 81 tests (real-tape smoke excluded)

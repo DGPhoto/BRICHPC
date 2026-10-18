@@ -1,0 +1,269 @@
+#!/bin/bash
+# bric-library-preflight — NON-DESTRUCTIVE health check of the tape library devices (changer + drives).
+# Run it before the first production run, after any hardware intervention, or whenever the library
+# misbehaves. It never writes to tape, never moves media, never touches firmware.
+#
+# Checks, in order:
+#   1. device nodes exist (BRIC_CHANGER + BRIC_DRIVE<n> for each element in BRIC_TAPE_DRIVES)
+#   2. SCSI inquiry (sg_inq): vendor/product/firmware revision of changer and every drive
+#      -> WARNS if two drives run DIFFERENT firmware revisions (a known source of trouble)
+#   3. Test Unit Ready (sg_turs) on the changer and drives
+#      -> the "bad pass-through setup" message from some sg3_utils builds is a known tool
+#         compatibility artifact, NOT a device error: reported as a warning, never a failure
+#   4. changer REQUEST SENSE (sg_requests): detects the "manual intervention required" condition
+#      (sense key 0x02, ASC 0x04, ASCQ 0x03) that blocks all robotics until cleared
+#   5. mtx status: inventory parses; counts drives/slots; lists barcodes
+#   6. mt status on every configured drive + Linux st option safety (single filemark, reliable EOD count)
+#   7. barcode sanity: format and duplicates, plus an informational count of complete physical pairs.
+#      Unrelated/offsite/incomplete pairs never fail the generic hardware preflight; the daemon checks
+#      only the complete onsite pairs required by the current project's reservation.
+#   8. (optional) informational cross-check against the tape catalog DB
+#
+# Exit codes: 0 = ready (warnings possible, listed), 2 = at least one FAILURE (fix before archiving).
+set -uo pipefail
+HERE="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+. "$HERE/../scripts/lib_common.sh"
+. "$HERE/../scripts/lib_tape_io.sh"
+bric_log_process_start "tape-library-preflight" "$@"
+
+FAILS=0; WARNS=0
+ok()   { printf '  ok:   %s\n' "$*"; }
+warn() { printf '  WARN: %s\n' "$*"; WARNS=$((WARNS+1)); }
+failc(){ printf '  FAIL: %s\n' "$*"; FAILS=$((FAILS+1)); }
+
+if [ "${BRIC_TAPE_BACKEND:-sim}" != real ]; then
+    echo "preflight: BRIC_TAPE_BACKEND=${BRIC_TAPE_BACKEND:-sim} — this check targets REAL hardware only."
+    echo "Set BRIC_TAPE_BACKEND=real (and BRIC_CHANGER / BRIC_DRIVE0 / BRIC_TAPE_DRIVES) to run it."
+    exit 0
+fi
+
+echo "== bric library preflight =="
+echo "changer=$BRIC_CHANGER  drives(elements)=$BRIC_TAPE_DRIVES  block=$BRIC_TAPE_BLOCK"
+
+# Parse the configured element list once.  Do not rely on the caller's IFS: the daemon deliberately
+# uses IFS=$'\n\t', while the config value is space-separated (for example "0 1").
+declare -a DRIVES=()
+_ifs_saved="$IFS"; IFS=$' \t\n'; read -r -a DRIVES <<<"$BRIC_TAPE_DRIVES"; IFS="$_ifs_saved"
+[ "${#DRIVES[@]}" -gt 0 ] || failc "BRIC_TAPE_DRIVES is empty"
+if [ "${BRIC_PARALLEL_DRIVES:-1}" -ge 2 ] 2>/dev/null && [ "${#DRIVES[@]}" -lt 2 ]; then
+    failc "BRIC_PARALLEL_DRIVES=${BRIC_PARALLEL_DRIVES:-1} requires at least two configured drive elements (BRIC_TAPE_DRIVES='$BRIC_TAPE_DRIVES')"
+fi
+declare -A _SEEN_DRIVE_DEV=()
+for D in "${DRIVES[@]}"; do
+    dev="$(_drive_dev "$D")"
+    if [ -n "${_SEEN_DRIVE_DEV[$dev]:-}" ]; then
+        failc "drive elements ${_SEEN_DRIVE_DEV[$dev]} and $D both map to $dev"
+    fi
+    _SEEN_DRIVE_DEV[$dev]="$D"
+done
+
+# ---------------------------------------------------------------- 1. device nodes
+echo "-- 1. device nodes"
+[ -e "$BRIC_CHANGER" ] && ok "changer node present: $BRIC_CHANGER" || failc "changer node MISSING: $BRIC_CHANGER"
+for D in "${DRIVES[@]}"; do
+    dev="$(_drive_dev "$D")"
+    [ -e "$dev" ] && ok "drive $D node present: $dev" || failc "drive $D node MISSING: $dev"
+done
+
+# ---------------------------------------------------------------- 2. SCSI inquiry + firmware
+echo "-- 2. SCSI inquiry (identity + firmware)"
+declare -A DRIVE_FW
+if command -v sg_inq >/dev/null 2>&1; then
+    inq_line() { sg_inq "$1" 2>/dev/null | awk -F': *' '
+        /Vendor identification/ {v=$2} /Product identification/ {p=$2} /Product revision level/ {r=$2}
+        END { gsub(/ +$/,"",v); gsub(/ +$/,"",p); gsub(/ +$/,"",r); printf "%s|%s|%s", v, p, r }'; }
+    ci="$(inq_line "$BRIC_CHANGER")"
+    if [ -n "${ci//|/}" ]; then ok "changer: $(echo "$ci" | tr '|' ' ') "
+    else warn "changer: sg_inq returned nothing readable (device busy or driver quirk)"; fi
+    for D in "${DRIVES[@]}"; do
+        dev="$(_drive_dev "$D")"
+        di="$(inq_line "$dev")"
+        if [ -n "${di//|/}" ]; then
+            fw="${di##*|}"; DRIVE_FW[$D]="$fw"
+            ok "drive $D: $(echo "$di" | tr '|' ' ')"
+        else warn "drive $D: sg_inq returned nothing readable"; fi
+    done
+    # firmware coherence across drives (mixed revisions after a part swap are a classic trouble source)
+    if [ "${#DRIVE_FW[@]}" -ge 2 ]; then
+        u="$(printf '%s\n' "${DRIVE_FW[@]}" | sort -u | wc -l)"
+        if [ "$u" -gt 1 ]; then
+            warn "drives run DIFFERENT firmware revisions ($(for k in "${!DRIVE_FW[@]}"; do printf 'drive%s=%s ' "$k" "${DRIVE_FW[$k]}"; done)) — align them (vendor technician) before relying on both"
+        else ok "all drives on the same firmware revision (${DRIVE_FW[$(echo "${!DRIVE_FW[@]}" | awk '{print $1}')]})"; fi
+    fi
+else
+    warn "sg_inq not available (install sg3_utils for identity/firmware checks)"
+fi
+
+# ---------------------------------------------------------------- 3. Test Unit Ready
+echo "-- 3. test unit ready"
+if command -v sg_turs >/dev/null 2>&1; then
+    check_tur() {
+        local lbl="$1" dev="$2" out rc
+        out="$(sg_turs "$dev" 2>&1)"; rc=$?
+        if [ "$rc" = 0 ]; then
+            ok "$lbl ($dev): unit ready"
+        elif printf '%s' "$out" | grep -qi "bad pass.through setup"; then
+            warn "$lbl ($dev): sg_turs 'bad pass-through setup' — known sg3_utils/driver artifact on this platform, NOT a device error"
+        else
+            failc "$lbl ($dev): NOT ready (sg_turs rc=$rc: $(printf '%s' "$out" | head -1))"
+        fi
+    }
+    check_tur "changer" "$BRIC_CHANGER"
+    for D in "${DRIVES[@]}"; do
+        check_tur "drive $D" "$(_drive_dev "$D")"
+    done
+else
+    warn "sg_turs not available (install sg3_utils)"
+fi
+
+# ---------------------------------------------------------------- 4. changer sense data
+echo "-- 4. changer sense data"
+if command -v sg_requests >/dev/null 2>&1; then
+    sense="$(sg_requests -s "$BRIC_CHANGER" 2>&1 || true)"
+    if printf '%s' "$sense" | grep -Eqi 'asc=0?x?04.*ascq=0?x?03|manual intervention'; then
+        failc "changer reports SENSE 0x02/ASC 0x04/ASCQ 0x03 'manual intervention required' — robotics BLOCKED. Power-cycle the library from its front panel / open a hardware case; do NOT start the daemon."
+    elif printf '%s' "$sense" | grep -Eqi 'sense key *: *(hardware error|medium error)'; then
+        failc "changer reports a hardware/medium error sense: $(printf '%s' "$sense" | head -1)"
+    else
+        ok "changer sense clean"
+    fi
+else
+    warn "sg_requests not available — cannot read changer sense (the 'manual intervention required' condition would be invisible here)"
+fi
+
+# ---------------------------------------------------------------- 5. mtx inventory
+echo "-- 5. mtx inventory"
+BARCODES=""
+if ST="$(mtx -f "$BRIC_CHANGER" status 2>&1)"; then
+    ndrv="$(printf '%s\n' "$ST" | grep -c '^Data Transfer Element')"
+    nsto="$(printf '%s\n' "$ST" | grep -c 'Storage Element .*:')"
+    ok "mtx status parses: $ndrv data-transfer element(s), $nsto storage-element line(s)"
+    for D in "${DRIVES[@]}"; do
+        printf '%s\n' "$ST" | grep -q "^Data Transfer Element $D:" \
+            && ok "drive element $D visible to the changer" \
+            || failc "drive element $D NOT reported by the changer (BRIC_TAPE_DRIVES misconfigured or drive dead)"
+    done
+    BARCODES="$(printf '%s\n' "$ST" | grep -o 'VolumeTag *=* *[A-Za-z0-9]*' | awk -F'[= ]+' '{print $NF}' | sort)"
+    n_bc="$(printf '%s\n' "$BARCODES" | grep -c . || true)"
+    [ "$n_bc" -gt 0 ] && ok "$n_bc barcode(s) read by the library scanner" \
+                      || warn "no barcodes visible (empty library, or barcode scanner/labels problem)"
+else
+    failc "mtx status FAILED: $(printf '%s' "$ST" | head -1)"
+fi
+
+# ---------------------------------------------------------------- 6. drive status
+echo "-- 6. drive status (mt)"
+declare -A DRIVE_MT_STATUS
+for D in "${DRIVES[@]}"; do
+    dev="$(_drive_dev "$D")"
+    if MO="$(mt -f "$dev" status 2>&1)"; then
+        DRIVE_MT_STATUS[$D]="$MO"
+        state="$(printf '%s\n' "$MO" | grep -Eo 'ONLINE|DR_OPEN|IM_REP_EN|BOT|EOF' | tr '\n' ' ')"
+        ok "drive $D ($dev) answers mt status ${state:+(flags: $state)}"
+        # Cross-check the changer element against the Linux tape node.  This catches the dangerous
+        # case where BRIC_DRIVE0/1 are swapped: the changer says element D is Full while the mapped
+        # /dev/nstN reports DR_OPEN, or vice versa.
+        inv_line="$(printf '%s\n' "${ST:-}" | grep "^Data Transfer Element $D:" | head -1 || true)"
+        if printf '%s' "$inv_line" | grep -q ':Full'; then
+            printf '%s\n' "$MO" | grep -q 'ONLINE' \
+                || failc "drive mapping mismatch: changer element $D is Full but $dev does not report ONLINE (check BRIC_DRIVE$D)"
+        elif printf '%s' "$inv_line" | grep -q ':Empty'; then
+            if printf '%s\n' "$MO" | grep -q 'ONLINE'; then
+                failc "drive mapping mismatch: changer element $D is Empty but $dev reports ONLINE (check BRIC_DRIVE$D)"
+            fi
+        fi
+    else
+        # an empty drive can refuse mt status on some stacks — degrade to warn if changer says Empty
+        if printf '%s\n' "${ST:-}" | grep -q "^Data Transfer Element $D:Empty"; then
+            warn "drive $D ($dev): mt status refused while empty — acceptable on this driver stack"
+        else failc "drive $D ($dev): mt status FAILED: $(printf '%s' "$MO" | head -1)"; fi
+    fi
+    opts="$(_tape_st_options "$dev" 2>/dev/null || true)"
+    if [ -n "$opts" ]; then
+        case "$opts" in 0[xX]*) oval=$((opts));; *) oval=$((10#$opts));; esac
+        if (( oval & 0x10 )); then
+            failc "drive $D: Linux st MT_ST_TWO_FM is enabled ($opts) — BRIC requires exactly one filemark per close"
+        else
+            ok "drive $D: Linux st single-filemark close mode ($opts)"
+        fi
+        if (( oval & 0x20 )); then
+            failc "drive $D: Linux st MT_ST_FAST_MTEOM is enabled ($opts) — file number after eod is not reliable"
+        else
+            ok "drive $D: reliable counted EOD mode (FAST_MTEOM disabled)"
+        fi
+    else
+        warn "drive $D: cannot read Linux st sysfs options; filemark/EOD mode must be proven by the scratch smoke test"
+    fi
+done
+
+# ---------------------------------------------------------------- 7. barcode convention
+ echo "-- 7. barcode convention and project-scoped pairing"
+if [ -n "$BARCODES" ]; then
+    dup="$(printf '%s\n' "$BARCODES" | uniq -d)"
+    [ -z "$dup" ] && ok "no duplicate barcodes" || failc "DUPLICATE barcodes in the library: $(echo $dup)"
+    badfmt="$(printf '%s\n' "$BARCODES" | grep -Ev '^[0-9]{6}L[0-9]$' || true)"
+    [ -z "$badfmt" ] && ok "all barcodes match NNNNNNL9" || warn "non-conforming barcode(s): $(echo $badfmt)"
+
+    # Pairing follows the configured/site catalog convention; it is not hard-coded to even labels.
+    parity_name="${BRIC_PRIMARY_PARITY:-}"
+    if [ -z "$parity_name" ] && [ -s "${BRIC_TAPE_DB:-}" ] && command -v sqlite3 >/dev/null 2>&1; then
+        parity_name="$(sqlite3 "$BRIC_TAPE_DB" "SELECT value FROM config WHERE key='primary_parity';" 2>/dev/null | head -1)"
+    fi
+    [ -n "$parity_name" ] || parity_name=even
+    case "$parity_name" in
+        even) parity=0;;
+        odd)  parity=1;;
+        *) failc "invalid primary parity '$parity_name' (expected even|odd)"; parity=0; parity_name=even;;
+    esac
+
+    complete=0; unpaired=""
+    declare -A present=() complete_seen=() orphan_seen=()
+    while IFS= read -r bc; do [ -n "$bc" ] && present["$bc"]=1; done <<<"$BARCODES"
+    while IFS= read -r bc; do
+        [ -n "$bc" ] || continue
+        num="${bc%L*}"; gen="${bc#"$num"}"
+        case "$num" in *[!0-9]*) continue;; esac
+        n=$((10#$num))
+        if [ $((n % 2)) -eq "$parity" ]; then
+            primary=$n; partner_n=$((n+1)); is_primary=1
+        else
+            primary=$((n-1)); partner_n=$((n-1)); is_primary=0
+        fi
+        [ "$primary" -ge 0 ] || continue
+        partner="$(printf '%06d%s' "$partner_n" "$gen")"
+        pair=$(( (primary - parity)/2 + 1 ))
+        if [ -n "${present[$partner]:-}" ]; then
+            if [ "$is_primary" -eq 1 ] && [ -z "${complete_seen[$pair]:-}" ]; then
+                complete_seen[$pair]=1; complete=$((complete+1))
+            fi
+        elif [ -z "${orphan_seen[$bc]:-}" ]; then
+            orphan_seen[$bc]=1; unpaired="$unpaired $bc->$partner"
+        fi
+    done <<<"$BARCODES"
+    ok "$complete complete physical barcode pair(s) currently onsite (primary_parity=$parity_name)"
+    [ -z "$unpaired" ] || printf '  info: unrelated/offsite/incomplete physical pair member(s) ignored by generic preflight:%s\n' "$unpaired"
+    printf '  info: reservation validates only complete onsite pairs needed for the current project and requested capacity\n'
+fi
+
+# ---------------------------------------------------------------- 8. catalog cross-check (optional)
+echo "-- 8. tape catalog cross-check"
+if [ -n "${BRIC_TAPE_DB:-}" ] && [ -f "${BRIC_TAPE_DB:-}" ] && command -v sqlite3 >/dev/null 2>&1 && [ -n "$BARCODES" ]; then
+    DBVT="$(sqlite3 "$BRIC_TAPE_DB" "SELECT volumetag FROM tapes WHERE status!='RETIRED';" 2>/dev/null | sort)"
+    only_db="$(comm -23 <(printf '%s\n' "$DBVT" | grep . ) <(printf '%s\n' "$BARCODES") | tr '\n' ' ')"
+    only_lib="$(comm -13 <(printf '%s\n' "$DBVT" | grep . ) <(printf '%s\n' "$BARCODES") | tr '\n' ' ')"
+    [ -z "$only_db" ]  && ok "every catalog tape is physically in the library" \
+                       || printf '  info: catalog tape(s) not currently onsite (offsite/unrelated is allowed): %s\n' "$only_db"
+    [ -z "$only_lib" ] && ok "no unknown tapes in the library" \
+                       || ok "in library but not in catalog (fresh scratch is normal): $only_lib"
+else
+    echo "  (skipped: no BRIC_TAPE_DB / sqlite3 / barcodes)"
+fi
+
+echo
+echo "== preflight result: $FAILS failure(s), $WARNS warning(s) =="
+if [ "$FAILS" -gt 0 ]; then
+    echo "✗ LIBRARY NOT READY — fix the failures above before starting the daemon or any production run."
+    exit 2
+fi
+echo "✓ LIBRARY PREFLIGHT PASSED${WARNS:+ (with $WARNS warning(s) — read them)}"
+exit 0

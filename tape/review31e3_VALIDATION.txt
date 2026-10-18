@@ -1,0 +1,41 @@
+BRIC Archive 2.0 Review 31E3 validation contract
+================================================
+
+1. Extract the complete release on supekgate04fl as a normal test user.
+2. Verify MANIFEST.sha256 with sha256sum -c MANIFEST.sha256.
+3. Run: bash test/run_all_tests.sh --timeout 600
+   Required result: 64 OK, 0 FAIL.
+4. Run the root-only ACL/onboarding regressions from the extracted release:
+     sudo bash test/run_user_setup.sh
+     sudo bash test/run_user_activation.sh
+   Both must PASS. These tests use temporary homes/catalogs and do not touch a real user's key/home.
+5. Only after steps 1-4 pass, install 31E3 with bric-update on the slurm and tape hosts.
+6. On the slurm host rerun the idempotent activation once for every already-active real archive user,
+   e.g.:
+     sudo bric-activate-user vsz652
+   This provisions /var/log/bric/users/USER and refreshes the managed env.sh without rotating the user key.
+7. Verify for an activated user:
+     getfacl -p /var/log/bric/users/USER
+     sudo -u USER bric status
+   BRIC_LOG_DIR must resolve to /var/log/bric/users/USER and BRIC_LOG_FALLBACK_DIR to $HOME/.bric/log.
+8. Verify central administrator visibility and user isolation using a harmless event/status invocation;
+   root/bric-admin must be able to read the user's central event files, another ordinary user must not.
+9. Tape hardware smoke does NOT need to be repeated solely for 31E3: the tape daemon is byte-identical to
+   31D2 and only the idempotent FD-close helpers differ on the tape side. The 31D2 real dense smoke 0012
+   remains the acceptance evidence for streaming verification and on-tape behavior.
+
+31E3-specific regression: direct run_setup_e2e invocation must sanitize inherited BRIC state itself.
+Run this safe poison test from the extracted tree (all poisoned paths are under a fresh /tmp directory):
+
+  P=$(mktemp -d /tmp/bric31e3-poison.XXXXXX)
+  env BRIC_CONFIG=none BRIC_DB="$P/cluster.db" BRIC_TAPE_DB="$P/tape.db" \
+      BRIC_QNAP="$P/qnap" BRIC_KEYS="$P/keys" BRIC_TAPELIB="$P/tapelib" \
+      BRIC_TAPE_BACKEND=sim BRIC_LOG_DIR="$P/log" BRIC_LOG_FALLBACK_DIR="$P/log2" \
+      bash test/run_setup_e2e.sh
+  test ! -e "$P/cluster.db" -a ! -e "$P/tape.db" -a ! -e "$P/qnap"
+  rm -rf "$P"
+
+The E2E test must PASS and none of the poisoned inherited destinations may be created.
+
+31E2 logging regression remains inherited: forced central-primary failure emits an explicit
+"BRIC structured log failover" warning naming both primary and fallback.

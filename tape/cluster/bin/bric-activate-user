@@ -1,0 +1,228 @@
+#!/bin/bash
+# One-command, root-only activation of a real OS/AD BRIC user.
+#
+# This is intentionally a thin administrative wrapper around the canonical
+# cluster/scripts/bric-setup-user.sh implementation. It adds a clean environment,
+# strict runtime checks, and a complete post-provision verification without
+# creating a second key/escrow implementation.
+set -euo pipefail
+IFS=$'\n\t'
+
+SELF="$(readlink -f "$0")"
+CONFIG="${BRIC_CONFIG:-/etc/bric/bric.conf}"
+_args=("$@")
+
+# Find --config before sanitising the inherited environment. Production shells may
+# export stale BRIC_ROLE, DB paths or signing keys; config precedence is env > file,
+# so activation must not inherit any of them.
+_i=0
+while [ "$_i" -lt "${#_args[@]}" ]; do
+    if [ "${_args[$_i]}" = --config ]; then
+        _i=$((_i + 1))
+        [ "$_i" -lt "${#_args[@]}" ] || { echo "ERROR: --config requires a path" >&2; exit 2; }
+        CONFIG="${_args[$_i]}"
+    fi
+    _i=$((_i + 1))
+done
+unset _i
+
+if [ "${_BRIC_ACTIVATE_CLEAN:-0}" != 1 ]; then
+    exec env -i \
+        PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+        HOME=/root USER=root LOGNAME=root LANG="${LANG:-C.UTF-8}" \
+        BRIC_CONFIG="$CONFIG" _BRIC_ACTIVATE_CLEAN=1 \
+        "$SELF" "${_args[@]}"
+fi
+
+[ "${EUID:-$(id -u)}" -eq 0 ] || { echo "ERROR: bric-activate-user must be run as root" >&2; exit 1; }
+
+HERE="$(cd "$(dirname "$SELF")" && pwd)"
+ROOT="$(cd "$HERE/../.." && pwd)"
+COMMON="$ROOT/cluster/scripts/lib_common.sh"
+SETUP_USER="$ROOT/cluster/scripts/bric-setup-user.sh"
+[ -r "$COMMON" ] || { echo "ERROR: missing $COMMON" >&2; exit 1; }
+[ -x "$SETUP_USER" ] || { echo "ERROR: missing or non-executable $SETUP_USER" >&2; exit 1; }
+# shellcheck disable=SC1090
+. "$COMMON"
+
+usage() {
+    cat <<'USAGE'
+usage: bric-activate-user USER [--home ABSOLUTE_HOME] [--handout ABSOLUTE_DIR]
+       bric-activate-user --user USER [--home ABSOLUTE_HOME] [--handout ABSOLUTE_DIR]
+                          [--config /etc/bric/bric.conf]
+
+Run as root on the Slurm/cluster host. The command is idempotent and performs:
+  * NSS/AD identity and home validation;
+  * personal 32-byte key creation or recovery;
+  * authenticated institutional escrow;
+  * private ~/.bric state plus centralized /var/log/bric/users/USER logging;
+  * no changes to .bashrc, .profile, PATH, modules or the login environment;
+  * SQLite ACL installation;
+  * strict bus/signing/runtime checks;
+  * post-install verification as the target user.
+
+No plaintext administrator handout is created unless --handout is explicitly used.
+USAGE
+}
+
+die_activate() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+ok()           { printf '  [ok] %s\n' "$*"; }
+
+USERNAME=""
+HOME_OVERRIDE=""
+HANDOUT_DIR=""
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --user)    USERNAME="${2:-}"; shift 2;;
+        --home)    HOME_OVERRIDE="${2:-}"; shift 2;;
+        --handout) HANDOUT_DIR="${2:-}"; shift 2;;
+        --config)  BRIC_CONFIG="${2:-}"; shift 2;; # already applied before clean re-exec
+        -h|--help) usage; exit 0;;
+        --*)       die_activate "unknown option: $1";;
+        *)
+            [ -z "$USERNAME" ] || die_activate "unexpected argument: $1"
+            USERNAME="$1"; shift;;
+    esac
+done
+
+[ -n "$USERNAME" ] || { usage >&2; exit 2; }
+require_cmds getent id sqlite3 openssl sha256sum base64 awk stat getfacl runuser
+valid_name "$USERNAME" || die_activate "invalid user name '$USERNAME'"
+[ "${BRIC_ROLE:-slurm}" = slurm ] || die_activate "host role mismatch: activation requires BRIC_ROLE=slurm, got '${BRIC_ROLE:-unset}'"
+[ -s "$BRIC_DB" ] || die_activate "cluster catalog missing or empty: $BRIC_DB"
+
+PW="$(getent passwd "$USERNAME" || true)"
+[ -n "$PW" ] || die_activate "user '$USERNAME' is not resolvable through NSS/AD"
+IFS=: read -r _n _x USER_UID USER_GID _g USER_HOME USER_SHELL <<EOF_PW
+$PW
+EOF_PW
+[ "$USER_UID" -ne 0 ] 2>/dev/null || die_activate "refusing to activate uid 0"
+[ -z "$HOME_OVERRIDE" ] || USER_HOME="$HOME_OVERRIDE"
+case "$USER_HOME" in /*) ;; *) die_activate "user home must be absolute: $USER_HOME";; esac
+[ "$USER_HOME" != / ] || die_activate "refusing to use / as the user home"
+[ -d "$USER_HOME" ] || die_activate "user home does not exist or is not mounted: $USER_HOME"
+
+printf '== BRIC user activation ==\n'
+printf '  user:   %s (uid=%s gid=%s)\n' "$USERNAME" "$USER_UID" "$USER_GID"
+printf '  home:   %s\n' "$USER_HOME"
+printf '  config: %s\n' "$BRIC_CONFIG"
+printf '  catalog:%s\n' " $BRIC_DB"
+
+setup_args=(--user "$USERNAME" --strict-runtime-checks --no-handout)
+[ -z "$HOME_OVERRIDE" ] || setup_args+=(--home "$HOME_OVERRIDE")
+if [ -n "$HANDOUT_DIR" ]; then
+    case "$HANDOUT_DIR" in /*) ;; *) die_activate "--handout directory must be absolute";; esac
+    setup_args=(--user "$USERNAME" --strict-runtime-checks --handout "$HANDOUT_DIR")
+    [ -z "$HOME_OVERRIDE" ] || setup_args+=(--home "$HOME_OVERRIDE")
+fi
+
+"$SETUP_USER" "${setup_args[@]}"
+
+USER_DIR="$USER_HOME/.bric"
+USER_KEY="$USER_DIR/${USERNAME}_user_key.txt"
+USER_ENV="$USER_DIR/env.sh"
+USER_FALLBACK_LOG="$USER_DIR/log"
+LOG_ADMIN_GROUP="${BRIC_LOG_ADMIN_GROUP:-bric}"
+USER_LOG_ROOT="${BRIC_USER_LOG_ROOT:-${BRIC_LOG_DIR:-/var/log/bric}/users}"
+USER_LOG="$USER_LOG_ROOT/$USERNAME"
+USER_BG="$USER_LOG/jobs"
+USER_RUNSTATE="$USER_DIR/runstate"
+USER_PIDS="$USER_DIR/pids"
+
+check_owned_mode() {
+    local path="$1" mode="$2" kind="$3" got_mode got_uid got_gid
+    [ -e "$path" ] || die_activate "$kind missing: $path"
+    got_mode="$(stat -c %a "$path")"
+    got_uid="$(stat -c %u "$path")"
+    got_gid="$(stat -c %g "$path")"
+    [ "$got_mode" = "$mode" ] || die_activate "$kind has mode $got_mode, expected $mode: $path"
+    [ "$got_uid" = "$USER_UID" ] || die_activate "$kind uid is $got_uid, expected $USER_UID: $path"
+    [ "$got_gid" = "$USER_GID" ] || die_activate "$kind gid is $got_gid, expected $USER_GID: $path"
+}
+
+check_owned_mode "$USER_DIR" 700 "private BRIC directory"
+check_owned_mode "$USER_KEY" 600 "personal key"
+check_owned_mode "$USER_ENV" 600 "user environment"
+head -n 1 "$USER_ENV" | grep -q '^# BRIC-MANAGED-FILE ' \
+    || die_activate "user environment is not marked as BRIC-managed: $USER_ENV"
+[ "$(stat -c %u "$USER_LOG")" = "$USER_UID" ] || die_activate "central user log has wrong owner: $USER_LOG"
+getfacl -cp "$USER_LOG" | awk -F: -v g="$LOG_ADMIN_GROUP" '$1=="group" && $2==g && $3 ~ /^r-x/ {ok=1} END{exit !ok}' \
+    || die_activate "central user log lacks admin read ACL: $USER_LOG"
+getfacl -cp "$USER_LOG" | awk -F: '$1=="group" && $2=="" && $3=="---" {ok=1} END{exit !ok}' \
+    || die_activate "central user log owning-group ACL is not isolated: $USER_LOG"
+getfacl -cp "$USER_LOG" | awk -F: -v g="$LOG_ADMIN_GROUP" '$1=="default" && $2=="group" && $3==g && $4 ~ /^r-x/ {ok=1} END{exit !ok}' \
+    || die_activate "central user log lacks inherited admin ACL: $USER_LOG"
+[ "$(stat -c %u "$USER_BG")" = "$USER_UID" ] || die_activate "central background-job log owner wrong: $USER_BG"
+check_owned_mode "$USER_FALLBACK_LOG" 700 "private fallback log directory"
+check_owned_mode "$USER_RUNSTATE" 700 "run-state directory"
+check_owned_mode "$USER_PIDS" 700 "PID directory"
+ok "home files and permissions are correct"
+
+TMP="$(mktemp -d "${TMPDIR:-/tmp}/bric-activate-user.XXXXXX")"
+chmod 700 "$TMP"
+trap 'rm -rf "$TMP"' EXIT
+if ! openssl base64 -d -A -in "$USER_KEY" -out "$TMP/home.raw" 2>/dev/null; then
+    die_activate "personal key is not valid Base64: $USER_KEY"
+fi
+[ "$(wc -c < "$TMP/home.raw" | tr -d ' ')" = 32 ] || die_activate "personal key does not decode to exactly 32 bytes"
+ok "personal key is a valid 32-byte secret"
+
+ESCROW="$(sql "SELECT key_escrow FROM users WHERE username='$(sql_quote "$USERNAME")';")"
+case "$ESCROW" in v2:*) ;; *) die_activate "authenticated v2 escrow missing for '$USERNAME'";; esac
+MK="$(master_key_file)"
+[ -s "$MK" ] || die_activate "institution master key missing or empty: $MK"
+printf '%s' "$ESCROW" | master_unwrap "$MK" > "$TMP/escrow.key" \
+    || die_activate "cannot unwrap escrow for '$USERNAME'"
+[ "$(sha256sum "$USER_KEY" | awk '{print $1}')" = "$(sha256sum "$TMP/escrow.key" | awk '{print $1}')" ] \
+    || die_activate "home key and institutional escrow do not match"
+[ "$(cfg require_user_escrow)" = 1 ] || die_activate "catalog policy require_user_escrow is not enabled"
+ok "authenticated escrow matches the user's home key"
+
+DB_DIR="$(dirname "$BRIC_DB")"
+getfacl -cp "$DB_DIR" | awk -F: -v u="$USERNAME" '$1=="user" && $2==u && $3=="rwx" {ok=1} END{exit !ok}' \
+    || die_activate "missing user rwx ACL on catalog directory: $DB_DIR"
+getfacl -cp "$DB_DIR" | awk -F: -v u="$USERNAME" '$1=="default" && $2=="user" && $3==u && $4=="rwx" {ok=1} END{exit !ok}' \
+    || die_activate "missing default user rwx ACL on catalog directory: $DB_DIR"
+getfacl -cp "$BRIC_DB" | awk -F: -v u="$USERNAME" '$1=="user" && $2==u && $3=="rw-" {ok=1} END{exit !ok}' \
+    || die_activate "missing user rw ACL on cluster catalog: $BRIC_DB"
+ok "SQLite directory, WAL/SHM inheritance and catalog ACLs are installed"
+
+BRIC_CMD="${BRIC_COMMAND_LINK:-/usr/local/bin/bric}"
+[ -x "$BRIC_CMD" ] || die_activate "user command missing or non-executable: $BRIC_CMD"
+runuser -u "$USERNAME" -- env -i \
+    HOME="$USER_HOME" USER="$USERNAME" LOGNAME="$USERNAME" LANG=C.UTF-8 \
+    PATH=/usr/local/bin:/usr/bin:/bin \
+    "$BRIC_CMD" status >/dev/null \
+    || die_activate "'$BRIC_CMD status' failed as $USERNAME"
+ok "the target user can run 'bric status' without shell initialization"
+
+# Validate the ACL on a real file produced by the activated user's CLI, not only on the provisioned root.
+ACL_EVENT="$(find "$USER_LOG/events" -type f -name '*.events.v1.log' -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2- || true)"
+[ -n "$ACL_EVENT" ] || die_activate "CLI test produced no central structured event under $USER_LOG"
+getfacl -cp "$ACL_EVENT" | awk -F: '$1=="group" && $2=="" && $3=="---" {ok=1} END{exit !ok}' \
+    || die_activate "central log file owning-group ACL is not isolated: $ACL_EVENT"
+getfacl -cp "$ACL_EVENT" | awk -F: -v g="$LOG_ADMIN_GROUP" '$1=="group" && $2==g && $3 ~ /^r--/ {ok=1} END{exit !ok}' \
+    || die_activate "central log file lacks admin read ACL: $ACL_EVENT"
+getfacl -cp "$ACL_EVENT" | awk -F: '$1=="other" && $2=="" && $3=="---" {ok=1} END{exit !ok}' \
+    || die_activate "central log file grants access to other: $ACL_EVENT"
+ok "a real CLI-produced central log file has isolated owning-group and admin-read ACLs"
+
+audit USER_ACTIVATED "$USERNAME" OK "home=$USER_HOME strict_runtime=1 verified=key,escrow,acl,cli"
+
+cat <<EOF_DONE
+
+BRIC activation complete
+  user:         $USERNAME
+  personal key: $USER_KEY
+  environment:  $USER_ENV
+  central log:  $USER_LOG
+  fallback log: $USER_FALLBACK_LOG
+  escrow:       authenticated and verified
+  CLI test:     bric status OK
+
+The user can log in and run:
+  bric backup PROJECT SOURCE
+  bric restore PROJECT DESTINATION
+  bric status
+  bric jobs
+EOF_DONE

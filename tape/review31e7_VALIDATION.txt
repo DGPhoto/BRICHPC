@@ -1,0 +1,18 @@
+BRIC Archive 2.0 Review 31E7 validation contract
+
+Required gates before installation:
+1. sha256sum -c MANIFEST.sha256
+2. sudo bash test/run_user_setup.sh
+   Required: USER ONBOARDING CHECKS PASSED.
+3. sudo bash test/run_user_activation.sh
+   Required: PASS run_user_activation.
+4. bash test/run_close_hardening.sh
+   Required: ALL CLOSE-HARDENING CHECKS PASSED, including:
+   - run.CLOSED published only after reservation RELEASED
+   - run.CLOSED published only after CLOSED audit commit
+5. bash test/run_all_tests.sh --timeout 600
+   Required: 64 OK, 0 FAIL.
+
+Review 31E7 changes the tape daemon's terminal close ordering and strengthens its regression test.
+BRIC-FORMAT-V1 and the database schema are unchanged. A new real-tape smoke is not required solely for
+this change if the native gate passes, because no physical tape write/read/positioning path changed.

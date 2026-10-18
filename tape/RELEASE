@@ -1,0 +1,8 @@
+BRIC Archive 2.0
+review=34R2rc3
+release_id=2.0-review34R2rc3-b3-payload-safe-recovery
+build_date=2026-10-15
+update_format=1
+database_migration=files-v34-mode-metadata
+on_tape_format=BRIC-FORMAT-V1
+build_state=candidate

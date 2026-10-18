@@ -1,0 +1,15 @@
+BRIC Archive 2.0 — Review 32B5R1 invariant check
+Date: 2026-09-24
+
+Baseline tarball SHA-256: 095878febc2f71f7f695aaf8976220470a0a445b63532685e6cc5378a4606ca4
+Expected: 095878febc2f71f7f695aaf8976220470a0a445b63532685e6cc5378a4606ca4
+
+PASS  cluster/scripts/bric-stream-backup.sh  019c119ea27b22ba2c2cf0a4f81ad644ab6d69ea77538cbfbb4e367daec236bb
+PASS  cluster/scripts/bric-stream-parallel-produce.sh  9068e18d863e3de0d6d705f5dbe23cccb65a02b3f374454bf892558424e7cf47
+PASS  cluster/scripts/bric-chunk.sh  62440d029f7b74c193e56e663c8cb9f46adc2d9ab2a9b82fc8b53aa610569580
+PASS  cluster/libexec/bric-tar-stream  290307ac951a0869b310e0c814011eba8c557394579dbd66e0ed80f38488e180
+PASS  cluster/libexec/bric-tar-stream.go  1e593c5fb5bd93bccb1f541251329b9b18072bcf97288f6d9e3310cd86bf3233
+
+PASS  tape/** exact set and bytes (10 files)
+PASS  on_tape_format=BRIC-FORMAT-V1
+PASS  database_migration=config-v32b5-logical-namespace

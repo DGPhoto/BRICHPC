@@ -1,0 +1,21 @@
+BRIC Archive 2.0 Review 32B5R2 — file changes vs exact 32B5R1 candidate
+
+ADDED    CHANGES_REVIEW32B5R2_SLURM_DR_GATE.md
+ADDED    CLAUDE_REVIEW_BRIEF_32B5R2.md
+MODIFIED MANIFEST.sha256
+MODIFIED README.md
+MODIFIED RELEASE
+ADDED    REVIEW32B5R2_CHANGED_VS_32B4A.txt
+ADDED    REVIEW32B5R2_CHANGED_VS_32B5R1.txt
+MODIFIED cluster/bin/bric
+MODIFIED cluster/bin/bric-run
+MODIFIED cluster/scripts/bric-dr-from-tapes.sh
+MODIFIED cluster/scripts/bric-orchestrate.sh
+MODIFIED cluster/scripts/lib_common.sh
+MODIFIED docs/man/bric.1
+ADDED    review32b5r2_INVARIANTS.txt
+ADDED    review32b5r2_VALIDATION.txt
+MODIFIED test/run_32b5_dr_verify_semantics.sh
+MODIFIED test/run_32b5_schema_namespace.sh
+MODIFIED test/run_32b5_slurm_cli.sh
+MODIFIED test/run_all_tests.sh

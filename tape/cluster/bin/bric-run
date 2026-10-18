@@ -1,0 +1,591 @@
+#!/bin/bash
+# bric-run — operational wrapper around `bric backup|restore`. Slurm backup jobs load the pinned
+# OpenSSL module inside their sbatch scripts; this wrapper checks role, mounts and submission setup, then execs
+# the real CLI. Everything here is OPERATIONAL convenience for day-to-day runs on the cluster; it
+# is NOT a recovery prerequisite — disaster recovery from tapes uses only parameter-pinned openssl
+# `enc`/`dgst` and must never depend on a loaded module (see docs/RECOVERY_HANDBOOK.html).
+#
+# Installed for users as `bric` by bric-setup.sh. No shell initialization is required:
+#   bric backup  PROJECT SOURCE [--as LOGICAL_ROOT] [--exclude RELPATH ...] [--source-change-policy strict|record] [--force] [--wait]
+#   bric restore PROJECT DEST [--file REL] [--run RUN_ID]
+#   bric status  [--project PROJECT]
+#   bric list    [--long]
+#   bric contents PROJECT [--run RUN_ID]
+#   bric find     PROJECT QUERY [--run RUN_ID]
+#
+# The explicit long forms remain accepted:
+#   bric backup  --project NAME --source DIR [--as LOGICAL_ROOT] [--exclude RELPATH ...] [--source-change-policy strict|record] [--force] [--wait]
+#   bric restore --project NAME --dest DIR [--file REL] [--run RUN_ID]
+#   bric --skip-preflight backup ...         # debugging only
+#
+# In local mode and inside Slurm jobs, BRIC keeps the current OpenSSL when it is already >=3.
+# Otherwise it initializes Environment Modules, inspects `module avail openssl`, and loads the newest
+# compatible module that this UID can actually use. The configured module is only a preference.
+
+set -euo pipefail
+IFS=$'\n\t'
+HERE="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+RELEASE_FILE="$HERE/../../RELEASE"
+if [ "${1:-}" = version ] || [ "${1:-}" = --version ]; then
+    if [ -r "$RELEASE_FILE" ]; then cat "$RELEASE_FILE"; else printf 'BRIC Archive 2.0\nreview=unknown\nbuild_state=legacy-or-mixed\n'; fi
+    exit 0
+fi
+print_general_help() {
+    cat <<'EOF_HELP'
+BRIC Archive user commands
+
+Usage:
+  bric backup  PROJECT SOURCE [--as LOGICAL_ROOT] [--exclude RELPATH ...] [--source-change-policy strict|record] [--force] [--wait]
+  bric restore PROJECT DEST [--file REL] [--run RUN_ID] [--require-destination-verify] [--wait]
+  bric status   [--project PROJECT]
+  bric list     [--long] [--all]
+  bric contents PROJECT [--run RUN_ID] [--history] [--type TYPE] [--long] [--limit N] [--offset N]
+  bric find     PROJECT QUERY [--run RUN_ID] [--history] [--type TYPE] [--long] [--limit N] [--offset N]
+  bric exclusions PROJECT [--run RUN_ID]
+  bric source-changes PROJECT [--run RUN_ID]
+  bric jobs
+  bric log     [JOB_ID|PID]
+  bric cancel  JOB_ID|PID
+  bric version
+  bric help    [COMMAND]
+
+Commands:
+  backup   Create an encrypted archive backup.
+  restore  Restore a complete project or one relative path.
+  status    Show archive runs and live progress.
+  list      List archived projects.
+  contents  List paths recorded in a closed backup without reading tape.
+  find      Search recorded backup paths without reading tape.
+  exclusions Show intentionally omitted subtrees recorded for a CLOSED run.
+  source-changes Show recorded source-change diagnostics for a CLOSED run.
+  jobs      List local background jobs and PIDs.
+  log      Follow a background job log.
+  cancel   Cancel a running local background job.
+  version  Show the installed BRIC release identity.
+  help     Show general or command-specific help.
+
+Advanced long forms with --project/--source/--dest are also accepted.
+No shell source command, module command or /opt path is required.
+Use "bric help COMMAND" for details or "man bric" for the full manual.
+EOF_HELP
+}
+
+print_command_help() {
+    case "${1:-}" in
+        backup) cat <<'EOF'
+Usage: bric backup PROJECT SOURCE [--as LOGICAL_ROOT] [--exclude RELPATH ...] [--source-change-policy strict|record] [--force] [--wait]
+       bric backup --project NAME --source DIR [--as LOGICAL_ROOT] [--exclude RELPATH ...] [--source-change-policy strict|record] [--force] [--wait]
+
+Create an encrypted archive backup. --as assigns a stable single-component logical root; the default is the declared source basename. Before tape reservation BRIC traverses the
+included source as the caller, logs every unreadable path and refuses the backup by default. --force keeps
+the preflight but auditably skips precisely identified unreadable paths; every omission
+is logged and recorded in the encrypted catalog. --exclude remains an explicit exact
+relative path/subtree. Source changes are fatal by default; explicit record mode
+catalogs GNU tar's FILE_CHANGED_DURING_READ diagnostics and allows the captured bytes
+to close. In local mode the backup is detached by default; --wait keeps it foreground.
+EOF
+            ;;
+        restore) cat <<'EOF'
+Usage: bric restore PROJECT DEST [--file REL] [--run RUN_ID] [--require-destination-verify] [--wait]
+       bric restore --project NAME --dest DIR [--file REL] [--run RUN_ID] [--require-destination-verify] [--wait]
+
+Restore the latest CLOSED run in full, or use --file LOGICAL_ROOT/RELATIVE_PATH to
+select the newest CLOSED run containing that logical key. With --run, legacy bare
+run-relative paths remain accepted. Local mode is detached unless --wait is used.
+EOF
+            ;;
+        status) cat <<'EOF'
+Usage: bric status [--project PROJECT]
+
+Show recent runs and live progress. Without --project, show runs owned by the
+current user; with --project, filter by project name.
+EOF
+            ;;
+        list) cat <<'EOF'
+Usage: bric list [--long] [--all]
+
+List projects. --long includes run count and assigned tape barcodes. --all
+includes projects owned by other users when catalog permissions allow it.
+EOF
+            ;;
+        contents) cat <<'EOF'
+Usage: bric contents PROJECT [--run RUN_ID] [--history] [--type TYPE] [--long]
+                     [--limit N] [--offset N]
+       bric contents --project NAME [--run RUN_ID] [--history] [--type TYPE] [--long]
+                     [--limit N] [--offset N]
+
+List the project logical namespace across all CLOSED backups; latest version wins per logical path. --history shows all versions. --run selects one immutable CLOSED run.
+TYPE is all, file, dir or link. The default limit is 1000; --limit 0 lists all.
+--long also shows entry type, byte size and UTC modification time. No tape is read.
+EOF
+            ;;
+        find) cat <<'EOF'
+Usage: bric find PROJECT QUERY [--run RUN_ID] [--history] [--type TYPE] [--long]
+                 [--limit N] [--offset N]
+       bric find --project NAME --query TEXT [--run RUN_ID] [--history] [--type TYPE]
+                 [--long] [--limit N] [--offset N]
+
+Search case-insensitively for QUERY anywhere in an archived relative path. The
+project logical namespace is searched across CLOSED runs; latest version wins unless --history is used. --run selects one CLOSED run. TYPE is all, file, dir or
+link. The default limit is 200; --limit 0 returns all matches. No tape is read.
+EOF
+            ;;
+        exclusions) cat <<'EOF'
+Usage: bric exclusions PROJECT [--run RUN_ID]
+
+Show source paths omitted from a CLOSED backup, including user-declared and --force unreadable exclusions.
+EOF
+            ;;
+        source-changes) cat <<'EOF'
+Usage: bric source-changes PROJECT [--run RUN_ID]
+
+Show source-consistency semantics and recorded FILE_CHANGED_DURING_READ paths.
+EOF
+            ;;
+        jobs) cat <<'EOF'
+Usage: bric jobs
+
+List local background jobs with job ID, PID, state, action, project and times.
+EOF
+            ;;
+        log) cat <<'EOF'
+Usage: bric log [JOB_ID|PID]
+
+Follow the last 80 lines of a local background job log. With no argument, use
+the newest recorded job. Press Ctrl-C to stop following the log.
+EOF
+            ;;
+        cancel) cat <<'EOF'
+Usage: bric cancel JOB_ID|PID
+
+Request cancellation of a running local background job and its process group.
+EOF
+            ;;
+        version) cat <<'EOF'
+Usage: bric version
+
+Show the authoritative installed release marker from /opt/bric2/RELEASE.
+EOF
+            ;;
+        help|"") print_general_help ;;
+        *) printf 'Unknown help topic: %s\n\n' "$1" >&2; print_general_help >&2; return 2 ;;
+    esac
+}
+
+SKIP_PREFLIGHT=0
+FOREGROUND=0
+while [ "$#" -gt 0 ]; do
+    case "${1:-}" in
+        --skip-preflight) SKIP_PREFLIGHT=1; shift;;
+        --foreground)     FOREGROUND=1; shift;;   # internal: background supervisor re-entry
+        *) break;;
+    esac
+done
+if [ "$#" -lt 1 ]; then
+    print_general_help
+    exit 0
+fi
+ACTION="$1"
+case "$ACTION" in
+    backup)
+        case "${2:-}" in help|-h|--help) print_command_help backup; exit 0;; esac
+        # Friendly positional form: bric backup PROJECT SOURCE [options]. Normalize
+        # even partial positional input so validation can report the missing operand.
+        if [ "$#" -ge 2 ] && [[ "${2:-}" != --* ]]; then
+            _project="$2"; shift 2
+            if [ "$#" -ge 1 ] && [[ "${1:-}" != --* ]]; then
+                _source="$1"; shift
+                set -- backup --project "$_project" --source "$_source" "$@"
+            else
+                set -- backup --project "$_project" "$@"
+            fi
+        fi
+        ;;
+    restore)
+        case "${2:-}" in help|-h|--help) print_command_help restore; exit 0;; esac
+        # Friendly positional form: bric restore PROJECT DEST [options]. Normalize
+        # even partial positional input so validation can report the missing operand.
+        if [ "$#" -ge 2 ] && [[ "${2:-}" != --* ]]; then
+            _project="$2"; shift 2
+            if [ "$#" -ge 1 ] && [[ "${1:-}" != --* ]]; then
+                _dest="$1"; shift
+                set -- restore --project "$_project" --dest "$_dest" "$@"
+            else
+                set -- restore --project "$_project" "$@"
+            fi
+        fi
+        ;;
+    status|list|contents|find|exclusions|source-changes|jobs|log|cancel|register-user)
+        if [ "$SKIP_PREFLIGHT" -ne 0 ]; then
+            printf 'ERROR: --skip-preflight is valid only for backup or restore\n' >&2
+            exit 1
+        fi
+        case "${2:-}" in help|-h|--help) print_command_help "$ACTION"; exit 0;; esac
+        exec "$HERE/bric" "$@"
+        ;;
+    help)
+        print_command_help "${2:-}"
+        exit $?
+        ;;
+    -h|--help)
+        print_command_help "${2:-}"
+        exit $?
+        ;;
+    *)
+        printf "ERROR: unknown command '%s' (use: bric backup|restore|status|list|contents|find|exclusions|source-changes|jobs|log|cancel|version|help)\n" "$ACTION" >&2
+        exit 1;;
+esac
+
+# Help and non-operational commands have already exited or delegated above. Load
+# the user's BRIC runtime only for actual backup/restore work.
+USER_ENV="${BRIC_USER_ENV_FILE:-$HOME/.bric/env.sh}"
+[ -r "$USER_ENV" ] && . "$USER_ENV"
+. "$HERE/../scripts/lib_common.sh"
+bric_log_process_start "bric-run" "$@"
+require_role slurm
+
+# Validate the complete operational command before runtime selection, preflight or
+# background detachment.  A typo or missing operand must never create a job record.
+validate_operational_args() {
+    local action="$1" project="" source="" dest="" file="" run_id="" logical_root=""
+    shift
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --project)
+                [ "$#" -ge 2 ] && [ -n "${2:-}" ] || die "$action: --project requires a value"
+                project="$2"; shift 2;;
+            --source)
+                [ "$action" = backup ] || die "$action: unknown option --source"
+                [ "$#" -ge 2 ] && [ -n "${2:-}" ] || die "backup: --source requires a value"
+                source="$2"; shift 2;;
+            --as)
+                [ "$action" = backup ] || die "$action: unknown option --as"
+                [ "$#" -ge 2 ] && [ -n "${2:-}" ] || die "backup: --as requires a value"
+                logical_root="$(bric_validate_logical_root "$2" || true)"
+                [ -n "$logical_root" ] || die "backup: invalid --as '$2' (one NFC path component, max 255 bytes, no slash/comma/control/. or ..)"
+                shift 2;;
+            --exclude)
+                [ "$action" = backup ] || die "$action: unknown option --exclude"
+                [ "$#" -ge 2 ] && [ -n "${2:-}" ] || die "backup: --exclude requires a relative path"
+                bric_normalize_exclude_rel "$2" >/dev/null || die "backup: invalid exclusion '$2' (relative subtree, no . or .. components)"
+                shift 2;;
+            --source-change-policy)
+                [ "$action" = backup ] || die "$action: unknown option --source-change-policy"
+                [ "$#" -ge 2 ] && [ -n "${2:-}" ] || die "backup: --source-change-policy requires strict or record"
+                case "$2" in strict|record) :;; *) die "backup: invalid source change policy '$2'";; esac
+                shift 2;;
+            --force)
+                [ "$action" = backup ] || die "$action: unknown option --force"
+                shift;;
+            --dest)
+                [ "$action" = restore ] || die "$action: unknown option --dest"
+                [ "$#" -ge 2 ] && [ -n "${2:-}" ] || die "restore: --dest requires a value"
+                dest="$2"; shift 2;;
+            --file)
+                [ "$action" = restore ] || die "$action: unknown option --file"
+                [ "$#" -ge 2 ] && [ -n "${2:-}" ] || die "restore: --file requires a value"
+                file="$2"; shift 2;;
+            --run)
+                [ "$action" = restore ] || die "$action: unknown option --run"
+                [ "$#" -ge 2 ] && [ -n "${2:-}" ] || die "restore: --run requires a value"
+                run_id="$2"; shift 2;;
+            --require-destination-verify)
+                [ "$action" = restore ] || die "$action: unknown option --require-destination-verify"
+                shift;;
+            --wait) shift;;
+            help|-h|--help)
+                print_command_help "$action"
+                exit 0;;
+            --*) die "$action: unknown option $1";;
+            *) die "$action: unexpected argument $1";;
+        esac
+    done
+    [ -n "$project" ] || die "usage: bric $action PROJECT $([ "$action" = backup ] && printf SOURCE || printf DEST)"
+    if [ "$action" = backup ]; then
+        [ -n "$source" ] || die "usage: bric backup PROJECT SOURCE [--as LOGICAL_ROOT] [--exclude RELPATH ...] [--source-change-policy strict|record] [--force] [--wait]"
+        if [ -z "$logical_root" ]; then
+            logical_root="$(bric_default_logical_root "$source" || true)"
+            [ -n "$logical_root" ] || die "backup: source basename is not a valid logical root; use --as NAME"
+        fi
+    else
+        [ -n "$dest" ] || die "usage: bric restore PROJECT DEST [--file REL] [--run RUN_ID] [--require-destination-verify] [--wait]"
+    fi
+}
+
+case "$ACTION" in
+    backup|restore) validate_operational_args "$@";;
+esac
+
+# ---------------------------------------------------------------------------- runtime selection
+# Local mode keeps an already suitable OpenSSL. When the current binary is too old, resolve a
+# loadable module dynamically; the configured module is only a preference, not a hard requirement.
+# This matters on sites where `module avail` is shared but module ACLs differ between root and users.
+if [ "${BRIC_RUN_MODE:-local}" = local ]; then
+    bric_ensure_openssl3 purge \
+        || die "${BRIC_OPENSSL_ERROR:-unable to resolve an OpenSSL >=${BRIC_OPENSSL_MIN_MAJOR:-3} runtime}"
+fi
+
+# ---------------------------------------------------------------------------- preflight
+# Each check prints one line and contributes to a single pass/fail verdict. Read-only: nothing
+# here writes to tape, the bus, or the catalog.
+pf_fail=0
+say()  { printf '  %s\n' "$*"; }
+good() { printf '  [ok]   %s\n' "$*"; }
+bad()  { printf '  [FAIL] %s\n' "$*"; pf_fail=1; }
+
+preflight() {
+    echo "== bric-run preflight =="
+
+    # 1) Runtime selection.  Backups run under Slurm and load OpenSSL in the actual sbatch files;
+    #    the login node's system OpenSSL is irrelevant. Backup and restore both run as Slurm jobs;
+    #    only explicit BRIC_RUN_MODE=local needs OpenSSL >=3 in the current shell.
+    if [ "${BRIC_RUN_MODE:-local}" = slurm ]; then
+        good "Slurm jobs will keep OpenSSL >=${BRIC_OPENSSL_MIN_MAJOR:-3}, or auto-select a loadable module from 'module avail openssl'"
+        [ -z "${BRIC_SLURM_OPENSSL_MODULE:-}" ] \
+            || say "preferred OpenSSL module: ${BRIC_SLURM_OPENSSL_MODULE} (automatic fallback enabled)"
+        command -v sbatch >/dev/null 2>&1 && good "sbatch available" || bad "sbatch not found"
+        if [ "$ACTION" = backup ]; then
+            [ -x "$HERE/../slurm/orchestrate.sbatch" ] \
+                && [ -x "$HERE/../slurm/archive_array.sbatch" ] \
+                && [ -x "$HERE/../slurm/finalize_close.sbatch" ] \
+                && good "module-aware backup sbatch scripts installed" \
+                || bad "one or more backup sbatch scripts are missing/not executable"
+        else
+            [ -x "$HERE/../slurm/restore.sbatch" ] \
+                && good "module-aware restore sbatch script installed" \
+                || bad "restore.sbatch is missing/not executable"
+        fi
+    else
+        local ov major; ov="$(bric_openssl_version)"; major="${ov%%.*}"
+        if bric_openssl_version_ok; then
+            if [ "${BRIC_OPENSSL_MODULE_LOADED:-0}" = 1 ]; then
+                good "OpenSSL $ov available for direct restore/local mode (module ${BRIC_OPENSSL_MODULE_SELECTED})"
+            else
+                good "OpenSSL $ov available for direct restore/local mode"
+            fi
+        else
+            bad "direct restore/local mode requires OpenSSL >=3 in this shell"
+        fi
+    fi
+
+    # 2) NFS bus mounted. Check the mount point declared in the config as BRIC_QNAP_MNT — the same
+    #    variable healthcheck_qnap.sh already uses. This is exact (no walking up the tree): the
+    #    operator states which path must be a mount point, and we verify precisely that. If it is
+    #    unset we fall back to the parent of BRIC_QNAP, but the config value is the intended source.
+    local qnap="${BRIC_QNAP:-/mnt/data/bric}"
+    local qmnt="${BRIC_QNAP_MNT:-}"
+    if [ -z "$qmnt" ]; then
+        qmnt="$(dirname "$qnap")"
+        say "note: BRIC_QNAP_MNT not set in the config — checking $qmnt (parent of BRIC_QNAP). Set BRIC_QNAP_MNT for an exact check."
+    fi
+    if ! mountpoint -q "$qmnt" 2>/dev/null; then
+        bad "bus mount $qmnt is NOT mounted — mount the QNAP NFS export first (e.g. mount $qmnt)."
+    else
+        local fstype; fstype="$(stat -f -c %T "$qmnt" 2>/dev/null || echo '?')"
+        case "$fstype" in
+            nfs*) good "bus mount $qmnt is mounted over NFS" ;;
+            *)
+                if [ "${BRIC_REQUIRE_NFS_BUS:-0}" = 1 ]; then
+                    bad "bus mount $qmnt has type '$fstype', expected NFS (BRIC_REQUIRE_NFS_BUS=1)"
+                else
+                    good "bus mount $qmnt is mounted (type $fstype)"
+                    say "note: fstype is '$fstype', not nfs; production role configs should set BRIC_REQUIRE_NFS_BUS=1"
+                fi
+                ;;
+        esac
+        [ -e "$qnap" ] || bad "bus root $qnap does not exist under the mount — check BRIC_QNAP."
+        [ ! -e "$qnap" ] || [ -w "$qnap" ] || bad "bus $qnap is not writable by $(id -un) — check NFS squash/permissions."
+    fi
+
+    # 3) Personal encryption key. The master key is intentionally irrelevant to normal jobs.
+    local me ukf
+    me="$(bric_whoami)"; ukf="$(user_key_file "$me")"
+    if [ -s "$ukf" ] && [ -r "$ukf" ]; then
+        good "personal archive key readable: $ukf"
+    else
+        bad "personal archive key missing/unreadable: $ukf — ask BRIC IT to run bric-setup-user --user $me"
+    fi
+
+    # Bus signing authenticates the cluster side as a trusted archive operator. If policy requires it,
+    # this user must be able to read the configured cluster signing key and tape public key.
+    if [ "$(cfg require_bus_signing 2>/dev/null)" = 1 ]; then
+        [ -n "${BRIC_BUS_SIGN_KEY:-}" ] && [ -r "$BRIC_BUS_SIGN_KEY" ] \
+            && good "cluster bus signing key readable" \
+            || bad "require_bus_signing=1 but cluster signing key is not readable by $(id -un)"
+        [ -n "${BRIC_BUS_VERIFY_KEY:-}" ] && [ -r "$BRIC_BUS_VERIFY_KEY" ] \
+            && good "tape bus public verification key readable" \
+            || bad "require_bus_signing=1 but tape verification key is not readable"
+    fi
+
+    # 4) Source integrity (backup only). This is deliberately before reservation: an archive must
+    #    never spend append-only tape capacity merely to discover at EOF that the caller could not read
+    #    part of the requested tree. Explicit exclusions are checked and later recorded in the catalog.
+    if [ "$ACTION" = backup ]; then
+        local src="" scan="" a force=0 force_file=""
+        local -a sx=() scan_args=()
+        set -- "$@"
+        while [ "$#" -gt 0 ]; do
+            case "$1" in
+                --source) src="${2:-}"; shift 2;;
+                --exclude) sx+=(--exclude "${2:-}"); shift 2;;
+                --force) force=1; shift;;
+                *) shift;;
+            esac
+        done
+        if [ -z "$src" ]; then
+            bad "backup source could not be resolved for integrity preflight"
+        else
+            scan_args=(--source "$src" "${sx[@]}")
+            if [ "$force" -eq 1 ]; then
+                force_file="${BRIC_FORCE_EXCLUDE_FILE:-}"
+                if [ -z "$force_file" ]; then
+                    force_file="$(mktemp "${BRIC_LOCAL_TMPDIR:-/tmp}/bric-force-excludes.$(id -u).XXXXXX")"
+                    chmod 600 "$force_file"
+                    export BRIC_FORCE_EXCLUDE_FILE="$force_file"
+                fi
+                scan_args+=(--force --force-exclude-file "$force_file")
+            fi
+            if scan="$("$HERE/../scripts/bric-source-preflight.sh" "${scan_args[@]}")"; then
+                IFS='|' read -r BRIC_SOURCE_PREFLIGHT_FILES BRIC_SOURCE_PREFLIGHT_LOGICAL_BYTES BRIC_SOURCE_PREFLIGHT_ALLOCATED_BYTES BRIC_SOURCE_PREFLIGHT_EXCLUSION_COUNT BRIC_SOURCE_PREFLIGHT_UID <<< "$scan"
+                export BRIC_SOURCE_PREFLIGHT_FILES BRIC_SOURCE_PREFLIGHT_LOGICAL_BYTES BRIC_SOURCE_PREFLIGHT_ALLOCATED_BYTES BRIC_SOURCE_PREFLIGHT_EXCLUSION_COUNT BRIC_SOURCE_PREFLIGHT_UID
+                good "source integrity scan completed before reservation"
+                [ "$force" -eq 0 ] || good "force mode omissions captured for background run and catalog"
+            else
+                [ -z "$force_file" ] || rm -f "$force_file"
+                unset BRIC_FORCE_EXCLUDE_FILE 2>/dev/null || true
+                bad "source integrity scan failed; no tape reservation will be requested"
+            fi
+        fi
+    fi
+
+    # 5) Tape hardware belongs to BRIC_ROLE=tape and cannot be inspected from supekgate.
+    #    The real-tape acceptance procedure requires bric-library-preflight on brictape immediately
+    #    before submission.  The gate only verifies its own slurm-side prerequisites here.
+    say "[info] tape hardware preflight must pass on the BRIC_ROLE=tape host before a real run"
+
+    if [ "$pf_fail" != 0 ]; then
+        die "preflight failed — refusing to start. Fix the [FAIL] items above, or use --skip-preflight to override (discouraged)."
+    fi
+    echo "== preflight OK =="
+}
+
+[ "$SKIP_PREFLIGHT" = 1 ] && echo "bric: preflight SKIPPED (--skip-preflight)" || preflight "$@"
+
+# Local mode is detached by default.  --wait keeps the historical foreground behavior and is useful
+# for scripts/tests.  The supervisor owns a new session/process group, records PID+metadata, redirects
+# output to the configured per-user central job log (home fallback on failure), and removes the live PID file when the command exits.
+start_background_local() {
+    local action="$1" project="unknown" a job_id pid_dir log_dir pidfile metafile logfile pid
+    shift || true
+    set -- "$action" "$@"
+    a=1
+    while [ "$a" -le "$#" ]; do
+        if [ "${!a}" = --project ]; then
+            a=$((a+1)); project="${!a:-unknown}"; break
+        fi
+        a=$((a+1))
+    done
+    project="$(printf '%s' "$project" | sed 's/[^A-Za-z0-9._-]/_/g')"
+    job_id="${action}.${project}.$(date -u +%Y%m%dT%H%M%SZ).$$"
+    pid_dir="${BRIC_PID_DIR:-$HOME/.bric/pids}"
+    log_dir="${BRIC_BACKGROUND_LOGDIR:-${BRIC_LOG_DIR:-$HOME/.bric/log}/jobs}"
+    mkdir -p "$pid_dir"; chmod 700 "$pid_dir"
+    prepare_background_log_dir() {
+        local d="$1" probe group="${BRIC_LOG_GROUP:-bric}"
+        mkdir -p "$d" 2>/dev/null || return 1
+        if [ -n "${BRIC_LOG_DIR:-}" ]; then
+            _central_user_root="${BRIC_USER_LOG_ROOT:-/var/log/bric/users}/$(id -un 2>/dev/null || printf unknown)"
+            case "$d/" in
+                "${_central_user_root%/}/"*)
+                    command -v setfacl >/dev/null 2>&1 || return 1
+                    setfacl -m "u::rwx,g::---,g:${group}:r-x,m::r-x,o::---" "$d" >/dev/null 2>&1 || return 1
+                    setfacl -d -m "u::rwx,g::---,g:${group}:r-x,m::r-x,o::---" "$d" >/dev/null 2>&1 || return 1
+                    ;;
+                *) chmod 0700 "$d" 2>/dev/null || true;;
+            esac
+        else
+            chmod 0700 "$d" 2>/dev/null || true
+        fi
+        probe="$d/.bric-bg-write-test.$$"
+        ( umask 0077; : >"$probe" ) 2>/dev/null || return 1
+        rm -f "$probe" 2>/dev/null || true
+        return 0
+    }
+    if ! prepare_background_log_dir "$log_dir"; then
+        log_dir="${BRIC_LOG_FALLBACK_DIR:-$HOME/.bric/log}/jobs"
+        prepare_background_log_dir "$log_dir" || die "neither central nor fallback background-log directory is writable"
+        printf '[%s] WARN: background log failover to %s\n' "$(date +'%Y-%m-%d %H:%M:%S')" "$log_dir" >&2
+    fi
+    pidfile="$pid_dir/$job_id.pid"; metafile="$pid_dir/$job_id.meta"; logfile="$log_dir/$job_id.log"
+    ( umask 0077; : >"$logfile" ) 2>/dev/null || die "cannot create background log: $logfile"
+    if [ -n "${BRIC_LOG_DIR:-}" ]; then
+        _central_user_root="${BRIC_USER_LOG_ROOT:-/var/log/bric/users}/$(id -un 2>/dev/null || printf unknown)"
+        case "$logfile/" in
+            "${_central_user_root%/}/"*)
+                command -v setfacl >/dev/null 2>&1 || die "setfacl is required for central background-log ACLs"
+                setfacl -m "u::rw-,g::---,g:${BRIC_LOG_GROUP:-bric}:r--,m::r--,o::---" "$logfile" >/dev/null 2>&1 \
+                    || die "cannot enforce central background-log ACL: $logfile"
+                ;;
+            *) chmod 0600 "$logfile" 2>/dev/null || true;;
+        esac
+    else
+        chmod 0600 "$logfile" 2>/dev/null || true
+    fi
+
+    command -v setsid >/dev/null 2>&1 || die "setsid is required for reliable detached local jobs"
+    nohup setsid bash -c '
+        pidfile=$1; metafile=$2; logfile=$3; job_id=$4; action=$5; project=$6; shift 6
+        umask 077
+        started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+        printf "%s\n" "$$" > "$pidfile"
+        {
+            printf "job_id=%s\n" "$job_id"
+            printf "pid=%s\n" "$$"
+            printf "action=%s\n" "$action"
+            printf "project=%s\n" "$project"
+            printf "state=RUNNING\n"
+            printf "started=%s\n" "$started"
+            printf "log=%s\n" "$logfile"
+        } > "$metafile"
+        child=0; signalled=0
+        on_signal() {
+            signalled=1
+            [ "$child" -eq 0 ] || kill -TERM "$child" 2>/dev/null || true
+        }
+        trap on_signal TERM INT HUP
+        "$@" &
+        child=$!
+        set +e
+        wait "$child"
+        rc=$?
+        set -e
+        trap - TERM INT HUP
+        {
+            printf "state=%s\n" "$([ "$rc" -eq 0 ] && echo FINISHED || echo FAILED)"
+            printf "rc=%s\n" "$rc"
+            printf "ended=%s\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        } >> "$metafile"
+        rm -f "$pidfile"
+        exit "$rc"
+    ' _ "$pidfile" "$metafile" "$logfile" "$job_id" "$action" "$project"         "$0" --skip-preflight --foreground "$@" >"$logfile" 2>&1 </dev/null &
+    pid=$!
+    for _ in 1 2 3 4 5 6 7 8 9 10; do [ -s "$pidfile" ] && break; sleep 0.05; done
+    printf 'BRIC %s started in background\n' "$action"
+    printf '  job: %s\n' "$job_id"
+    printf '  PID: %s\n' "$pid"
+    printf '  log: %s\n' "$logfile"
+    printf '  follow: bric log %s\n' "$job_id"
+    printf '  cancel: bric cancel %s\n' "$job_id"
+}
+
+if [ "${BRIC_RUN_MODE:-local}" = local ] && [ "$FOREGROUND" -eq 0 ]; then
+    wait_requested=0
+    for arg in "$@"; do [ "$arg" = --wait ] && wait_requested=1; done
+    if [ "$wait_requested" -eq 0 ]; then
+        case "$ACTION" in
+            backup|restore) start_background_local "$@"; exit 0;;
+        esac
+    fi
+fi
+
+exec "$HERE/bric" "$@"

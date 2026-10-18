@@ -1,0 +1,52 @@
+BRIC Archive 2.0 Review 30AC validation
+Date: 2026-08-28
+
+Release decision
+----------------
+Review 30AB is REJECTED / DO NOT DEPLOY. Its CLOSED terminal fence prevented the pre-existing
+idempotent re-DONE behavior exercised by test/run_job_lifecycle.sh.
+Review 30AC restores that contract while retaining the terminal tape-I/O fence.
+
+Code/test changes
+-----------------
+- CLOSED may reach handle_chunk only for receipt reconstruction from two already-VERIFIED segment rows.
+- The full terminal fence is checked immediately after that branch, before blob error handling,
+  placement, media preparation, allocation, or tape write.
+- ABORTED / ABORT_DONE / DENIED block all chunk handling.
+- Terminal marker existence remains a fence only; destructive cleanup remains owned by verified/path-bound
+  handle_abort.
+- Added signing-enabled test/run_terminal_marker_authenticity.sh.
+- Extended test/run_terminal_drain_safety.sh with CLOSED idempotent re-DONE/no-rewrite coverage.
+- Retains Review 30AB failure-propagation, claim timestamp, ERROR reclaim, startup fence, and abort cleanup fixes.
+- Retains Review 30AA stream-gate race fix unchanged.
+
+Validation completed in this build environment
+----------------------------------------------
+PASS  bash -n across 97 shell scripts
+PASS  systemd-analyze verify tape/systemd/bric-tape-daemon.service
+PASS  test/run_terminal_drain_safety.sh
+      - signed/path-bound ABORT owns destructive cleanup
+      - unsigned CLOSED fences new I/O without destructive cleanup
+      - fresh CLAIMED timestamp / ERROR no-reclaim loop
+      - unsigned ERROR is not delete authority
+      - ABORT_DONE startup claim is not requeued
+      - CLOSED + two VERIFIED copies reconstructs DONE with segment count unchanged
+      - no terminal/error scenario writes simulated tape
+PASS  test/run_terminal_marker_authenticity.sh
+      - with require_bus_signing=1, unsigned run.ABORTED fences I/O but preserves READY/ciphertext
+        and cannot publish run.ABORT_DONE
+PASS  test/run_tape_failure_propagation.sh
+PASS  test/run_stream_gate_race.sh
+PASS  test/run_drive_state_timing.sh
+PASS  test/run_update.sh (after Review 30AC version assertions and manifest regeneration)
+
+SQLite caveat
+-------------
+The build container does not provide the distribution sqlite3 CLI. SQLite-dependent targeted tests above
+were run with the existing local compatibility CLI linked to libsqlite3. The full test/run_job_lifecycle.sh
+was also attempted with that compatibility CLI, but it is too slow in this environment and was NOT counted
+as PASS. The exact regression it exposed on Review 30AB is independently covered in
+run_terminal_drain_safety.sh by a CLOSED run with two pre-existing VERIFIED segment rows, asserting DONE
+reconstruction, unchanged physical segment count, and zero simulated tape writes.
+
+Before production deployment, run the complete test suite on a BRIC host with its native sqlite3 CLI.

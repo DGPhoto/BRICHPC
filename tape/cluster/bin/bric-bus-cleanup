@@ -1,0 +1,99 @@
+#!/bin/bash
+# Remove terminal BRIC run directories from the shared QNAP transport bus without touching catalogs,
+# keys, configuration, logs or tape data. CLOSED/DENIED require their signed terminal receipt;
+# FAILED/CANCELLED additionally require the tape server's signed run.ABORT_DONE acknowledgement.
+set -euo pipefail
+IFS=$'\n\t'
+HERE="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+. "$HERE/../scripts/lib_common.sh"
+
+usage() {
+    cat <<'USAGE'
+Usage: bric-bus-cleanup [--dry-run] [--project NAME] [--force]
+
+Safely removes terminal archive run directories from the QNAP bus and prunes empty project
+containers under archive/ and restore/. By default:
+  CLOSED            requires a valid signed run.CLOSED
+  DENIED            requires a valid signed run.DENIED
+  FAILED/CANCELLED  requires a valid signed run.ABORT_DONE
+
+--force removes a directory based on the terminal cluster-catalog state even when its receipt is
+missing. Use only after verifying that no daemon recovery or reservation release is pending.
+USAGE
+}
+
+DRY=0; FORCE=0; ONLY_PROJECT=""
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --dry-run) DRY=1; shift;;
+        --force) FORCE=1; shift;;
+        --project) ONLY_PROJECT="${2:-}"; shift 2;;
+        -h|--help) usage; exit 0;;
+        *) printf 'ERROR: unknown option: %s\n' "$1" >&2; usage >&2; exit 2;;
+    esac
+done
+
+[ "$(id -u)" -eq 0 ] || die "bric-bus-cleanup must run as root"
+require_role slurm
+require_cmds sqlite3 find du awk
+[ -z "$ONLY_PROJECT" ] || valid_name "$ONLY_PROJECT" || die "invalid project name: $ONLY_PROJECT"
+[ -d "$BRIC_QNAP/archive" ] || { printf 'no archive bus directory: %s/archive\n' "$BRIC_QNAP"; exit 0; }
+
+removed=0; deferred=0; active=0; unknown=0; bytes=0
+for rd in "$BRIC_QNAP"/archive/*/*; do
+    [ -d "$rd" ] || continue
+    project="$(basename "$(dirname "$rd")")"; run_id="$(basename "$rd")"
+    [ -z "$ONLY_PROJECT" ] || [ "$project" = "$ONLY_PROJECT" ] || continue
+    if ! valid_name "$project" || [[ "$run_id" != "$project"__* ]]; then
+        printf 'DEFER unsafe/unbound directory: %s\n' "$rd" >&2
+        deferred=$((deferred+1)); continue
+    fi
+    status="$(sql "SELECT status FROM runs WHERE run_id='$(sql_quote "$run_id")' AND project_name='$(sql_quote "$project")';" 2>/dev/null || true)"
+    if [ -z "$status" ]; then
+        printf 'KEEP  unknown to cluster catalog: %s\n' "$rd"
+        unknown=$((unknown+1)); continue
+    fi
+    case "$status" in
+        CLOSED) marker=run.CLOSED;;
+        DENIED) marker=run.DENIED;;
+        FAILED|CANCELLED) marker=run.ABORT_DONE;;
+        *) printf 'KEEP  active/non-terminal %-10s %s\n' "$status" "$rd"; active=$((active+1)); continue;;
+    esac
+    ready=0
+    if [ "$FORCE" -eq 1 ]; then
+        ready=1
+    elif [ -f "$rd/$marker" ] && marker_verify "$rd" "$marker"; then
+        ready=1
+    fi
+    if [ "$ready" -ne 1 ]; then
+        printf 'DEFER %-10s missing/invalid %s: %s\n' "$status" "$marker" "$rd" >&2
+        deferred=$((deferred+1)); continue
+    fi
+    sz="$(du -sb "$rd" 2>/dev/null | awk '{print $1}')"; sz="${sz:-0}"
+    if [ "$DRY" -eq 1 ]; then
+        printf 'REMOVE %-10s %12s bytes  %s\n' "$status" "$sz" "$rd"
+    else
+        rm -rf -- "$rd"
+        [ ! -e "$rd" ] || die "could not remove terminal bus directory: $rd"
+        rmdir -- "$(dirname "$rd")" 2>/dev/null || true
+        printf 'REMOVED %-9s %12s bytes  %s\n' "$status" "$sz" "$rd"
+    fi
+    removed=$((removed+1)); bytes=$((bytes+sz))
+done
+
+# Successful restores already remove request subdirectories. Remove only empty project containers;
+# never delete a non-empty restore request from this generic cleaner.
+if [ -d "$BRIC_QNAP/restore" ]; then
+    for pd in "$BRIC_QNAP"/restore/*; do
+        [ -d "$pd" ] || continue
+        [ -z "$ONLY_PROJECT" ] || [ "$(basename "$pd")" = "$ONLY_PROJECT" ] || continue
+        if [ -z "$(find "$pd" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]; then
+            if [ "$DRY" -eq 1 ]; then printf 'PRUNE empty restore project directory: %s\n' "$pd"
+            else rmdir -- "$pd" 2>/dev/null || true; printf 'PRUNED empty restore project directory: %s\n' "$pd"; fi
+        fi
+    done
+fi
+
+printf 'summary: candidates=%d bytes=%d deferred=%d active=%d unknown=%d mode=%s\n' \
+    "$removed" "$bytes" "$deferred" "$active" "$unknown" "$([ "$DRY" -eq 1 ] && echo dry-run || echo apply)"
+[ "$deferred" -eq 0 ] || exit 1

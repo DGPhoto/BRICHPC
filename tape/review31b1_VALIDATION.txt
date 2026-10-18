@@ -1,0 +1,63 @@
+BRIC Archive 2.0 Review 31B1 validation
+=======================================
+Build date: 2026-09-04
+Release: 2.0-review31B1
+On-tape format: BRIC-FORMAT-V1 (unchanged)
+
+Scope of Review 31B1
+--------------------
+Review 31B1 includes Review 31B source-consistency/PAX sparse work plus one explicit catalog semantic:
+- sparse materiality/batch sizing uses GNU PAX 0.1 GNU.sparse.map, not st_blocks or SEEK_HOLE;
+- sparse batch output is verified while the exact same raw tar bytes are encrypted;
+- former third sparse source read/hashSourceFile is removed;
+- source-change policy strict|record with FILE_CHANGED_DURING_READ-only rc=1 classification;
+- additive run_source_semantics/run_source_changes catalog tables and CLI display;
+- run_source_semantics.restore_allocation_effect = zero-ranges-may-restore-as-holes;
+- allocation_topology remains not-guaranteed: byte content is authoritative, source allocation intent is not;
+- tape daemon/positioning logic unchanged.
+
+Sparse verifier gate
+--------------------
+PASS: test/run_tar_stream.sh creates genuinely sparse files with truncate + positioned writes, feeds them
+      through GNU tar PAX sparse 0.1 -> production bric-tar-stream -> TeeReader verification -> encryption,
+      then decrypts/restores and compares full logical bytes. It also verifies sparse allocation on restore.
+      This exercises Go archive/tar against the exact GNU sparse representation used by production.
+PASS: 100 sparse files -> 7 TAR_PART chunks at the 1 MiB artificial test target.
+PASS: sparse classification has no st_blocks dependency and the third source hash read is absent.
+
+Local validation in build environment
+-------------------------------------
+PASS: gofmt clean
+PASS: go vet cluster/libexec/bric-tar-stream.go
+PASS: CGO_ENABLED=0 static linux/amd64 bric-tar-stream
+PASS: helper version BRIC tar-stream 31B1
+PASS: no ELF NEEDED entries
+PASS: no GLIBC_ symbol references
+PASS: test/run_tar_stream.sh
+PASS: test/run_helper_portability.sh
+PASS: test/run_cli_help_man.sh
+PASS: test/run_source_consistency.sh using a local Python sqlite CLI shim
+      - strict records then refuses file-changed-only tar rc=1
+      - record accepts file-changed-only tar rc=1
+      - mixed/unclassified rc=1 remains fatal
+      - tar rc>=2 remains fatal
+      - restore allocation effect is explicit in run_source_semantics
+PASS: test/run_update.sh
+PASS: shell syntax check across 101 shell/shebang files
+PASS: systemd-analyze verify tape/systemd/bric-tape-daemon.service
+
+Important limitation
+--------------------
+The build container does NOT provide the native sqlite3 CLI used on supekgate04fl. The local
+source-consistency test used a small Python sqlite shim only to exercise SQL/control flow.
+This is NOT a substitute for the native cross-role suite and is not claimed as one.
+
+Required release gate before installation
+-----------------------------------------
+Run from a COMPLETE EXTRACTED Review 31B1 release tree on supekgate04fl with native sqlite3 3.45.1:
+
+  sha256sum -c MANIFEST.sha256
+  bash test/run_all_tests.sh --timeout 600
+
+Expected selection count: 59 tests.
+Do not install or run real media unless the native suite passes.

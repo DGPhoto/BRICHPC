@@ -1,0 +1,25 @@
+Review 33R3 local pre-gate validation — 2026-10-09
+
+PASS bash -n over 129 Bash scripts.
+PASS run_33_restore_txn.sh using a locally compiled sqlite3 CLI against libsqlite3 3.46.1.
+     Includes live symlink escape and stale-journal symlink escape regressions.
+     ACL/xattr subtests skipped locally because acl/attr command-line tools are absent.
+PASS configured journal base exercised as user nobody: per-UID 65534 root created mode 700 and transaction finalized.
+PASS G2 minimal cleanup-trap reproduction with DAEMON=0 exits 0; no kill 0 path.
+PASS harness static audit: 37 background tape-daemon --loop launches across 34 tests; every launch uses setsid,
+     every such test sources lib_test_daemon.sh, and no tape-daemon teardown uses a raw parent-only kill.
+PASS all test env -i sites explicitly retain BRIC_RESTORE_JOURNAL_ROOT.
+PASS run_32b5_dr_verify_semantics.sh.
+PASS run_32b5_schema_namespace.sh.
+PASS run_32b5_slurm_cli.sh.
+PASS run_cli_help_man.sh.
+PASS run_one_command_ux.sh.
+
+Not claimed locally:
+- full native 81-test gate;
+- ACL/xattr native subtests;
+- two consecutive full serial green runs;
+- full run_verify_failure_attribution with the local compatibility CLI (functional assertions need the real sqlite3 CLI environment).
+PASS run_update.sh after manifest regeneration.
+PASS run_update_legacy_daemon.sh with setsid/process-group teardown.
+PASS run_tape_singleton_migration.sh with setsid/process-group teardown.

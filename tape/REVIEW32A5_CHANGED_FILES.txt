@@ -1,0 +1,8 @@
+Review 32A5 changed files relative to Review 32A4
+
+Only in /mnt/data/bric_archive_2_0_review32a5_close_catalog_test_contract_20260909: CHANGES_REVIEW32A5_CLOSE_CATALOG_TEST_CONTRACT.md
+Only in /mnt/data/bric_archive_2_0_review32a5_close_catalog_test_contract_20260909: CLAUDE_REVIEW_BRIEF_32A5.md
+Files /mnt/data/pristine32a4/bric_archive_2_0_review32a4_large_file_target_cap_20260909/RELEASE and /mnt/data/bric_archive_2_0_review32a5_close_catalog_test_contract_20260909/RELEASE differ
+Only in /mnt/data/bric_archive_2_0_review32a5_close_catalog_test_contract_20260909: REVIEW32A5_CHANGED_FILES.txt
+Only in /mnt/data/bric_archive_2_0_review32a5_close_catalog_test_contract_20260909: review32a5_VALIDATION.txt
+Files /mnt/data/pristine32a4/bric_archive_2_0_review32a4_large_file_target_cap_20260909/test/run_local_e2e.sh and /mnt/data/bric_archive_2_0_review32a5_close_catalog_test_contract_20260909/test/run_local_e2e.sh differ

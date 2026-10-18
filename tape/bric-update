@@ -1,0 +1,470 @@
+#!/bin/bash
+# BRIC Archive in-place static-file updater.
+#
+# Run this script FROM an extracted new release, never from the installed tree:
+#   ./bric-update --target /opt/bric2   # role read from /etc/bric/bric.conf
+#   ./bric-update --role tape --target /opt/bric2  # optional matching assertion
+#
+# It deliberately does not run bric-setup.sh and never modifies catalogs, keys,
+# user homes, /etc/bric/bric.conf or the NFS bus. Only release-managed static
+# files whose content changed are replaced. Replaced/removed files are backed up.
+set -euo pipefail
+IFS=$'\n\t'
+umask 077
+
+SELF="$(readlink -f "$0")"
+SOURCE_ROOT="$(cd "$(dirname "$SELF")" && pwd)"
+TARGET_ROOT="/opt/bric2"
+ROLE=""
+ROLE_CLI=""
+ROLE_SOURCE=""
+CONFIG="/etc/bric/bric.conf"
+BACKUP_BASE="/var/backups/bric2"
+DRY_RUN=0
+SKIP_INTEGRATIONS=0
+SKIP_ACTIVE_CHECK=0
+SHOW_CURRENT=0
+
+usage() {
+    cat <<'USAGE'
+Usage:
+  bric-update [--role slurm|tape] [--target /opt/bric2] [--config FILE]
+  bric-update --current [--target /opt/bric2]
+
+Options:
+  --role ROLE             Optional safety assertion. When CONFIG exists, BRIC_ROLE
+                          is read from it and a conflicting --role is refused.
+                          Required only when CONFIG does not exist.
+  --target DIR            Installed BRIC tree. Default: /opt/bric2.
+  --config FILE           Runtime config used only to locate catalogs and links.
+                          Default: /etc/bric/bric.conf.
+  --backup-dir DIR        Static-file backup root. Default: /var/backups/bric2.
+  --dry-run               Show changes without writing or stopping services.
+  --skip-integrations     Do not update symlinks, man page or systemd unit.
+                          Intended for tests/offline inspection only.
+  --skip-active-check     Bypass active-run safety check. Dangerous.
+  --current               Print the installed RELEASE marker and exit.
+
+Safety contract:
+  * never runs bric-setup.sh;
+  * never edits cluster/db, tape/db, cluster/log, tape/log or key directories;
+  * never edits /etc/bric/bric.conf, /etc/bric/keys, /root/.bric or user homes;
+  * refuses an update while archive/restore work is active;
+  * backs up every replaced or removed managed file before changing it;
+  * writes RELEASE last, after validation and host integration succeed.
+USAGE
+}
+
+die()  { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+info() { printf '%s\n' "$*"; }
+run()  { if [ "$DRY_RUN" -eq 1 ]; then printf '  [dry-run]'; printf ' %q' "$@"; printf '\n'; else "$@"; fi; }
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --role) ROLE_CLI="${2:-}"; shift 2;;
+        --target) TARGET_ROOT="${2:-}"; shift 2;;
+        --config) CONFIG="${2:-}"; shift 2;;
+        --backup-dir) BACKUP_BASE="${2:-}"; shift 2;;
+        --dry-run) DRY_RUN=1; shift;;
+        --skip-integrations) SKIP_INTEGRATIONS=1; shift;;
+        --skip-active-check) SKIP_ACTIVE_CHECK=1; shift;;
+        --current) SHOW_CURRENT=1; shift;;
+        -h|--help) usage; exit 0;;
+        *) die "unknown option: $1";;
+    esac
+done
+
+case "$TARGET_ROOT" in /*) ;; *) die "--target must be absolute";; esac
+case "$CONFIG" in /*) ;; *) die "--config must be absolute";; esac
+case "$BACKUP_BASE" in /*) ;; *) die "--backup-dir must be absolute";; esac
+
+if [ "$SHOW_CURRENT" -eq 1 ]; then
+    if [ -r "$TARGET_ROOT/RELEASE" ]; then
+        cat "$TARGET_ROOT/RELEASE"
+    else
+        printf 'BRIC Archive 2.0\nreview=unknown\nbuild_state=legacy-or-mixed\n'
+    fi
+    exit 0
+fi
+
+[ "${EUID:-$(id -u)}" -eq 0 ] || die "bric-update must run as root"
+
+# Read exactly one BRIC_* assignment without sourcing the file. This mirrors the runtime
+# parser's first-assignment-wins behavior and prevents a writable config from executing code.
+config_value() { # KEY FILE
+    local want="$1" file="$2" line key val
+    [ -r "$file" ] || return 1
+    while IFS= read -r line || [ -n "$line" ]; do
+        line="${line%%#*}"
+        line="${line#"${line%%[![:space:]]*}"}"
+        line="${line%"${line##*[![:space:]]}"}"
+        [ -n "$line" ] || continue
+        key="${line%%=*}"; val="${line#*=}"
+        [ "$key" = "$want" ] || continue
+        val="${val#"${val%%[![:space:]]*}"}"
+        val="${val%"${val##*[![:space:]]}"}"
+        case "$val" in
+            \"*\") val="${val#\"}"; val="${val%\"}";;
+            \'*\') val="${val#\'}"; val="${val%\'}";;
+        esac
+        printf '%s\n' "$val"
+        return 0
+    done < "$file"
+    return 1
+}
+normalize_role() { # value
+    case "$1" in
+        slurm|cluster) printf 'slurm\n';;
+        tape) printf 'tape\n';;
+        *) return 1;;
+    esac
+}
+
+CONFIG_ROLE=""
+if [ -e "$CONFIG" ]; then
+    [ -f "$CONFIG" ] && [ -r "$CONFIG" ] || die "config exists but is not a readable regular file: $CONFIG"
+    raw_role="$(config_value BRIC_ROLE "$CONFIG" || true)"
+    [ -n "$raw_role" ] || die "$CONFIG exists but has no BRIC_ROLE assignment; refusing to guess the host role"
+    CONFIG_ROLE="$(normalize_role "$raw_role" || true)"
+    [ -n "$CONFIG_ROLE" ] || die "invalid BRIC_ROLE='$raw_role' in $CONFIG (expected slurm|cluster|tape)"
+    if [ -n "$ROLE_CLI" ]; then
+        CLI_ROLE="$(normalize_role "$ROLE_CLI" || true)"
+        [ -n "$CLI_ROLE" ] || die "invalid --role '$ROLE_CLI' (expected slurm|cluster|tape)"
+        [ "$CLI_ROLE" = "$CONFIG_ROLE" ] || die "--role $CLI_ROLE conflicts with BRIC_ROLE=$CONFIG_ROLE in $CONFIG"
+    fi
+    ROLE="$CONFIG_ROLE"
+    ROLE_SOURCE="config:$CONFIG"
+else
+    [ -n "$ROLE_CLI" ] || die "$CONFIG is absent; --role slurm|tape is required"
+    ROLE="$(normalize_role "$ROLE_CLI" || true)"
+    [ -n "$ROLE" ] || die "invalid --role '$ROLE_CLI' (expected slurm|cluster|tape)"
+    ROLE_SOURCE="command-line (config absent)"
+fi
+unset raw_role CLI_ROLE CONFIG_ROLE
+
+[ -d "$TARGET_ROOT" ] || die "installed tree not found: $TARGET_ROOT"
+[ "$SOURCE_ROOT" != "$TARGET_ROOT" ] || die "run bric-update from an extracted NEW release, not from the installed tree"
+[ -r "$SOURCE_ROOT/RELEASE" ] || die "release marker missing from source: $SOURCE_ROOT/RELEASE"
+[ -r "$SOURCE_ROOT/MANIFEST.sha256" ] || die "release manifest missing: $SOURCE_ROOT/MANIFEST.sha256"
+
+NEW_REVIEW="$(awk -F= '$1=="review"{print $2}' "$SOURCE_ROOT/RELEASE" | tail -1)"
+[ -n "$NEW_REVIEW" ] || die "source RELEASE has no review= entry"
+CURRENT_REVIEW="unknown"
+if [ -r "$TARGET_ROOT/RELEASE" ]; then
+    CURRENT_REVIEW="$(awk -F= '$1=="review"{print $2}' "$TARGET_ROOT/RELEASE" | tail -1)"
+    [ -n "$CURRENT_REVIEW" ] || CURRENT_REVIEW=unknown
+fi
+
+# Verify the complete source release before touching the installation.
+(
+    cd "$SOURCE_ROOT"
+    sha256sum -c MANIFEST.sha256 >/dev/null
+) || die "source release failed MANIFEST.sha256 verification"
+
+is_mutable_path() {
+    case "$1" in
+        cluster/db|cluster/db/*|cluster/log|cluster/log/*|cluster/keys|cluster/keys/*|\
+        tape/db|tape/db/*|tape/log|tape/log/*|tape/keys|tape/keys/*|\
+        .update-backups|.update-backups/*) return 0;;
+        *) return 1;;
+    esac
+}
+
+path_selected() {
+    case "$1" in
+        cluster/*) [ "$ROLE" = slurm ];;
+        tape/*)    [ "$ROLE" = tape ];;
+        *)         return 0;;
+    esac
+}
+
+# Refuse a malformed release that tries to manage runtime data.
+while IFS= read -r _line; do
+    [ -n "$_line" ] || continue
+    _hash="${_line%% *}"
+    _path="${_line#*  }"
+    _path="${_path#\*}"
+    [ -n "$_hash" ] && [ -n "$_path" ] || die "malformed manifest line: $_line"
+    case "$_path" in /*|../*|*/../*) die "unsafe path in manifest: $_path";; esac
+    is_mutable_path "$_path" && die "release manifest illegally contains mutable path: $_path"
+done < "$SOURCE_ROOT/MANIFEST.sha256"
+unset _line _hash _path
+
+resolve_runtime_var() {
+    local var="$1" fallback="$2" lib out
+    if [ "$ROLE" = slurm ]; then lib="$TARGET_ROOT/cluster/scripts/lib_common.sh"
+    else lib="$TARGET_ROOT/tape/scripts/lib_common.sh"; fi
+    if [ -r "$lib" ]; then
+        out="$(env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+            HOME=/root USER=root LOGNAME=root LANG=C.UTF-8 TERM=dumb \
+            BRIC_CONFIG="$CONFIG" BRIC_ROLE="$ROLE" \
+            bash -c '. "$1"; _v="$2"; printf "%s" "${!_v:-}"' _ "$lib" "$var" 2>/dev/null || true)"
+        [ -n "$out" ] && { printf '%s\n' "$out"; return; }
+    fi
+    printf '%s\n' "$fallback"
+}
+
+check_no_active_work() {
+    [ "$SKIP_ACTIVE_CHECK" -eq 0 ] || { info "! active-work safety check skipped by request"; return 0; }
+    command -v sqlite3 >/dev/null 2>&1 || die "sqlite3 is required for the active-work safety check"
+    local db n
+    if [ "$ROLE" = slurm ]; then
+        db="$(resolve_runtime_var BRIC_DB "$TARGET_ROOT/cluster/db/cluster_catalog.db")"
+        if [ -s "$db" ]; then
+            n="$(sqlite3 "$db" "SELECT COUNT(*) FROM runs WHERE status IN ('PLANNING','RESERVED','PRODUCING','DRAINING','CLOSING','RESTORING');" 2>/dev/null || echo query-failed)"
+            [ "$n" != query-failed ] || die "cannot query active cluster runs in $db"
+            [ "$n" = 0 ] || die "$n active cluster run(s) found; wait for completion before updating"
+        else
+            info "! cluster catalog not found at $db; active-run check skipped"
+        fi
+    else
+        db="$(resolve_runtime_var BRIC_TAPE_DB "$TARGET_ROOT/tape/db/tape_catalog.db")"
+        if [ -s "$db" ]; then
+            n="$(sqlite3 "$db" "SELECT
+                  (SELECT COUNT(*) FROM reservation WHERE state='GRANTED') +
+                  (SELECT COUNT(*) FROM segments WHERE state IN ('WRITING','WRITTEN')) +
+                  (SELECT COUNT(*) FROM tape_artifacts WHERE state='WRITING');" 2>/dev/null || echo query-failed)"
+            [ "$n" != query-failed ] || die "cannot query active tape work in $db"
+            [ "$n" = 0 ] || die "$n active tape reservation/write item(s) found; wait for completion before updating"
+        else
+            info "! tape catalog not found at $db; active-work check skipped"
+        fi
+    fi
+}
+
+check_no_active_work
+
+STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+BACKUP_DIR="$BACKUP_BASE/update-${CURRENT_REVIEW}-to-${NEW_REVIEW}-${ROLE}-${STAMP}"
+SERVICE_WAS_ACTIVE=0
+SERVICE_STOPPED=0
+SAFE_TO_RESTART_SERVICE=1
+UPDATE_SUCCESS=0
+SELECTED_MANIFEST=""
+
+on_exit() {
+    local rc=$?
+    [ -z "$SELECTED_MANIFEST" ] || rm -f "$SELECTED_MANIFEST"
+    if [ "$rc" -ne 0 ] && [ "$ROLE" = tape ] && [ "$SERVICE_STOPPED" -eq 1 ] && [ "$SERVICE_WAS_ACTIVE" -eq 1 ] && [ "$SAFE_TO_RESTART_SERVICE" -eq 1 ]; then
+        systemctl start bric-tape-daemon.service >/dev/null 2>&1 || true
+    fi
+    exit "$rc"
+}
+trap on_exit EXIT
+
+if [ "$ROLE" = tape ]; then
+    if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files bric-tape-daemon.service >/dev/null 2>&1; then
+        if systemctl is-active --quiet bric-tape-daemon.service; then SERVICE_WAS_ACTIVE=1; fi
+        if [ "$DRY_RUN" -eq 0 ]; then
+            systemctl stop bric-tape-daemon.service
+            SERVICE_STOPPED=1
+        else
+            info "  [dry-run] systemctl stop bric-tape-daemon.service"
+        fi
+    fi
+    if [ "$DRY_RUN" -eq 0 ]; then
+        # Review 31C: systemd can only stop its own cgroup, and an offline/manual installation may
+        # have no unit at all. A daemon launched from any extracted historical tree must therefore
+        # be checked independently of systemd before changing even one managed file.
+        legacy_pids="$(pgrep -f '[b]ric-tape-daemon --loop' 2>/dev/null || true)"
+        if [ -n "$legacy_pids" ]; then
+            SAFE_TO_RESTART_SERVICE=0
+            printf 'ERROR: tape daemon process(es) remain after systemd stop/check; update aborted before file changes.\n' >&2
+            printf 'PID/PPID/START/CMD:\n' >&2
+            ps -o pid=,ppid=,lstart=,args= -p "$(printf '%s\n' "$legacy_pids" | paste -sd, -)" >&2 2>/dev/null || true
+            while IFS= read -r _pid; do
+                [ -n "$_pid" ] || continue
+                _exe="$(readlink -f "/proc/$_pid/exe" 2>/dev/null || true)"
+                printf '  executable pid=%s: %s\n' "$_pid" "${_exe:-unknown}" >&2
+            done <<<"$legacy_pids"
+            die "foreign/legacy bric-tape-daemon detected; service left stopped for manual inspection"
+        fi
+        unset legacy_pids _pid _exe
+    fi
+fi
+
+info "== BRIC in-place update =="
+info "  role:       $ROLE ($ROLE_SOURCE)"
+info "  installed:  $CURRENT_REVIEW"
+info "  incoming:   $NEW_REVIEW"
+info "  target:      $TARGET_ROOT"
+info "  backup:      $BACKUP_DIR"
+
+if [ "$DRY_RUN" -eq 0 ]; then
+    install -d -m 0700 "$BACKUP_DIR"
+    cp -a "$SOURCE_ROOT/RELEASE" "$BACKUP_DIR/incoming.RELEASE"
+    [ ! -r "$TARGET_ROOT/RELEASE" ] || cp -a "$TARGET_ROOT/RELEASE" "$BACKUP_DIR/previous.RELEASE"
+fi
+
+backup_existing() {
+    local rel="$1" src dst
+    src="$TARGET_ROOT/$rel"
+    dst="$BACKUP_DIR/files/$rel"
+    [ -e "$src" ] || [ -L "$src" ] || return 0
+    run mkdir -p "$(dirname "$dst")"
+    run cp -a "$src" "$dst"
+}
+
+install_changed_file() {
+    local rel="$1" src dst tmp
+    src="$SOURCE_ROOT/$rel"
+    dst="$TARGET_ROOT/$rel"
+    [ -f "$src" ] || die "manifest source is not a regular file: $rel"
+    if [ -f "$dst" ] && cmp -s "$src" "$dst"; then
+        UNCHANGED=$((UNCHANGED+1)); return 0
+    fi
+    [ ! -d "$dst" ] || die "cannot replace directory with file: $dst"
+    backup_existing "$rel"
+    if [ "$DRY_RUN" -eq 1 ]; then
+        printf '  UPDATE %s\n' "$rel"
+    else
+        mkdir -p "$(dirname "$dst")"
+        tmp="$dst.bric-update.$$"
+        rm -f "$tmp"
+        cp -p "$src" "$tmp"
+        mv -f "$tmp" "$dst"
+    fi
+    UPDATED=$((UPDATED+1))
+}
+
+# Build the selected new manifest in memory and on disk.
+declare -A NEW_PATHS=()
+SELECTED_MANIFEST="$(mktemp)"
+while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    hash="${line%% *}"
+    rel="${line#*  }"
+    rel="${rel#\*}"
+    path_selected "$rel" || continue
+    NEW_PATHS["$rel"]=1
+    printf '%s  %s\n' "$hash" "$rel" >> "$SELECTED_MANIFEST"
+done < "$SOURCE_ROOT/MANIFEST.sha256"
+
+UPDATED=0
+UNCHANGED=0
+REMOVED=0
+
+# Remove only files explicitly managed by the previous updater manifest.
+if [ -r "$TARGET_ROOT/.bric-managed-files" ]; then
+    while IFS= read -r old_line; do
+        [ -n "$old_line" ] || continue
+        old_hash="${old_line%% *}"
+        old_rel="${old_line#*  }"
+        old_rel="${old_rel#\*}"
+        path_selected "$old_rel" || continue
+        is_mutable_path "$old_rel" && continue
+        [ -n "${NEW_PATHS[$old_rel]:-}" ] && continue
+        if [ -e "$TARGET_ROOT/$old_rel" ] || [ -L "$TARGET_ROOT/$old_rel" ]; then
+            backup_existing "$old_rel"
+            if [ "$DRY_RUN" -eq 1 ]; then printf '  REMOVE %s\n' "$old_rel"; else rm -f "$TARGET_ROOT/$old_rel"; fi
+            REMOVED=$((REMOVED+1))
+        fi
+    done < "$TARGET_ROOT/.bric-managed-files"
+fi
+
+# RELEASE is a commit marker and must be installed last.
+while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    hash="${line%% *}"
+    rel="${line#*  }"
+    rel="${rel#\*}"
+    [ "$rel" = RELEASE ] && continue
+    install_changed_file "$rel"
+done < "$SELECTED_MANIFEST"
+
+# Host integrations use the newly installed tree, but still never touch state/config/keys.
+if [ "$SKIP_INTEGRATIONS" -eq 0 ]; then
+    UPDATE_LINK="$(resolve_runtime_var BRIC_UPDATE_LINK /usr/local/sbin/bric-update)"
+    case "$UPDATE_LINK" in /*) ;; *) die "BRIC_UPDATE_LINK must be absolute: $UPDATE_LINK";; esac
+    run mkdir -p "$(dirname "$UPDATE_LINK")"
+    run ln -sfn "$TARGET_ROOT/bric-update" "$UPDATE_LINK"
+
+    if [ "$ROLE" = slurm ]; then
+        COMMAND_LINK="$(resolve_runtime_var BRIC_COMMAND_LINK /usr/local/bin/bric)"
+        ACTIVATE_LINK="$(resolve_runtime_var BRIC_ACTIVATE_USER_LINK /usr/local/sbin/bric-activate-user)"
+        BUS_CLEANUP_LINK="$(resolve_runtime_var BRIC_BUS_CLEANUP_LINK /usr/local/sbin/bric-bus-cleanup)"
+        MAN_DIR="$(resolve_runtime_var BRIC_MAN_DIR /usr/local/share/man/man1)"
+        run mkdir -p "$(dirname "$COMMAND_LINK")" "$(dirname "$ACTIVATE_LINK")" "$(dirname "$BUS_CLEANUP_LINK")" "$MAN_DIR"
+        run ln -sfn "$TARGET_ROOT/cluster/bin/bric-run" "$COMMAND_LINK"
+        run ln -sfn "$TARGET_ROOT/cluster/bin/bric-activate-user" "$ACTIVATE_LINK"
+        run ln -sfn "$TARGET_ROOT/cluster/bin/bric-bus-cleanup" "$BUS_CLEANUP_LINK"
+        run install -m 0644 "$TARGET_ROOT/docs/man/bric.1" "$MAN_DIR/bric.1"
+    else
+        IMPORT_LINK="$(resolve_runtime_var BRIC_TAPE_IMPORT_LINK /usr/local/sbin/bric-tape-import-inventory)"
+        case "$IMPORT_LINK" in /*) ;; *) die "BRIC_TAPE_IMPORT_LINK must be absolute: $IMPORT_LINK";; esac
+        run mkdir -p "$(dirname "$IMPORT_LINK")"
+        run ln -sfn "$TARGET_ROOT/tape/bin/bric-tape-import-inventory" "$IMPORT_LINK"
+
+        UNIT_DIR="$(resolve_runtime_var BRIC_SYSTEMD_UNIT_DIR /etc/systemd/system)"
+        run install -d -m 0755 "$UNIT_DIR"
+        run install -m 0644 "$TARGET_ROOT/tape/systemd/bric-tape-daemon.service" "$UNIT_DIR/bric-tape-daemon.service"
+        if command -v systemctl >/dev/null 2>&1; then
+            run systemctl daemon-reload
+            run systemctl enable bric-tape-daemon.service
+            if [ "$SERVICE_WAS_ACTIVE" -eq 1 ]; then
+                run systemctl restart bric-tape-daemon.service
+                if [ "$DRY_RUN" -eq 0 ]; then
+                    sleep 2
+                    systemctl is-active --quiet bric-tape-daemon.service \
+                        || die "updated tape daemon did not remain active"
+                fi
+            fi
+        fi
+    fi
+else
+    info "! host integrations skipped"
+fi
+
+# Validate selected files after installation.
+if [ "$DRY_RUN" -eq 0 ]; then
+    while IFS= read -r line; do
+        [ -n "$line" ] || continue
+        hash="${line%% *}"
+        rel="${line#*  }"
+        rel="${rel#\*}"
+        [ "$rel" = RELEASE ] && continue
+        got="$(sha256sum "$TARGET_ROOT/$rel" | awk '{print $1}')"
+        [ "$got" = "$hash" ] || die "post-update checksum mismatch: $rel"
+        if head -1 "$TARGET_ROOT/$rel" 2>/dev/null | grep -qE '^#!.*/(ba)?sh'; then
+            bash -n "$TARGET_ROOT/$rel" || die "shell syntax validation failed: $rel"
+        fi
+    done < "$SELECTED_MANIFEST"
+
+    if [ "$ROLE" = slurm ]; then
+        "$TARGET_ROOT/cluster/libexec/bric-tar-stream" --version >/dev/null 2>&1 \
+            || die "tar-stream helper cannot execute after update"
+    fi
+fi
+
+# Commit metadata last. An interrupted update therefore never advertises the new release.
+install_changed_file RELEASE
+if [ "$DRY_RUN" -eq 0 ]; then
+    cp -f "$SELECTED_MANIFEST" "$TARGET_ROOT/.bric-managed-files.tmp.$$"
+    chmod 0644 "$TARGET_ROOT/.bric-managed-files.tmp.$$"
+    mv -f "$TARGET_ROOT/.bric-managed-files.tmp.$$" "$TARGET_ROOT/.bric-managed-files"
+    cp -f "$SOURCE_ROOT/MANIFEST.sha256" "$TARGET_ROOT/MANIFEST.sha256"
+    chmod 0644 "$TARGET_ROOT/MANIFEST.sha256"
+    printf 'previous=%s\ncurrent=%s\nrole=%s\nupdated_at=%s\nbackup=%s\n' \
+        "$CURRENT_REVIEW" "$NEW_REVIEW" "$ROLE" "$STAMP" "$BACKUP_DIR" \
+        > "$TARGET_ROOT/.bric-update-state"
+    chmod 0644 "$TARGET_ROOT/.bric-update-state"
+fi
+
+UPDATE_SUCCESS=1
+SERVICE_STOPPED=0
+rm -f "$SELECTED_MANIFEST"
+SELECTED_MANIFEST=""
+trap - EXIT
+
+info ""
+info "Update complete"
+info "  review:    $NEW_REVIEW"
+info "  updated:   $UPDATED file(s)"
+info "  unchanged: $UNCHANGED file(s)"
+info "  removed:   $REMOVED obsolete managed file(s)"
+info "  backup:    $BACKUP_DIR"
+if [ "$ROLE" = slurm ] && [ "$DRY_RUN" -eq 0 ]; then
+    info "  verify:    bric version"
+elif [ "$ROLE" = tape ] && [ "$DRY_RUN" -eq 0 ]; then
+    info "  verify:    systemctl status bric-tape-daemon --no-pager"
+fi

@@ -1,0 +1,36 @@
+# ---------------------------------------------------------------------------------------------------
+# BRIC archive partition — EXAMPLE slurm.conf fragment (adapt node names to your site).
+# Partition 'archive' = the CPU nodes (no GPU) that mount BOTH Isilon (NFS, read) and the QNAP (NFS,
+# write). Nodes are SHARED with general research compute, so the partition is a "good neighbour":
+# low priority in queue, never preempts running research, tiny per-job footprint.
+# Discover nodes/features with:  sinfo -N -h -o '%N %f'   /   scontrol show node <name>
+# ---------------------------------------------------------------------------------------------------
+
+# Mark the CPU nodes that have the mounts with a feature, so the constraint is explicit and checkable.
+# (RealMemory/CPUs/Sockets are defined in your existing NodeName lines; just add the Feature.)
+# NodeName=cpu-[01-24] Features=qnap,isilon
+
+PartitionName=archive \
+    Nodes=cpu-[01-24] \                 # the CPU nodes that mount QNAP+Isilon (edit me)
+    State=UP Default=NO \
+    AllowGroups=archive \               # only the archive service account/group may submit
+    MaxNodes=1 \                        # a chunk job is single-node; no multi-node jobs here
+    DefaultTime=08:00:00 MaxTime=2-00:00:00 \
+    OverSubscribe=NO \                  # don't time-slice the SAME cpus; node is still shared via cons_tres
+    PriorityTier=1 \                    # low queue priority: research outranks archive
+    QOS=archive
+
+# Health: SLURM knows which nodes SHOULD have the mounts, not whether they are live right now.
+# Drain a node automatically if the QNAP/Isilon mount drops, so chunk jobs never fail opaquely.
+HealthCheckProgram=/etc/slurm/healthcheck_qnap.sh
+HealthCheckInterval=300
+
+# ---- QOS (run once with sacctmgr, not in slurm.conf) ----------------------------------------------
+# Cap CONCURRENCY in cpu/mem (not nodes: on shared nodes a 2-cpu job must not count as a whole node).
+# Keep GrpTRES=cpu coherent with max_inflight_chunks (blobs on the QNAP): the smaller wins.
+# Make archive jobs NON-preemptible: a 128 GB chunk writing for hours, holding a tape reservation,
+# must never be killed mid-write — it should wait in queue, not die in flight.
+#
+#   sacctmgr add qos archive
+#   sacctmgr modify qos archive set \
+#       GrpTRES=cpu=32,mem=64G MaxJobsPerUser=400 Priority=10 PreemptMode=OFF

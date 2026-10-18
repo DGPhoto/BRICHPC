@@ -1,0 +1,14 @@
+Review 34 pre-gate validation (container)
+- Baseline: Review 33R3 final.
+- RELEASE: review=34, database_migration=files-v34-mode-metadata, on_tape_format=BRIC-FORMAT-V1, build_state=candidate.
+- Migration column-order proof: PASS (upgraded 33R3 files schema == fresh Review34 files schema).
+- Bash syntax sweep: PASS on 130 scripts.
+- bric-tar-stream static Go build: PASS.
+- bric-file-metadata static Go build: PASS.
+- Direct large-file metadata helper round-trip: PASS (0600, historical mtime, binary user.*; stale selected xattr removed).
+- GNU tar ACL/xattr flags basic round-trip: PASS for mode/mtime/binary user.* in this container.
+- GNU tar -> Go archive/tar -> TAR_PART PAX xattr preservation: PASS for binary user.*.
+- test/run_tar_stream.sh: PASS.
+- test/run_helper_portability.sh: PASS.
+- test/run_performance_policy.sh: reached sqlite3-dependent phase; container has no sqlite3 CLI, so native completion is NOT claimed.
+- Review34 full sim E2E/DR/ACL gate: NOT claimed here; requires native sqlite3 + acl + attr and is delegated to independent gate.

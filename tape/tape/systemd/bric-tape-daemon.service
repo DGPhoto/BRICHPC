@@ -1,0 +1,36 @@
+[Unit]
+Description=BRIC tape server daemon
+Wants=network-online.target
+After=network-online.target remote-fs.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+RequiresMountsFor=/mnt/data
+ConditionPathExists=/opt/bric2/tape/bin/bric-tape-daemon
+ConditionPathExists=/etc/bric/bric.conf
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/bric2
+Environment=BRIC_CONFIG=/etc/bric/bric.conf
+RuntimeDirectory=bric
+RuntimeDirectoryMode=0750
+RuntimeDirectoryPreserve=yes
+UMask=0027
+ExecStartPre=/usr/bin/test -r /opt/bric2/tape/bin/bric-tape-daemon
+ExecStartPre=/bin/bash -n /opt/bric2/tape/bin/bric-tape-daemon
+ExecStartPre=/usr/bin/test -r /etc/bric/bric.conf
+ExecStart=/bin/bash /opt/bric2/tape/bin/bric-tape-daemon --loop
+KillSignal=SIGTERM
+KillMode=mixed
+TimeoutStopSec=120
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=bric-tape-daemon
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

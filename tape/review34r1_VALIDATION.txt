@@ -1,0 +1,28 @@
+BRIC Archive 2.0 — Review 34R1 local pre-gate validation
+Date: 2026-10-10
+Baseline candidate: Review 34 f66a295e55145509d696eca1ba2f23018f1ca898d191b0071ac0d1311eeedeb7
+
+Environment note:
+- container has GNU tar 1.35 and Go toolchain
+- native sqlite3/acl/attr CLIs are not installed
+- a local C sqlite3 compatibility CLI linked against libsqlite3 was used only for focused pre-gate tests
+- ACL/xattr Review33 subtests therefore skipped locally; they MUST execute in the independent native gate
+
+PASS:
+- bash -n sweep: 130/130 scripts
+- CGO_ENABLED=0 static build: bric-tar-stream, bric-file-metadata
+- go vet: both helpers
+- test/run_helper_portability.sh
+- test/run_tar_stream.sh, including Review34R1 TAR_PART + LARGE_FILE_CHUNK setgid policy regression
+- test/run_33_restore_txn.sh with sqlite3 compatibility CLI; multi-UID configured-base R1 regression passed (root + nobody)
+- focused serial planner probe: ordinary + oversized source planned successfully; 3 files / 3 chunks; oversized source mode 2755 catalogued as ordinary mode 493 (0755)
+- focused bric-chunk probe: file-only TAR_PART created by serial planner stored small source mode 2755 as tar mode -rwxr-xr-x; oversized catalog mode was 493 (0755)
+
+NOT CLAIMED:
+- complete native 82-test suite in this container
+- native ACL/xattr execution in run_33/run_34
+- NFSv4 system.nfs4_acl round-trip
+
+Required independent gate: see CLAUDE_REVIEW_BRIEF_34R1.md.
+- test/run_update.sh: PASS
+- test/run_update_legacy_daemon.sh: PASS

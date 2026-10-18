@@ -1,0 +1,20 @@
+BRIC Archive 2.0 Review 33R2 invariants
+
+Production baseline tarball:
+  bric_archive_2_0_review32b5r2_final_20261007.tar.gz
+  SHA-256 46874ddae77cd32fa1a9fee0ecae26b0e136b413c4f78bdd56bddbdfeda3748b
+
+Direct byte comparison against extracted final 32B5R2:
+  IDENTICAL cluster/scripts/bric-stream-backup.sh
+  IDENTICAL cluster/scripts/bric-stream-parallel-produce.sh
+  IDENTICAL cluster/scripts/bric-chunk.sh
+  IDENTICAL cluster/libexec/bric-tar-stream
+  IDENTICAL cluster/libexec/bric-tar-stream.go
+  IDENTICAL tape/** recursively
+
+Release invariants:
+  on_tape_format=BRIC-FORMAT-V1
+  database_migration=config-v32b5-logical-namespace
+  no producer/chunking/tape-format change in Review 33R2
+
+Review 33R2 changes restore/destination handling, DR verification semantics, documentation, and test harness determinism only.

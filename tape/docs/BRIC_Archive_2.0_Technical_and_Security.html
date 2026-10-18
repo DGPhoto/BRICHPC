@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>BRIC Archive 2.0 — Technical and Security Description</title>
+<style>
+:root{
+ color-scheme:light;
+ --page:#f2f4f7;--paper:#fff;--ink:#17202a;--ink-soft:#34424f;--muted:#667482;--faint:#8e99a4;
+ --rule:#dfe5ea;--rule-strong:#c5ced6;--accent:#7a2336;--accent-dark:#541825;--accent-soft:#f8eef1;
+ --accent-2:#245b67;--code-bg:#f4f6f8;--note-bg:#f5f8fa;--note-border:#bfd0da;
+ --flag-bg:#fff8e8;--flag-border:#d7ae4e;--danger-bg:#fff1f1;--danger-border:#c85a5a;
+ --shadow:0 14px 42px rgba(24,34,45,.07);--radius:10px;--maxw:78ch;--tocw:21.5rem;
+ --font-ui:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+ --font-body:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+ --font-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;background:var(--page)}
+body{margin:0;color:var(--ink);background:var(--page);font-family:var(--font-body);font-size:17px;line-height:1.66;text-rendering:optimizeLegibility}
+::selection{background:#ead5dc;color:var(--ink)}
+.layout{display:block;min-width:0}
+nav.toc{font-family:var(--font-ui);font-size:13.5px;line-height:1.38;background:#f7f8fa;border-bottom:1px solid var(--rule);padding:1.2rem 1.1rem 1.35rem;max-height:48vh;overflow:auto;scrollbar-width:thin}
+nav.toc h2{position:sticky;top:-1.2rem;z-index:2;margin:0 0 .8rem;padding:1rem 0 .72rem;background:#f7f8fa;border-bottom:1px solid var(--rule-strong);color:var(--accent-dark);font-family:var(--font-ui);font-size:.74rem;font-weight:750;letter-spacing:.105em;text-transform:uppercase}
+nav.toc ol{list-style:none;margin:0;padding:0} nav.toc>ol>li{margin:.08rem 0}
+nav.toc ol ol{margin:.15rem 0 .5rem .2rem;padding-left:1rem;border-left:1px solid #d7dde3}
+nav.toc ol ol li{margin:.02rem 0;color:var(--muted)}
+nav.toc a{display:block;padding:.2rem .35rem .2rem .25rem;border-radius:5px;color:inherit;text-decoration:none;transition:background .12s ease,color .12s ease}
+nav.toc a:hover{color:var(--accent-dark);background:#eceff2}
+nav.toc .num{display:inline-block;min-width:2.65em;color:var(--faint);font-variant-numeric:tabular-nums}
+nav.toc ol ol .num{min-width:3.45em}
+main{width:min(calc(100% - 1.5rem),980px);margin:1rem auto 5rem;padding:2.1rem 1.35rem 5rem;background:var(--paper);box-shadow:var(--shadow);border:1px solid #e6eaee;border-radius:12px;min-width:0}
+.doc-kicker{margin:0 0 .55rem;font:750 .73rem/1.2 var(--font-ui);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+h1,h2,h3,h4{font-family:var(--font-ui);color:var(--ink);letter-spacing:-.015em;text-wrap:balance}
+h1{margin:0 0 .45rem;font-size:clamp(2rem,5vw,3rem);line-height:1.08;font-weight:760;letter-spacing:-.035em}
+.subtitle{margin:0 0 1rem;color:var(--muted);font:400 1.02rem/1.5 var(--font-ui)}
+h2{position:relative;margin:4rem 0 1.2rem;padding:1.05rem 0 0;border-top:1px solid var(--rule-strong);font-size:1.48rem;line-height:1.22;font-weight:750;scroll-margin-top:1.5rem}
+h2::before{content:"";position:absolute;top:-2px;left:0;width:4.4rem;height:3px;border-radius:2px;background:var(--accent)}
+h3{margin:2.3rem 0 .72rem;font-size:1.1rem;line-height:1.3;font-weight:720;scroll-margin-top:1.5rem}
+h4{margin:1.65rem 0 .5rem;color:var(--accent-dark);font-size:.98rem;line-height:1.35;font-weight:720}
+h2 .num,h3 .num,h4 .num{margin-right:.5em;color:var(--faint);font-weight:500;font-variant-numeric:tabular-nums}
+p{margin:0 0 1rem}.lead{margin-bottom:1.35rem;color:#25313d;font-size:1.08rem;line-height:1.7}.small{font-size:.86rem;color:var(--muted)}
+ul,ol{margin:0 0 1.15rem;padding-left:1.45rem}li{margin:.34rem 0}li::marker{color:#87929c}li>ul,li>ol{margin:.38rem 0 .42rem}
+a{color:var(--accent-2);text-decoration-thickness:.08em;text-underline-offset:.14em}a:hover{color:var(--accent-dark)}
+code,kbd{font-family:var(--font-mono);font-size:.84em;color:#24323e;background:var(--code-bg);border:1px solid #e3e8ec;border-radius:4px;padding:.08em .3em;word-break:break-word}
+pre,.ascii{display:block;overflow-x:auto;margin:0 0 1.25rem;padding:1rem 1.05rem;color:#25323d;background:#f5f7f9;border:1px solid #e2e7eb;border-left:3px solid #9caab5;border-radius:7px;box-shadow:inset 0 1px 0 rgba(255,255,255,.7);font:400 .81rem/1.55 var(--font-mono);tab-size:4}
+pre code{padding:0;border:0;background:transparent;font-size:1em}.ascii{white-space:pre;line-height:1.38}
+.table-wrap{width:100%;overflow-x:auto;margin:0 0 1.55rem;border:1px solid var(--rule);border-radius:8px;background:#fff}
+.table-wrap table{margin:0;border:0}
+table{width:100%;border-collapse:separate;border-spacing:0;margin:0 0 1.55rem;font:400 .84rem/1.48 var(--font-ui)}
+th,td{padding:.62rem .72rem;text-align:left;vertical-align:top;border-bottom:1px solid var(--rule)}
+thead th{position:sticky;top:0;z-index:1;background:#f3f5f7;color:#293642;border-bottom:1px solid var(--rule-strong);font-weight:720;white-space:nowrap}
+tbody tr:nth-child(even) td{background:#fbfcfd}tbody tr:last-child td{border-bottom:0}td code{font-size:.9em}
+caption{caption-side:bottom;padding:.55rem .7rem;color:var(--muted);text-align:left;font:400 .77rem/1.4 var(--font-ui)}
+.meta{overflow:hidden;margin:0 0 2.6rem;border:1px solid var(--rule-strong);border-radius:9px;background:#fff;font-family:var(--font-ui)}
+.meta table{margin:0;font-size:.82rem}.meta th,.meta td{border-bottom:1px solid var(--rule)}.meta tr:last-child th,.meta tr:last-child td{border-bottom:0}
+.meta th{width:12.5rem;color:#44515d;background:#f6f7f9;font-weight:720}
+.note,.flag,.risk{position:relative;margin:1.45rem 0;padding:1rem 1.1rem 1rem 1.15rem;border:1px solid var(--note-border);border-left-width:4px;border-radius:8px;background:var(--note-bg);box-shadow:0 4px 16px rgba(30,45,60,.035);font-size:.95rem}
+.note{border-left-color:var(--accent-2)}.flag{border-color:var(--flag-border);border-left-color:var(--flag-border);background:var(--flag-bg)}
+.risk{border-color:var(--danger-border);border-left-color:var(--danger-border);background:var(--danger-bg)}
+.note p:last-child,.flag p:last-child,.risk p:last-child{margin-bottom:0}
+.note .lbl,.flag .lbl,.risk .lbl{display:block;margin-bottom:.36rem;font:760 .72rem/1.2 var(--font-ui);letter-spacing:.075em;text-transform:uppercase}
+.note .lbl{color:var(--accent-2)}.flag .lbl{color:#8a6514}.risk .lbl{color:#9b3434}
+dl{margin:0 0 1.25rem}dt{margin-top:1rem;color:#2d3944;font:720 .92rem/1.4 var(--font-ui)}dd{margin:.2rem 0 0;padding:.05rem 0 .1rem 1rem;border-left:2px solid var(--rule)}
+hr{margin:3rem 0 1.5rem;border:0;border-top:1px solid var(--rule)}
+@media (min-width:1120px){.layout{display:grid;grid-template-columns:var(--tocw) minmax(0,1fr);align-items:start}nav.toc{position:sticky;top:0;height:100vh;max-height:none;padding:2rem 1.3rem 2.5rem 1.45rem;border-right:1px solid var(--rule);border-bottom:0;background:#f5f6f8}nav.toc h2{top:-2rem;background:#f5f6f8}main{width:min(calc(100% - 3rem),1040px);margin:2rem auto 6rem;padding:3.6rem 4.25rem 7rem}}
+@media (min-width:1500px){main{width:min(calc(100% - 5rem),1120px);padding-left:5rem;padding-right:5rem}}
+@media (max-width:720px){body{font-size:16px}main{width:100%;margin:0;padding:1.65rem 1rem 4rem;border:0;border-radius:0;box-shadow:none}nav.toc{max-height:42vh}h2{margin-top:3.2rem}.meta{border-radius:7px}.meta th{width:8.5rem}th,td{padding:.55rem .6rem}}
+@media print{@page{size:A4;margin:15mm 14mm 16mm}html,body{background:#fff}body{font-size:10.2pt;line-height:1.48}nav.toc{display:none!important}main{width:auto;max-width:none;margin:0;padding:0;border:0;box-shadow:none}h1{font-size:24pt}h2{margin-top:24pt;padding-top:8pt;font-size:15pt;break-after:avoid;page-break-after:avoid}h3,h4{break-after:avoid;page-break-after:avoid}h2::before{background:#555}a{color:inherit;text-decoration:none}.table-wrap{overflow:visible;border:0;border-radius:0}table{font-size:8.2pt}thead th{position:static;background:#f3f3f3}tr,pre,.ascii,.note,.flag,.risk,.meta{break-inside:avoid;page-break-inside:avoid}pre,.ascii{white-space:pre-wrap;word-break:break-word}code{border:0}}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav aria-label="Table of contents" class="toc">
+<h2>Contents</h2>
+<ol>
+<li><a href="#s1"><span class="num">1</span>Document control and scope</a>
+<ol>
+<li><a href="#s1-1"><span class="num">1.1</span>What is in scope</a></li>
+<li><a href="#s1-2"><span class="num">1.2</span>What is out of scope</a></li>
+<li><a href="#s1-3"><span class="num">1.3</span>Terminology conventions</a></li>
+<li><a href="#s1-4"><span class="num">1.4</span>Statements of confidence</a></li>
+</ol></li>
+<li><a href="#s2"><span class="num">2</span>Executive summary</a></li>
+<li><a href="#s3"><span class="num">3</span>Design thesis and invariants</a>
+<ol>
+<li><a href="#s3-1"><span class="num">3.1</span>The recoverability promise</a></li>
+<li><a href="#s3-2"><span class="num">3.2</span>The ten load-bearing invariants</a></li>
+<li><a href="#s3-3"><span class="num">3.3</span>Complexity control rule</a></li>
+</ol></li>
+<li><a href="#s4"><span class="num">4</span>System architecture</a>
+<ol>
+<li><a href="#s4-1"><span class="num">4.1</span>Hosts and trust zones</a></li>
+<li><a href="#s4-2"><span class="num">4.2</span>Component inventory</a></li>
+<li><a href="#s4-3"><span class="num">4.3</span>Data-flow overview</a></li>
+<li><a href="#s4-4"><span class="num">4.4</span>The two catalogues</a></li>
+<li><a href="#s4-5"><span class="num">4.5</span>Infrastructure assumptions</a></li>
+</ol></li>
+<li><a href="#s5"><span class="num">5</span>Threat model</a></li>
+<li><a href="#s6"><span class="num">6</span>Identity, accounts and authorisation</a>
+<ol>
+<li><a href="#s6-1"><span class="num">6.1</span>Host login and the absence of an application login</a></li>
+<li><a href="#s6-2"><span class="num">6.2</span>Identity resolution</a></li>
+<li><a href="#s6-3"><span class="num">6.3</span>Role separation</a></li>
+<li><a href="#s6-4"><span class="num">6.4</span>User provisioning</a></li>
+<li><a href="#s6-5"><span class="num">6.5</span>Idempotency and fail-closed rules</a></li>
+<li><a href="#s6-6"><span class="num">6.6</span>Deprovisioning and key destruction</a></li>
+<li><a href="#s6-7"><span class="num">6.7</span>User onboarding and authorisation procedure</a></li></ol></li>
+<li><a href="#s7"><span class="num">7</span>Key management and cryptography</a>
+<ol>
+<li><a href="#s7-1"><span class="num">7.1</span>Key hierarchy</a></li>
+<li><a href="#s7-2"><span class="num">7.2</span>Payload encryption</a></li>
+<li><a href="#s7-3"><span class="num">7.3</span>Encrypt-then-MAC</a></li>
+<li><a href="#s7-4"><span class="num">7.4</span>Institutional escrow</a></li>
+<li><a href="#s7-5"><span class="num">7.5</span>Bus signing keys</a></li>
+<li><a href="#s7-6"><span class="num">7.6</span>Parameter pinning and format versioning</a></li>
+<li><a href="#s7-7"><span class="num">7.7</span>Cryptographic review notes</a></li>
+</ol></li>
+<li><a href="#s8"><span class="num">8</span>The staging bus protocol</a>
+<ol>
+<li><a href="#s8-1"><span class="num">8.1</span>Layout and marker vocabulary</a></li>
+<li><a href="#s8-2"><span class="num">8.2</span>Atomic claim</a></li>
+<li><a href="#s8-3"><span class="num">8.3</span>Marker authentication</a></li>
+<li><a href="#s8-4"><span class="num">8.4</span>Export permissions</a></li>
+<li><a href="#s8-5"><span class="num">8.5</span>Bus lifetime and cleanup</a></li>
+</ol></li>
+<li><a href="#s9"><span class="num">9</span>Backup: end-to-end walkthrough</a>
+<ol>
+<li><a href="#s9-1"><span class="num">9.1</span>Command entry and preflight</a></li>
+<li><a href="#s9-2"><span class="num">9.2</span>Source-integrity gate</a></li>
+<li><a href="#s9-3"><span class="num">9.3</span>Run creation and reservation</a></li>
+<li><a href="#s9-4"><span class="num">9.4</span>Parallel tar-stream producer</a></li>
+<li><a href="#s9-5"><span class="num">9.5</span>Flow control</a></li>
+<li><a href="#s9-6"><span class="num">9.6</span>Publication of a chunk</a></li>
+<li><a href="#s9-7"><span class="num">9.7</span>Source-consistency policy</a></li>
+<li><a href="#s9-8"><span class="num">9.8</span>Drain and finalisation</a></li>
+<li><a href="#s9-9"><span class="num">9.9</span>Close and sealing</a></li>
+<li><a href="#s9-10"><span class="num">9.10</span>Slurm mode</a></li>
+<li><a href="#s9-11"><span class="num">9.11</span>Fidelity and metadata limits</a></li>
+</ol></li>
+<li><a href="#s10"><span class="num">10</span>The tape subsystem</a>
+<ol>
+<li><a href="#s10-1"><span class="num">10.1</span>Hardware and device map</a></li>
+<li><a href="#s10-2"><span class="num">10.2</span>Inventory, pairing and roles</a></li>
+<li><a href="#s10-3"><span class="num">10.3</span>Capacity model and reservations</a></li>
+<li><a href="#s10-4"><span class="num">10.4</span>Write path and verification</a></li>
+<li><a href="#s10-5"><span class="num">10.5</span>Positioning and filemark semantics</a></li>
+<li><a href="#s10-6"><span class="num">10.6</span>Concurrency and locking</a></li>
+<li><a href="#s10-7"><span class="num">10.7</span>On-tape layout and the TOC</a></li>
+<li><a href="#s10-8"><span class="num">10.8</span>Media health and re-verification</a></li>
+</ol></li>
+<li><a href="#s11"><span class="num">11</span>Restore</a>
+<ol>
+<li><a href="#s11-1"><span class="num">11.1</span>Data integrity and metadata fidelity</a></li>
+<li><a href="#s11-2"><span class="num">11.2</span>Destination capabilities and identity namespaces</a></li>
+<li><a href="#s11-3"><span class="num">11.3</span>Degraded restore semantics</a></li>
+<li><a href="#s11-4"><span class="num">11.4</span>User-visible result and communication</a></li>
+</ol></li>
+<li><a href="#s12"><span class="num">12</span>Disaster recovery</a>
+<ol>
+<li><a href="#s12-1"><span class="num">12.1</span>Owner recovery from tapes and key</a></li>
+<li><a href="#s12-2"><span class="num">12.2</span>Administrator break-glass</a></li>
+<li><a href="#s12-3"><span class="num">12.3</span>Tape-catalogue rebuild</a></li>
+<li><a href="#s12-4"><span class="num">12.4</span>Manual recovery without BRIC</a></li>
+<li><a href="#s12-5"><span class="num">12.5</span>Expected recovery cost</a></li>
+</ol></li>
+<li><a href="#s13"><span class="num">13</span>Failure handling and state machines</a>
+<ol>
+<li><a href="#s13-1"><span class="num">13.1</span>The two state machines</a></li>
+<li><a href="#s13-2"><span class="num">13.2</span>Crash recovery — strategy A</a></li>
+<li><a href="#s13-3"><span class="num">13.3</span>Terminal fencing</a></li>
+<li><a href="#s13-4"><span class="num">13.4</span>The abort protocol</a></li>
+<li><a href="#s13-5"><span class="num">13.5</span>The silent-failure discipline</a></li>
+<li><a href="#s13-6"><span class="num">13.6</span>Cancellation</a></li>
+</ol></li>
+<li><a href="#s14"><span class="num">14</span>Logging, audit and notifications</a>
+<ol>
+<li><a href="#s14-1"><span class="num">14.1</span>Logging as a correctness requirement</a></li>
+<li><a href="#s14-2"><span class="num">14.2</span>The BRICLOGv1 record</a></li>
+<li><a href="#s14-3"><span class="num">14.3</span>Audit trail</a></li>
+<li><a href="#s14-4"><span class="num">14.4</span>Notifications</a></li>
+</ol></li>
+<li><a href="#s15"><span class="num">15</span>Web interface</a></li>
+<li><a href="#s16"><span class="num">16</span>Deployment and operations</a>
+<ol>
+<li><a href="#s16-1"><span class="num">16.1</span>Installation</a></li>
+<li><a href="#s16-2"><span class="num">16.2</span>Configuration model</a></li>
+<li><a href="#s16-3"><span class="num">16.3</span>Versioning and in-place updates</a></li>
+<li><a href="#s16-4"><span class="num">16.4</span>Standing operational procedures</a></li>
+<li><a href="#s16-5"><span class="num">16.5</span>Timeout tuning</a></li>
+</ol></li>
+<li><a href="#s17"><span class="num">17</span>Assurance, validation status and residual risk</a>
+<ol>
+<li><a href="#s17-1"><span class="num">17.1</span>Automated test suite</a></li>
+<li><a href="#s17-2"><span class="num">17.2</span>Hardware validation status</a></li>
+<li><a href="#s17-3"><span class="num">17.3</span>Security observations and recommendations</a></li>
+<li><a href="#s17-4"><span class="num">17.4</span>Accepted residual risks</a></li>
+<li><a href="#s17-5"><span class="num">17.5</span>Open work</a></li>
+</ol></li>
+<li><a href="#sA"><span class="num">A</span>Command reference</a></li>
+<li><a href="#sB"><span class="num">B</span>Configuration reference</a></li>
+<li><a href="#sC"><span class="num">C</span>On-disk and on-tape formats</a></li>
+<li><a href="#sD"><span class="num">D</span>Glossary</a></li>
+</ol>
+</nav>
+<main>
+<p class="doc-kicker">Technical &amp; Security Description</p><h1>BRIC Archive 2.0</h1>
+<p class="subtitle">Technical and security description of the long-term genomic cold-archive system</p>
+<div class="meta">
+<table>
+<tr><th>Prepared for</th><td>Information Security Officer, KU-IT · BRIC management</td></tr>
+<tr><th>System</th><td>BRIC Archive 2.0 — encrypted LTO-9 cold archive for genomic research data</td></tr>
+<tr><th>Operator</th><td>Biotech Research &amp; Innovation Centre (BRIC), University of Copenhagen</td></tr>
+<tr><th>Hosts in scope</th><td><code>supekgate</code> (Slurm/gate role) and <code>brictape</code> (tape role), plus the QNAP NFS staging export and the HPE MSL3040 tape library</td></tr>
+<tr><th>Basis of this document</th><td>Direct reading of the current source tree and manifest (<code>MANIFEST.sha256</code>), the shipped documentation, and — only where explicitly labelled as validation status — recorded operational results from the deployment. Code-derived behaviour and operational evidence are kept distinct.</td></tr>
+<tr><th>Classification</th><td>Internal — describes security architecture, not secrets. Contains no key material.</td></tr>
+</table>
+</div>
+<h2 id="s1"><span class="num">1</span>Document control and scope</h2>
+<p class="lead">This document describes how BRIC Archive 2.0 works, in full, from the moment a researcher logs in to the moment data is recovered from tape fifteen years later. It is written for two audiences at once: a security reviewer who needs to judge the controls, and a management reader who needs to understand what the system guarantees and what it deliberately does not.</p>
+<h3 id="s1-1"><span class="num">1.1</span>What is in scope</h3>
+<p>The software described here is the BRIC Archive 2.0 system: the user-facing command-line interface, the backup producer, the staging protocol, the tape server daemon, the restore path, the disaster-recovery tooling, the installation and update machinery, the logging subsystem and the test suite. The physical library, the QNAP staging appliance, the Isilon source storage and the two host operating systems are described where the software depends on their behaviour, but they are managed outside this system.</p>
+<h3 id="s1-2"><span class="num">1.2</span>What is out of scope</h3>
+<ul>
+<li>Legal advice. Sections that touch on retention, deletion and personal data describe technical behaviour only; they are not a data-protection assessment and should be read alongside one, not instead of one.</li>
+<li>Network and endpoint security of the two hosts, the campus network, and SSH access control. BRIC Archive relies on those controls and does not replace them.</li>
+<li>The tape library vendor's firmware and robotics. An open vendor case exists (see <a href="#s17-2">§17.2</a>); BRIC's behaviour in the presence of a faulty changer is described, the fault itself is not.</li>
+</ul>
+<h3 id="s1-3"><span class="num">1.3</span>Terminology conventions</h3>
+<p>Throughout this document, <em>chunk</em> means one unit of archived payload; <em>segment</em> means one physical copy of a chunk on one cartridge; <em>run</em> means one invocation of <code>bric backup</code>; <em>marker</em> means a small file on the shared staging directory used as a message between the two hosts. A full glossary is in <a href="#sD">Appendix D</a>.</p>
+<h3 id="s1-4"><span class="num">1.4</span>Statements of confidence</h3>
+<p>Everything stated as system behaviour in sections 3 to 16 is derived from the current source code and is verifiable against it. Section 17 distinguishes between what the code implements and what has been demonstrated through automated tests and real-hardware validation. Where evidence differs in scope, the distinction is made explicit rather than merged into a single claim.</p>
+<h2 id="s2"><span class="num">2</span>Executive summary</h2>
+<p>BRIC Archive 2.0 is an <strong>archive</strong>, not a backup system. The distinction is the whole design. A backup is judged by how quickly it restores into an existing environment. An archive is judged by whether the data can still be read when the environment is gone. BRIC's promise is specific and testable:</p>
+<div class="note">
+<span class="lbl">The promise</span>
+<p>Genomic data written by BRIC Archive must be recoverable in ten to fifteen years from <strong>the tapes and one key alone</strong> — with no cluster, no central catalogue, no daemon, no QNAP appliance, and without BRIC or the University still operating the system that wrote them.</p>
+</div>
+<p>Everything else in the system is the cost of keeping that promise honest. The consequences, in brief:</p>
+<ul>
+<li><strong>Each closed archive carries the metadata needed to verify and recover every chunk independently.</strong> The chunk payload is ciphertext; the encrypted project catalogue carries the per-chunk HMAC and file map, while the cartridge carries the plaintext TOC and recovery kit. Recovery does not require the central BRIC databases.</li>
+<li><strong>Every chunk in a successfully closed run has two verified physical copies</strong>, on the PRIMARY and BACKUP cartridges of a matched pair. During production a run can temporarily have zero, one or two completed copies; <code>CLOSED</code> is the barrier that guarantees both.</li>
+<li><strong>No tape write is accepted as verified until it has been read back and re-hashed.</strong> A run is only reported as complete when both copies, all recovery artefacts and the tables of contents required by the close protocol have been written and read-back-verified, and the media-release barrier has completed.</li>
+<li><strong>The tape server never holds a data-decryption key.</strong> It moves opaque ciphertext. It does hold its own bus-signing private key, which authenticates tape-side protocol receipts but cannot decrypt research data. A root compromise of the tape host therefore preserves confidentiality but does <em>not</em> preserve protocol integrity or availability.</li>
+<li><strong>Each researcher has an individual data-encryption key.</strong> The operational key is stored in the user’s protected <code>~/.bric</code> area on the KU-managed cluster at mode <code>0600</code>; a user-held copy is delivered on dedicated USB media. The institution stores an authenticated escrow copy wrapped under the master key. The tape server never receives a data-decryption key.</li>
+<li><strong>Data confidentiality survives media loss.</strong> A cartridge lost in transit to the off-site location discloses nothing without the corresponding user key.</li>
+<li><strong>Restore has two independent outcomes: data integrity and metadata fidelity.</strong> File contents are verified against the archive independently of permissions, ACLs and extended attributes. A destination may be able to receive and verify every byte while being unable to reproduce historical access-control metadata. In that case BRIC must report the data as verified and the metadata fidelity as degraded; it must never describe the restore as full-fidelity merely because the files are readable.</li>
+</ul>
+<p>The operational picture for management is equally short. A researcher runs one command, <code>bric backup PROJECT /path</code>, and can log out; local-mode jobs detach and survive the session. Tape capacity is reserved <em>before</em> ciphertext production. The default local producer uses four parallel data workers inside one project/run and 128 GB decimal chunks, while the tape service still requires two verified physical copies before a chunk is complete. Progress, failures and completions are recorded in structured operational logs and catalogue audit records. The current source tree defines an 82-test standard software gate; the packaged validation record distinguishes focused development validation from the independent native gate and from real-hardware evidence, as described in <a href="#s17">§17</a>.</p>
+<h2 id="s3"><span class="num">3</span>Design thesis and invariants</h2>
+<h3 id="s3-1"><span class="num">3.1</span>The recoverability promise</h3>
+<p>The architecture document that governs this codebase opens with a single thesis: this is an archive, and a feature that does not serve the recoverability promise or fix a concrete observed failure is not an addition but weight. That rule is enforced culturally through code review, and it explains several deliberate absences in the system — there is no deduplication, no incremental-diff engine, no compression, no second implementation of any mechanism, and no optional hardening that is on by default.</p>
+<h3 id="s3-2"><span class="num">3.2</span>The ten load-bearing invariants</h3>
+<p>Correctness rests on ten invariants. They are few on purpose: if one is broken the system is broken regardless of everything else, so each is separately testable.</p>
+<div class="table-wrap"><table>
+<thead><tr><th>#</th><th>Invariant</th><th>What it buys</th></tr></thead>
+<tbody>
+<tr><td>I1</td><td><strong>Claim is an atomic rename.</strong> Taking a chunk off the staging bus is a <code>rename()</code> from <code>.READY</code> to <code>.CLAIMED</code>.</td><td>Exactly one winner, with no distributed lock manager.</td></tr>
+<tr><td>I2</td><td><strong>One active run per project</strong>, enforced by a conditional insert inside an explicit write transaction.</td><td>Two concurrent backups of the same project cannot coexist.</td></tr>
+<tr><td>I3</td><td><strong>Each chunk is independently recoverable with its project metadata and key.</strong> The ciphertext is separately hashed and MACed; the encrypted project catalogue records the HMAC, file map and crypto parameters, and the tape TOC records placement and ciphertext SHA-256.</td><td>No data dependency on another chunk; recovery can fall back copy-by-copy and chunk-by-chunk.</td></tr>
+<tr><td>I4</td><td><strong>Tape is append-only and project-scoped.</strong> The index is never rewritten; each close appends a new cumulative table of contents built only from verified rows.</td><td>No in-place mutation of media; the newest valid index wins.</td></tr>
+<tr><td>I5</td><td><strong>Two copies, PRIMARY and BACKUP</strong>, on the two cartridges of a registered pair; restore and disaster recovery try primary then fall back to backup.</td><td>Transparent self-healing against single-media failure.</td></tr>
+<tr><td>I6</td><td><strong>Encrypt-then-MAC.</strong> The HMAC over the ciphertext is verified <em>before</em> anything is handed to <code>openssl</code> or <code>tar</code>.</td><td>No blind decryption of a tampered or forged blob; path traversal and parser attacks are stopped upstream.</td></tr>
+<tr><td>I7</td><td><strong>Singleton plus generation fence plus recovery.</strong> One daemon at a time; a surviving worker from an older generation must exit before the new one touches catalogue or hardware.</td><td>No two processes driving the same library or catalogue.</td></tr>
+<tr><td>I8</td><td><strong>The central catalogue is not the only truth.</strong> Every tape carries its own recovery kit and encrypted project catalogue; the tape catalogue is rebuildable from the media.</td><td>Database loss is an inconvenience, not a data loss.</td></tr>
+<tr><td>I9</td><td><strong>The format is fixed and versioned.</strong> Cryptographic parameters are pinned and recorded; markers, index and kit all carry version tags.</td><td>A future V2 can evolve without making V1 tapes unreadable.</td></tr>
+<tr><td>I10</td><td><strong>No transition without a durable trace.</strong> Every process and hardware phase emits structured events; with <code>BRIC_REQUIRE_LOGGING=1</code> the system refuses to start if it cannot log.</td><td>A backup whose operational history cannot be reconstructed is not accepted.</td></tr>
+</tbody>
+</table></div>
+<h3 id="s3-3"><span class="num">3.3</span>Complexity control rule</h3>
+<p>New functionality must attach either to one of the invariants above — making it explicit or more robust — or to a concrete, observed operational failure. Two corollaries are enforced strictly, both after real incidents:</p>
+<ul>
+<li><strong>Never a second implementation of the same mechanism.</strong> A duplicate restore script that had grown alongside the canonical disaster-recovery tool was deleted, because two nearly identical things diverge and the bug appears exactly at the point of divergence.</li>
+<li><strong>Compatibility defaults must not be mistaken for production policy.</strong> Bus signing is optional at schema level for upgrade compatibility, while the production role configuration and setup path intend it to be mandatory once keys are present. The post-deploy catalogue value therefore has to be verified explicitly; a schema default of <code>0</code> is not a statement that unsigned operation is an acceptable production posture.</li>
+</ul>
+<h2 id="s4"><span class="num">4</span>System architecture</h2>
+<h3 id="s4-1"><span class="num">4.1</span>Hosts and trust zones</h3>
+<p>The system spans two servers that share no filesystem except one staging export, and share no database at all.</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Zone</th><th>Host</th><th>Holds</th><th>Never holds</th></tr></thead>
+<tbody>
+<tr>
+<td><strong>Cluster / gate</strong><br/><code>BRIC_ROLE=slurm</code></td>
+<td><code>supekgate</code> (RHEL 8.10)</td>
+<td>The cluster catalogue (file names, sizes, mtimes, plaintext checksums, chunk map and logical namespace); users’ personal data-encryption keys in their protected <code>~/.bric</code> directories; the institution master key as a root-only administrative file; and the cluster bus-signing key.</td>
+<td>Physical tape state; file numbers on media.</td>
+</tr>
+<tr>
+<td><strong>Bus</strong><br/>(shared, untrusted for confidentiality)</td>
+<td>QNAP NFS export, mounted at <code>/mnt/data</code> on both hosts</td>
+<td>Opaque encrypted blobs, their SHA-256 and HMAC sidecars, and small text markers. Transient only.</td>
+<td>Any key, any plaintext, any file name from the archived tree, the file-to-chunk map.</td>
+</tr>
+<tr>
+<td><strong>Tape</strong><br/><code>BRIC_ROLE=tape</code></td>
+<td><code>brictape</code> (AlmaLinux 10.2)</td>
+<td>The tape catalogue (cartridges, reservations, segment placement, verification state); the tape bus signing key.</td>
+<td><strong>Any key that decrypts data.</strong> Any plaintext. Any archived file name.</td>
+</tr>
+</tbody>
+</table></div>
+<p>The tape server being <em>keyless with respect to data decryption</em> is the central confidentiality property. It can authenticate the receipts it issues because it holds a tape-side signing private key, but that key cannot decrypt research data. This distinction is important to the threat model: root compromise of <code>brictape</code> does not disclose plaintext, but the attacker can sign false tape-side receipts, alter the tape catalogue, delete bus objects the host is permitted to modify, or drive the library. Confidentiality survives; integrity and availability of an active run do not.</p>
+<h3 id="s4-2"><span class="num">4.2</span>Component inventory</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Component</th><th>Role</th></tr></thead>
+<tbody>
+<tr><td><code>bric</code> / <code>bric-run</code></td><td>User entry point; validation, preflight, runtime selection, detached job supervision.</td></tr>
+<tr><td><code>bric-source-preflight.sh</code></td><td>Read-only traversal of the exact backup scope as the calling user, before any media is committed.</td></tr>
+<tr><td><code>bric-stream-plan.sh</code></td><td>Creates the run and obtains an initial tape reservation without a per-file scan.</td></tr>
+<tr><td><code>bric-tar-stream</code></td><td>Static Go helper used by each producer stream: parses GNU tar, cuts independent chunks, encrypts, hashes and catalogues the bytes actually read.</td></tr><tr><td><code>bric-stream-parallel-produce.sh</code></td><td>Default local-mode coordinator: assigns regular files to parallel GNU-tar workers, aggregates source-consistency results and emits directory/link metadata after data workers.</td></tr><tr><td><code>bric-stream-allocate.sh</code></td><td>Host-local locked allocator for the global per-run chunk namespace and reservation-aware concurrent chunk creation.</td></tr><tr><td><code>bric-file-metadata</code></td><td>Static Go helper for binary-safe capture/application of large-file mode, selected ACLs and xattrs.</td></tr><tr><td><code>lib_restore_txn.sh</code></td><td>Restore metadata transaction: per-UID SQLite journal, restrictive-directory relaxation, crash recovery, final metadata replay and destination-safety checks.</td></tr>
+<tr><td><code>bric-stream-gate.sh</code> / <code>bric-reserve-extend.sh</code></td><td>Per-chunk staging window, global bus budget, dynamic capacity extension.</td></tr>
+<tr><td><code>bric-stream-publish.sh</code></td><td>Commits one completed chunk to the catalogue and publishes its signed markers.</td></tr>
+<tr><td><code>bric-tape-daemon</code></td><td>The only process that touches the changer and the tape catalogue: reservations, drain, close, restore staging, re-verification.</td></tr>
+<tr><td><code>bric-finalize.sh</code></td><td>Waits for every chunk's verified tape receipt, frees staging, requests closing.</td></tr>
+<tr><td><code>bric-close.sh</code></td><td>Builds and encrypts the project catalogue, emits the escrow artefact and the plaintext recovery kit, hands over a signed manifest.</td></tr>
+<tr><td><code>bric-restore.sh</code></td><td>Normal restore through the catalogue: verify before decrypt, primary-to-backup fallback.</td></tr>
+<tr><td><code>bric-dr-from-tapes.sh</code></td><td>Disaster recovery from tapes and a key alone, whole project or a single path; administrator break-glass via escrow.</td></tr>
+<tr><td><code>bric-tape-rebuild-catalog.sh</code></td><td>Reconstructs the tape catalogue from the media.</td></tr>
+<tr><td><code>bric-setup-user.sh</code> / <code>bric-activate-user</code></td><td>Root-only onboarding: creates or repairs the user’s protected home key, authenticated institutional escrow, runtime environment, logging/lock directories and required ACLs; <code>bric-activate-user</code> performs strict post-verification.</td></tr>
+<tr><td><code>lib_common.sh</code></td><td>Key derivation, signed markers, escrow wrap/unwrap, durable logging with failover.</td></tr>
+<tr><td><code>lib_tape_io.sh</code></td><td>The four-function tape abstraction with a simulated and a real backend.</td></tr>
+<tr><td><code>bric-library-preflight</code></td><td>Non-destructive hardware health check of changer and drives.</td></tr>
+</tbody>
+</table></div>
+<h3 id="s4-3"><span class="num">4.3</span>Data-flow overview</h3>
+<span class="ascii"> ISILON (OneFS/NFS — accessible only from the KU cluster environment)
+      |
+      | source preflight + exact included-scope manifest
+      | default local mode: 4 parallel GNU tar streams
+      |       -&gt; bric-tar-stream -&gt; AES-256-CBC -&gt; SHA-256 + HMAC
+      v
+ QNAP /bric/archive/&lt;project&gt;/&lt;run_id&gt;/      &lt;-- encrypted staging bus
+      chunk_NNNN.enc (+ .sha256, .hmac, .meta)
+      READY -&gt; CLAIMED -&gt; DONE | ERROR
+      |
+      | tape server polls; it has no ISILON mount and no user data-decryption key
+      v
+ TAPE SERVER (mtx + mt + dd) -&gt; 2 verified copies per chunk
+                              -&gt; PRIMARY + BACKUP
+                              -&gt; streaming read-back byte/hash verification
+
+ Restore uses the same bus in reverse with progressive one-chunk backpressure:
+ request -&gt; signed PROGRESS -&gt; chunk.READY -&gt; chunk.CONSUMED -&gt; ... -&gt; request.STAGED
+ The tape server returns opaque ciphertext; authentication, decryption, placement and
+ final destination verification happen on the cluster side.</span>
+<p>Three properties of this flow matter to a reviewer. First, the tape server has no direct access to ISILON: archive work originates in the KU cluster environment and the tape side only polls the staging bus. Second, payload bytes that cross into the tape zone are already encrypted. The bus is not metadata-free — project/run identifiers, owner fields, sizes, hashes, timing and protocol state are visible — but archived file paths and plaintext contents remain on the cluster side or inside the encrypted project catalogue. Third, the producer may use several source streams concurrently, but every regular file belongs to exactly one worker and all workers publish into one global chunk namespace for the same run.</p>
+<h3 id="s4-4"><span class="num">4.4</span>The two catalogues</h3>
+<p>There is deliberately no shared database. Two SQLite catalogues exist, each authoritative for its own phase, both in WAL mode and both on local storage — never on a network filesystem.</p>
+<dl>
+<dt>Cluster catalogue (<code>cluster_catalog.db</code>) — authoritative for the data phase</dt>
+<dd>Holds configuration, users and authenticated key escrows, projects, runs, chunks, the per-file map, reservations, project/tape convenience mappings, audit records, exclusions and source-consistency records. Run records also carry the canonical source path and stable <code>logical_root</code>. File records contain relative path, size, mtime, plaintext SHA-256, chunk/member mapping and entry type; current rows can additionally carry ordinary regular-file mode and a versioned metadata envelope used for <code>LARGE_FILE_CHUNK</code> ACL/xattr fidelity.</dd>
+<dt>Tape catalogue (<code>tape_catalog.db</code>) — authoritative for the physical phase</dt>
+<dd>Holds cartridges, project assignment, reservations, physical segment placement, verification state, close artefacts, capacity/wear counters, health state and physical audit records. It contains no archived file-path map and no user data-decryption key.</dd>
+</dl>
+<p><strong>Privacy note.</strong> The cluster catalogue contains archived file names and plaintext file checksums and must therefore be treated as sensitive metadata within the KU-managed cluster environment. The QNAP staging bus does not carry the file-to-chunk map. On tape that map exists only inside <code>catalog_project.enc</code>, encrypted under the owner’s key.</p>
+<h3 id="s4-5"><span class="num">4.5</span>Infrastructure assumptions</h3>
+<p>Two assumptions are load-bearing and are stated explicitly because they are properties of the environment rather than of the code.</p>
+<div class="flag">
+<span class="lbl">Assumption 1 — POSIX semantics on the shared export</span>
+<p>The bus protocol depends on three properties of the QNAP NFS export: <strong>atomic <code>rename()</code></strong> (the chunk claim is a rename; there must be exactly one winner), <strong>coherent cross-host visibility</strong> (a file created by one host is immediately and completely visible to the other), and <strong>no incoherent caching</strong> (no stale reads). These hold for the export as configured. They are <em>not</em> guaranteed by an arbitrary network share; an NFS setup with aggressive attribute caching, or an implementation that does not preserve the expected rename semantics within one export, would violate them. Marker signing protects against forgery and relocation — it does not protect against filesystem incoherence.</p>
+</div>
+<div class="flag">
+<span class="lbl">Assumption 2 — source quiescence</span>
+<p>Archiving should be done from a snapshot or from frozen data. In the tar-driven local mode GNU tar is the authoritative reader and the catalogue describes what tar actually read, so there is no long window between planning and production. If a file changes while tar is reading it, the default policy (<code>source_change_policy=strict</code>) aborts the run rather than closing a silent mix of versions. An explicit <code>record</code> policy exists for live trees and is described in <a href="#s9-7">§9.7</a>.</p>
+</div>
+<h2 id="s5"><span class="num">5</span>Threat model</h2>
+<p>The controls in this system were chosen against a specific set of adversaries and accidents. Stating them makes it possible to judge both what is defended and what is knowingly not.</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Threat</th><th>Defence</th><th>Residual</th></tr></thead>
+<tbody>
+<tr>
+<td><strong>Loss or theft of a cartridge</strong> (in transit to the off-site location, or from the library)</td>
+<td>All payload is AES-256-CBC ciphertext under a per-user key. The tape carries no usable key: the escrow artefact on tape is itself ciphertext under the institution master key, which is never written to tape.</td>
+<td>Metadata leakage limited to the plaintext table of contents: barcode, run identifiers, project name, chunk numbers, file numbers and hashes. No file names, no data.</td>
+</tr>
+<tr>
+<td><strong>Compromise of the tape server</strong></td>
+<td>The host holds no data-decryption key, so ciphertext and cartridges do not reveal plaintext. Tape-side protocol receipts are ECDSA-signed, but the signing private key is present on the tape host.</td>
+<td><strong>Integrity and availability are not protected against root compromise of the tape host.</strong> Root can use the legitimate tape signing key to forge <code>DONE</code>/<code>CLOSED</code>-class receipts, can alter the tape catalogue, delete or modify bus objects permitted to the host, and can mis-drive or overwrite media. The control here is confidentiality separation, not Byzantine resistance.</td>
+</tr>
+<tr>
+<td><strong>Compromise of the QNAP or an unauthorised writer on the export</strong></td>
+<td>NFS host/permission controls restrict who may write; marker signatures and path binding detect forged or relocated messages from a writer that does not possess the relevant signing key; the tape daemon validates bus names; restore and DR verify ciphertext HMACs before decryption.</td>
+<td>A QNAP-only attacker can delete or delay staged data and can observe operational metadata. The signature model does <em>not</em> protect against an onboarded cluster user who can read the shared cluster-side signing private key, nor against a compromised tape host that holds the tape-side private key. In-place replay of an unchanged marker at its original path remains an accepted risk.</td>
+</tr>
+<tr>
+<td><strong>Tampering with an archived blob</strong> (on tape, on the bus, anywhere)</td>
+<td>Encrypt-then-MAC: HMAC-SHA256 over the ciphertext, verified before decryption, with the expected value held in the encrypted catalogue. Ciphertext SHA-256 is additionally verified on read-back at write time and during periodic re-verification.</td>
+<td>An attacker who holds the user key can forge valid blobs. That is equivalent to holding the data.</td>
+</tr>
+<tr>
+<td><strong>Impersonation of another archive owner</strong></td>
+<td>Identity is the real OS/NSS account. An unprivileged caller exporting <code>BRIC_USER</code> is ignored with a warning; overrides are honoured only for the caller's own name, for root, or in explicitly trusted contexts.</td>
+<td>Root on the cluster host is trusted by construction.</td>
+</tr>
+<tr>
+<td><strong>Silent data loss</strong> (the historical primary enemy of this codebase)</td>
+<td>Read-back verification of every write; catalogue never references unverified rows; source permission failures are fatal before reservation; tar diagnostics are classified rather than suppressed; missing or mismatched close artefacts block sealing; terminal-state fences prevent zombie writes.</td>
+<td>Covered in detail in <a href="#s13">§13</a>.</td>
+</tr>
+<tr>
+<td><strong>Loss of the personal key</strong></td>
+<td>The operational home key is protected inside the KU cluster and a separate USB copy is issued to the user. An authenticated institutional escrow under the master key provides break-glass recovery if those plaintext copies are unavailable.</td>
+<td>Loss of the cluster/home copy and the USB copy remains recoverable through authorised institutional escrow. Loss of all plaintext copies <em>and</em> the institution master key makes the data unrecoverable by design.</td>
+</tr>
+<tr>
+<td><strong>Loss of the cluster catalogue</strong></td>
+<td>Every tape carries the encrypted project catalogue, the escrow artefact, the schema, and a standalone restore script. Disaster recovery needs none of the infrastructure.</td>
+<td>Progress and audit history since the last close would be lost; archived data would not.</td>
+</tr>
+<tr>
+<td><strong>Institutional discontinuity</strong> (BRIC or the system no longer exists)</td>
+<td>Pinned cryptographic parameters, a plaintext recovery kit on every cartridge, and a documented manual recipe using only <code>openssl</code>, <code>sha256sum</code> and <code>tar</code>.</td>
+<td>Requires that someone still holds a key and can read LTO-9 media.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="s6"><span class="num">6</span>Identity, accounts and authorisation</h2>
+<h3 id="s6-1"><span class="num">6.1</span>Host login and the absence of an application login</h3>
+<p>BRIC Archive has <strong>no application-level login</strong>, no password of its own and no independent identity store. The authentication boundary is the KU-managed host environment. A researcher must hold a valid KU identity, connect through the KU VPN and authenticate to the designated cluster gate host. BRIC then uses the operating-system identity resolved through the University infrastructure (NSS/SSSD/Active Directory).</p>
+<p>Source-data access remains governed by the filesystem permissions, Unix groups and ACLs assigned through KU and the relevant research project. BRIC Archive does not grant additional access to ISILON data.</p>
+<p>The installed command loads a managed <code>~/.bric/env.sh</code>. User provisioning creates a protected <code>~/.bric</code> directory and stores the personal archive key there at mode <code>0600</code>, owned by that user. The key therefore remains inside the KU-managed cluster security boundary and is never stored on the tape server. A separate user-held copy may be issued on dedicated USB media under the onboarding procedure in <a href="#s6-7">§6.7</a>.</p>
+<h3 id="s6-2"><span class="num">6.2</span>Identity resolution and impersonation resistance</h3>
+<p>All ownership decisions call one function. It resolves the effective identity as follows:</p>
+<ol>
+<li>If <code>BRIC_USER</code> is unset: the real OS account (<code>id -un</code>), except that root invoking through <code>sudo</code> resolves to <code>SUDO_USER</code>.</li>
+<li>If <code>BRIC_USER</code> is set: it is honoured only when it equals the real OS account, or the caller is root (UID 0), or the explicitly trusted override <code>BRIC_ALLOW_USER_OVERRIDE=1</code> is set — a switch used by controlled test and service workflows.</li>
+<li>Otherwise the override is <strong>ignored</strong>, a warning is logged, and the real OS account is used.</li>
+</ol>
+<p>The practical consequence is that exporting <code>BRIC_USER=someone_else</code> does not let an unprivileged user act as another archive owner. Even if the identity check were bypassed, the attempt would fail at the next step, because the other user's key lives in their own home at mode <code>0600</code>.</p>
+<p>Project and owner names are additionally constrained by a strict charset — <code>^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$</code> — because these strings become path components on the shared export where SQL escaping offers no protection. The rule rejects slashes, spaces, control characters, leading dots or dashes, and <code>..</code>.</p>
+<div class="note">
+<span class="lbl">Long-term ACL identity principle</span>
+<p>An archived ACL is meaningful only together with the identity namespace to which its principals belong. Access-control entries may refer to Unix UID/GID identities, named users or groups, Windows/Active Directory SIDs, realms/domains, or storage-vendor mappings between those forms. The storage administrator controls ACL policy, inheritance and export behaviour; KU identity services and the destination storage configuration determine whether an archived principal still resolves at restore time.</p>
+<p>BRIC therefore distinguishes <strong>preservation</strong> from <strong>replayability</strong>. The archive may preserve an ACL exactly as historical metadata while a future destination is unable to apply it, or while the destination supports the ACL model but can no longer map one or more archived principals. A fifteen-year restore must not assume the same filesystem protocol, storage vendor, Active Directory domain, UID/GID allocation or identity-mapping policy that existed when the archive was written.</p>
+</div>
+<h3 id="s6-3"><span class="num">6.3</span>Role separation</h3>
+<p>Each host declares its role in <code>/etc/bric/bric.conf</code>. Every command asserts the role it needs and refuses to run on the wrong host: the user CLI requires <code>BRIC_ROLE=slurm</code>, the tape daemon requires <code>BRIC_ROLE=tape</code>. The updater reads the role from the configuration file and refuses a conflicting <code>--role</code> argument on the command line, which prevents a tape-role update from being applied to the cluster host or the reverse.</p>
+<p>Three privilege levels exist:</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Level</th><th>Who</th><th>Can do</th></tr></thead>
+<tbody>
+<tr><td>Researcher</td><td>Any onboarded OS/AD account</td><td>Back up, restore, list and search their own projects, view their own job logs, cancel their own jobs.</td></tr>
+<tr><td>Archive administrator (root on <code>supekgate</code>)</td><td>BRIC IT</td><td>Onboard and activate users, hold the master key, reset operational catalogue state, install and update releases, browse any project's catalogue.</td></tr>
+<tr><td>Tape operator (root on <code>brictape</code>)</td><td>BRIC IT</td><td>Run the daemon, import physical inventory, run hardware preflight, run periodic re-verification. Cannot read any research data.</td></tr>
+</tbody>
+</table></div>
+<h3 id="s6-4"><span class="num">6.4</span>User provisioning</h3>
+<div class="note"><span class="lbl">Operational authorisation</span><p>The technical provisioning step is performed only after the institutional and management approvals defined in <a href="#s6-7">§6.7</a>. KU controls institutional identity and access to research data; BRIC controls authorisation to use the archive and issuance of the archive key.</p></div>
+<p>Following approval, <code>bric-activate-user USER</code> performs root-only, idempotent activation on the cluster host. The canonical implementation is <code>cluster/scripts/bric-setup-user.sh</code>. The procedure:</p>
+<ol>
+<li><strong>Validates the institutional identity.</strong> The KU account must resolve through NSS/AD; UID 0 is refused and the user home must exist.</li>
+<li><strong>Serialises provisioning</strong> with a catalogue-scoped lock so two administrators cannot create competing keys.</li>
+<li><strong>Creates or repairs the personal key.</strong> The key is a 32-byte random secret, Base64 encoded, stored at <code>~/.bric/&lt;user&gt;_user_key.txt</code>, mode <code>0600</code>, owned by the user. If an authenticated escrow exists and the home key is missing, the same key is restored from escrow; if both exist and differ, provisioning fails rather than rotating silently.</li>
+<li><strong>Creates and self-checks institutional escrow.</strong> The personal key is wrapped and authenticated under the institution master key and the stored escrow is immediately unwrapped and compared with the home key.</li>
+<li><strong>Creates the managed runtime environment</strong>, private state/PID directories, the host-local allocator lock directory, central per-user logging with administrator-read ACLs and a private home-log fallback.</li>
+<li><strong>Installs the required catalogue/runtime permissions</strong> and enables the escrow policy.</li>
+<li><strong>Performs strict post-verification as the target user</strong>, including key format/equality, filesystem modes, logging ACLs, runtime access and a real <code>bric status</code> invocation.</li>
+</ol>
+<p>Under the BRIC operational onboarding procedure, a copy of the personal key is also delivered directly to the authorised user on dedicated USB media and the user signs a receipt. The cluster copy remains the normal operational key; the USB copy provides independent user custody and must be protected as described in §6.7.</p>
+<h3 id="s6-5"><span class="num">6.5</span>Idempotency and fail-closed rules</h3>
+<p>Provisioning is safe to re-run and deliberately fails closed around key identity:</p>
+<ul>
+<li>A personal key is never rotated implicitly. Existing home key and escrow must resolve to the same 32-byte secret.</li>
+<li>Missing home key plus valid escrow restores the existing key; existing home key plus missing escrow escrows that same key.</li>
+<li>An unmanaged or symlinked <code>~/.bric/env.sh</code> is refused rather than overwritten.</li>
+<li>Concurrent provisioning of the same user is serialised.</li>
+<li>The institution master key never enters normal user jobs, the QNAP bus or the tape server.</li>
+<li>The user’s operational key remains protected by KU host access controls, the user’s UID and mode <code>0600</code>; the tape server never receives it.</li>
+</ul>
+<h3 id="s6-6"><span class="num">6.6</span>Deprovisioning, retention and deletion</h3>
+<p>There is no delete operation for archived data, and this is intentional: the media is append-only, and a system that could erase an archive on request would not be an archive. The practical consequences for retention policy are:</p>
+<ul>
+<li><strong>Crypto-erase is the software-level erasure mechanism.</strong> Rendering a user’s archives permanently unreadable requires destruction of every recoverable copy of that user key: the protected cluster/home key, the user-held USB copy, the institutional escrow and any authorised additional copy. The effect is irreversible and coarse because the same user key is reused across that owner’s projects. Whether this satisfies a particular GDPR or retention obligation is a governance/legal determination outside the code.</li>
+<li><strong>Physical destruction of both cartridges of a pair</strong> is the alternative, and removes the ciphertext itself. It affects every project stored on those cartridges, which is bounded, because a cartridge is assigned to exactly one project.</li>
+<li><strong>The audit trail is append-only by design.</strong> Both catalogues carry an <code>audit_log</code> table recording who did what, when, and with what result — precisely so that in ten years a question of the form <em>"that project was never deleted"</em> has an answer.</li>
+<li><strong>Account departure.</strong> When a researcher leaves, their archives remain readable by the institution through the escrow and the master key. No action is required to preserve access; a deliberate decision is required to remove it.</li>
+</ul>
+<h3 id="s6-7"><span class="num">6.7</span>User onboarding and authorisation procedure</h3>
+<h4 id="s6-7-purpose">Purpose</h4>
+<p>This procedure defines how a user is authorised to use BRIC Archive 2.0 and how the user’s personal encryption key is issued and handled. BRIC Archive does not provide an independent identity-management system and does not determine access rights to the underlying research data. Authentication and filesystem authorisation remain under KU administration.</p>
+<h4 id="s6-7-1"><span class="num">6.7.1</span>Prerequisite institutional identity</h4>
+<p>Before BRIC Archive access can be requested, the user must already be an authorised KU user with a valid KU identity. Creation, verification, suspension and termination of that account follow normal KU identity-management procedures. Remote access to the BRIC cluster requires the KU VPN and successful authentication to the designated gate/login host.</p>
+<h4 id="s6-7-2"><span class="num">6.7.2</span>Access to research data</h4>
+<p>Once authenticated, the user can access only files and directories permitted by existing filesystem permissions, Unix groups, ACLs and project controls assigned through KU. Authorisation to use the tape archive does <strong>not</strong> grant access to additional research data; BRIC runs with the user’s operating-system identity.</p>
+<h4 id="s6-7-3"><span class="num">6.7.3</span>Request for BRIC Archive access</h4>
+<p>The user submits a written request by e-mail to the BRIC Archive administrator and the responsible BRIC management representative. The request identifies at minimum the user’s name, KU user ID and research group or organisational unit. No archive key is issued before management approval; the approval e-mail is retained as part of the authorisation record.</p>
+<h4 id="s6-7-4"><span class="num">6.7.4</span>Creation of the archive user</h4>
+<p>Following approval, the administrator activates the user with the standard provisioning command. A unique personal archive key is generated or recovered consistently with the authenticated escrow and installed in the user’s protected <code>~/.bric</code> directory at mode <code>0600</code>. The key is associated with that individual user and is not shared between researchers or groups.</p>
+<h4 id="s6-7-5"><span class="num">6.7.5</span>Delivery of the encryption key</h4>
+<p>A copy of the personal key is transferred to dedicated USB media and delivered directly to the authorised user. It must not be distributed through ordinary e-mail, messaging systems or uncontrolled electronic channels.</p>
+<p>At delivery the user signs a key-receipt document confirming receipt of the USB device, responsibility for preventing disclosure/loss/unauthorised copying, secure storage accessible only to the authorised user, and the obligation to report suspected loss, theft or compromise immediately to BRIC IT. The signed receipt is retained by BRIC.</p>
+<h4 id="s6-7-6"><span class="num">6.7.6</span>Use and location of the encryption key</h4>
+<p>Normal backup and restore operations use the protected key stored in the user’s KU-managed cluster home. The key file is owned by the user and readable only by that user. The USB copy should normally remain disconnected and securely stored; it is an independently held copy rather than a requirement for every archive operation.</p>
+<p>The personal data-encryption key must never be copied to the QNAP staging bus, the tape server or the tape library. The tape server receives only already-encrypted archive objects and has no access to ISILON source data.</p>
+<h4 id="s6-7-7"><span class="num">6.7.7</span>User responsibility for the USB copy</h4>
+<p>The user is responsible for the physical protection of the issued USB device. It must not be shared, copied to personal cloud storage, transmitted by ordinary e-mail or provided to unauthorised personnel. Loss or suspected compromise must be reported immediately to the BRIC Archive administrator.</p>
+<h4 id="s6-7-8"><span class="num">6.7.8</span>Completion of a project and physical tape custody</h4>
+<p>When a project is declared complete and its archive media have passed the required verification procedures, the two copies are stored separately: one in secure custody at BRIC and one in separate secure custody at Panum. The copies must not be stored at the same physical location. Tape movement and custody are recorded by cartridge barcode.</p>
+<h4 id="s6-7-9"><span class="num">6.7.9</span>Delivery of an archive copy to the user</h4>
+<p>Where formally requested and authorised, one physical archive copy may be released to the user. The handover records project, cartridge barcode(s), transfer date, recipient identity and acknowledgement of receipt. The recipient then assumes responsibility for physical protection of that copy.</p>
+<h4 id="s6-7-10"><span class="num">6.7.10</span>Separation of responsibilities</h4>
+<p>The resulting control model is:</p>
+<div class="table-wrap"><table><thead><tr><th>Control</th><th>Responsible party</th></tr></thead><tbody>
+<tr><td>Institutional identity creation</td><td>KU</td></tr>
+<tr><td>VPN authentication</td><td>KU</td></tr>
+<tr><td>Cluster/gate authentication</td><td>KU</td></tr>
+<tr><td>Filesystem/data access rights</td><td>KU / responsible research project</td></tr>
+<tr><td>Approval to use BRIC Archive</td><td>BRIC Archive administrator + BRIC management</td></tr>
+<tr><td>Personal encryption-key generation and cluster installation</td><td>BRIC Archive administrator</td></tr>
+<tr><td>Secure delivery of USB key copy</td><td>BRIC Archive administrator</td></tr>
+<tr><td>Protection of USB key copy</td><td>User</td></tr>
+<tr><td>Archive/tape system administration</td><td>Authorised BRIC IT</td></tr>
+<tr><td>Physical tape custody</td><td>BRIC / designated Panum custodian</td></tr>
+<tr><td>Research-data access decision</td><td>Responsible data owner/controller, implemented through KU access controls</td></tr>
+</tbody></table></div>
+<div class="note"><span class="lbl">Security principle</span><p><strong>Authorisation to use BRIC Archive does not grant access to research data.</strong> Data access is inherited from the user’s KU identity and existing filesystem permissions.</p></div>
+<div class="note"><span class="lbl">Key-location principle</span><p><strong>User data-encryption keys are stored only within the KU-managed cluster environment, in the user-held USB copy, and as encrypted institutional escrow; they are never stored on the tape server or tape library.</strong> Access to the operational cluster copy is subject to KU authentication, host-access and filesystem security controls.</p></div>
+<h2 id="s7"><span class="num">7</span>Key management and cryptography</h2>
+<h3 id="s7-1"><span class="num">7.1</span>Key hierarchy</h3>
+<p>Two levels of data-recovery secret exist, kept separate.</p>
+<dl>
+<dt>Personal user key</dt>
+<dd>One per KU identity: 32 random bytes, Base64-encoded on one line. The normal operational copy is stored in <code>~/.bric/&lt;user&gt;_user_key.txt</code>, mode <code>0600</code>, owned by the user inside the KU-managed cluster environment. A separate copy is delivered to the user on dedicated USB media under the onboarding procedure. The key encrypts every chunk of that user’s archives and the encrypted project catalogue. It never reaches the QNAP bus or tape server in plaintext.</dd>
+<dt>Institution master key</dt>
+<dd>A 32-byte administrative recovery secret located by <code>BRIC_MASTER_KEY_FILE</code>, normally a root-only file on the cluster host. It wraps authenticated escrow copies of user keys and is used for authorised break-glass recovery. It never enters normal user jobs, never reaches the QNAP payload bus, never reaches the tape server and is never written to tape.</dd>
+</dl>
+<p>A third, non-data key pair exists for bus authentication (<a href="#s7-5">§7.5</a>). It signs protocol messages; it decrypts nothing.</p>
+<h3 id="s7-2"><span class="num">7.2</span>Payload encryption</h3>
+<p>Two keys are derived from the user key with explicit domain separation:</p>
+<pre><code>ENC_PASS = sha256( USER_KEY + ":encryption" )
+HMAC_KEY = sha256( USER_KEY + ":authentication" )</code></pre>
+<p>Both are used as lowercase hexadecimal strings. <code>ENC_PASS</code> is supplied to OpenSSL as a passphrase; <code>HMAC_KEY</code> is the HMAC key. Payload encryption is byte-compatible with:</p>
+<pre><code>openssl enc -aes-256-cbc -pbkdf2 -iter 10000 -pass file:PASSFILE</code></pre>
+<p>The streaming chunker implements exactly this format natively rather than shelling out, so that a multi-terabyte stream is encrypted in one pass with no plaintext ever written to disk. Concretely, for each chunk the helper generates 8 random salt bytes, writes the OpenSSL <code>Salted__</code> header followed by the salt, derives 48 bytes with PBKDF2-HMAC-SHA256 over the passphrase and salt at 10 000 iterations (32-byte AES key plus 16-byte IV), and encrypts in CBC mode with PKCS#7 padding. While the ciphertext is written it simultaneously accumulates the SHA-256 of the ciphertext and the HMAC-SHA256 of the ciphertext — both computed over the complete file <em>including</em> the salted header.</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Parameter</th><th>Value</th><th>Why pinned</th></tr></thead>
+<tbody>
+<tr><td>Cipher</td><td>AES-256-CBC</td><td>Universally available in any OpenSSL a recovery host will have in 2040.</td></tr>
+<tr><td>KDF</td><td>PBKDF2-HMAC-SHA256</td><td>Explicit, not defaulted.</td></tr>
+<tr><td>Iterations</td><td>10 000, stated explicitly</td><td>Equals the historical OpenSSL default, so already-written blobs stay openable; stated explicitly so a future OpenSSL default change cannot make tapes unreadable.</td></tr>
+<tr><td>Salt</td><td>8 random bytes, embedded in the header</td><td>Nothing has to be recorded separately.</td></tr>
+<tr><td>Integrity</td><td>HMAC-SHA256 over the ciphertext</td><td>CBC provides no integrity; the MAC does, and is checked first.</td></tr>
+<tr><td>Compression</td><td>None</td><td>Genomic data is already compressed and ciphertext is incompressible.</td></tr>
+</tbody>
+</table></div>
+<div class="note">
+<span class="lbl">On the iteration count</span>
+<p>10 000 PBKDF2 iterations would be low for a human-chosen password. The passphrase here is not one: it is the SHA-256 of a 32-byte random key, so dictionary and brute-force attacks are not the threat model, and a higher count would add cost without adding security. The parameter is pinned <em>and recorded</em> per chunk and in the on-tape recovery kit, so if the system ever admitted human-chosen passphrases the count could be raised for new data while old tapes remain readable.</p>
+</div>
+<h3 id="s7-3"><span class="num">7.3</span>Encrypt-then-MAC and verify-before-decrypt</h3>
+<p>Every path that consumes a blob — normal restore, disaster recovery, and the standalone on-tape recovery script — computes the HMAC-SHA256 of the ciphertext and compares it against the expected value from the catalogue <em>before</em> the blob is passed to <code>openssl -d</code> or to <code>tar</code>. A mismatch is refused, not logged and continued.</p>
+<p>This single control does two jobs at once. It rejects tampered or forged ciphertext before any parser touches it, and it removes an entire class of path-traversal and archive-parser attacks: hostile data never reaches <code>tar</code>. In disaster recovery the failure is not fatal but healing: the primary copy that fails its HMAC is abandoned and the backup copy on the partner cartridge is read instead.</p>
+<p>Independently of the MAC, the ciphertext SHA-256 is verified at three further points: immediately after every tape write (read back and re-hash), when a blob is staged back for restore (the tape daemon re-hashes before publishing it on the bus, and marks the cartridge <code>SUSPECT</code> on mismatch), and during scheduled re-verification of a whole cartridge.</p>
+<h3 id="s7-4"><span class="num">7.4</span>Institutional escrow</h3>
+<p>The escrow format is authenticated and versioned:</p>
+<pre><code>v2:&lt;hmac_hex&gt;:&lt;ciphertext_b64&gt;
+
+ciphertext = openssl enc -aes-256-cbc -pbkdf2 -iter 10000 -a -A -salt -pass file:MASTER
+hmac = HMAC-SHA256( ciphertext_b64 ) under key sha256( MASTER + ":escrow-auth" )</code></pre>
+<p>Unwrapping verifies the HMAC first and refuses to decrypt on mismatch, so an attacker with write access to the catalogue cannot silently corrupt a wrapped key and have the damage surface only years later at break-glass time. Legacy unauthenticated escrows are still readable for backward compatibility.</p>
+<div class="note">
+<span class="lbl">Historical note relevant to assurance</span>
+<p>An earlier implementation produced the escrow ciphertext without base64 armour. Because shell command substitution strips NUL bytes silently, roughly a fifth of escrows were being corrupted invisibly. The current implementation uses the <code>-a</code> flag across all four consumers, and the escrow self-check that immediately unwraps and compares after writing exists precisely so that a defect of this shape cannot recur undetected.</p>
+</div>
+<p>At project close, the user's job copies the <strong>already wrapped</strong> escrow ciphertext to tape as <code>user_key_escrow.v1</code>, together with a project and owner binding:</p>
+<pre><code>BRIC-USER-ESCROW-V1
+project=&lt;project&gt;
+owner=&lt;owner&gt;
+escrow_b64=&lt;base64 of the v2 escrow string&gt;</code></pre>
+<p>The close job never reads the master key. Break-glass recovery verifies the artefact's SHA-256 against the tape's table of contents, checks the project binding, verifies the escrow HMAC, unwraps with the institution master key, and then cross-checks that the owner named in the escrow matches the owner recorded in the decrypted project catalogue.</p>
+<h3 id="s7-5"><span class="num">7.5</span>Bus signing keys</h3>
+<p>Marker authentication uses ECDSA over NIST P-256 with SHA-256, via <code>openssl dgst -sha256 -sign</code> and <code>-verify</code>. The choice of primitive is a portability constraint rather than a preference: Ed25519 has no command-line signing path in OpenSSL 1.1.1, which is what the RHEL 8 gate node ships, and a keygen-only capability probe had previously reported success on a host that could not actually sign. The setup script now exercises a full sign-and-verify round trip before declaring the host capable.</p>
+<p>Signing is <strong>symmetric in direction</strong>: each side signs what it publishes with its own private key and verifies what it consumes with the peer's public key. The tape server therefore holds a private key — but a signing key is not a data secret, so the host remains keyless with respect to data while still being able to authenticate its own receipts.</p><div class="flag">
+<span class="lbl">Trust-boundary note — the cluster signing key is shared with user processes</span>
+<p>With <code>require_bus_signing=1</code>, <code>bric-run</code> and <code>bric-setup-user.sh --strict-runtime-checks</code> explicitly require the calling researcher to be able to read <code>BRIC_BUS_SIGN_KEY</code>. The current design therefore authenticates “a process possessing the cluster-side key”, not a privileged cluster service distinct from archive users. This is useful against a QNAP-only attacker or an unauthorised NFS writer who lacks the key, but it is not protection against a malicious onboarded user. A stronger boundary would move signing behind a privileged broker or use per-user signing identities with an explicit trust policy on the tape side.</p>
+</div>
+<h3 id="s7-6"><span class="num">7.6</span>Parameter pinning and format versioning</h3>
+<p>Every persistent format carries a version tag so a future BRIC-FORMAT-V2 can evolve without orphaning V1 media: bus markers are <code>BRIC-MARKER-V1</code>, the tape index begins <code># BRIC tape TOC v1</code>, the on-tape recovery kit begins <code>BRIC-FORMAT-V1</code>, and <code>config.format_version='1'</code> is recorded in both catalogues. Cryptographic parameters are recorded per chunk in the catalogue and again in the plaintext <code>README_RECOVERY.txt</code> on every cartridge. A version header in front of the ciphertext itself is explicitly deferred to V2 so as not to break the current read path.</p>
+<h3 id="s7-7"><span class="num">7.7</span>Cryptographic review notes</h3>
+<p>Three points a reviewer should weigh explicitly.</p>
+<ul>
+<li><strong>CBC without an authenticated cipher mode.</strong> The system uses AES-CBC plus a separate HMAC rather than AES-GCM. The reason is longevity: <code>openssl enc</code> has no AEAD mode with a stable, scriptable command-line interface, and the recovery promise requires that a person in 2040 with nothing but <code>openssl</code>, <code>sha256sum</code> and <code>tar</code> can open a blob. Encrypt-then-MAC over the full ciphertext, verified before decryption, is the correct composition and is applied consistently on every read path.</li>
+<li><strong>Key derivation by hashing with a suffix.</strong> <code>sha256(key + ":encryption")</code> is not HKDF, but the input is a full-entropy 32-byte secret and the two labels are distinct and fixed, so the derived keys are independent for practical purposes. The choice buys reproducibility by hand with coreutils, which HKDF would not.</li>
+<li><strong>Derived HMAC key on the command line.</strong> Several call sites pass the derived authentication key as an <code>openssl dgst -hmac</code> argument, which makes it visible in the process table to other users on the shared login node for the duration of the call. This exposes the authentication key, not the encryption key, and the two cannot be derived from one another — the impact is the ability to forge a MAC for someone whose restore is running, not the ability to decrypt. It is nonetheless a real weakness on a multi-user host and is carried as a finding in <a href="#s17-3">§17.3</a>.</li>
+</ul>
+<h2 id="s8"><span class="num">8</span>The staging bus protocol</h2>
+<h3 id="s8-1"><span class="num">8.1</span>Layout and marker vocabulary</h3>
+<p>The two hosts communicate exclusively through small files on the shared QNAP NFS tree. There is no socket, RPC or message queue; the tape server polls.</p>
+<pre><code>&lt;bus&gt;/archive/&lt;project&gt;/&lt;run_id&gt;/
+    chunk_NNNN.enc            encrypted payload
+    chunk_NNNN.enc.sha256     ciphertext digest sidecar
+    chunk_NNNN.enc.hmac       ciphertext MAC sidecar
+    chunk_NNNN.meta           signed chunk metadata
+    chunk_NNNN.READY -&gt; .CLAIMED -&gt; .DONE | .ERROR
+    run.RESERVE_REQUEST -&gt; run.RESERVED | run.DENIED
+    run.RESERVE_EXTEND_REQUEST -&gt; run.RESERVE_EXTENDED | run.RESERVE_EXTEND_DENIED
+    run.PROJECT_CLOSING -&gt; run.CLOSE_PLACEMENT -&gt; run.CLOSE_CATALOGS -&gt; run.CLOSED
+    run.ABORTED -&gt; run.ABORT_DONE
+    close/
+
+&lt;bus&gt;/restore/&lt;project&gt;/&lt;req_id&gt;/
+    request                      protocol=restore-progressive-v1
+    request.PROGRESS             signed, refreshed heartbeat/progress
+    staged_&lt;run&gt;__cNNNN.enc
+    staged_&lt;run&gt;__cNNNN.READY
+    staged_&lt;run&gt;__cNNNN.CONSUMED
+    request.CANCELLED            cluster-side cancellation request
+    request.STAGED               terminal tape-side result</code></pre>
+<p>For progressive restore the tape daemon stages one chunk, publishes its signed READY receipt and waits for the cluster’s signed <code>CONSUMED</code> acknowledgement before staging the next. This bounds reverse-bus occupancy to approximately one chunk per restore request. The most safety-critical archive-direction message remains <code>DONE</code>, because it authorises freeing the staged producer blob only after both tape copies are verified.</p>
+<h3 id="s8-2"><span class="num">8.2</span>Atomic claim</h3>
+<p>Taking work off the bus is a single <code>rename()</code> from <code>chunk_NNNN.READY</code> to <code>chunk_NNNN.CLAIMED</code>. Exactly one caller can win. There is no lock manager, no lease table and no coordination protocol — which is why the POSIX assumption in <a href="#s4-5">§4.5</a> is load-bearing. After winning, the daemon explicitly refreshes the marker's modification time, so the stale-claim TTL measures time since <em>this</em> daemon acquired the claim rather than the age of the original publication.</p>
+<h3 id="s8-3"><span class="num">8.3</span>Marker authentication</h3>
+<p>Marker signing is a cryptographic defence against forgery on the shared export, complementary to export permissions. Three properties are worth spelling out.</p>
+<h4>Detached signature published first</h4>
+<p>The signature is written to a sidecar <code>&lt;marker&gt;.sig</code> and published <em>before</em> the marker itself, so a consumer can never observe a signable marker without its signature.</p>
+<h4>Domain separation and path binding</h4>
+<p>What is signed is not the bare marker body but a canonical envelope:</p>
+<pre><code>BRIC-MARKER-V1\n&lt;project&gt;/&lt;run_id&gt;/&lt;marker_name&gt;\n&lt;body&gt;</code></pre>
+<p>The verifier rebuilds that prefix from the file's <em>real</em> location on disk. A valid signature therefore cannot be moved onto a different marker name, a different run, or a different project — not even when the bodies are byte-identical, because the reconstructed prefix differs and the signature fails cryptographically. On top of that, consumers check semantic binding: <code>run_id</code> must equal the directory name, <code>chunk_no</code> must equal the number in the file name, <code>project</code> must equal the parent directory.</p>
+<h4>Mandatory mode</h4>
+<p>Backward compatibility — "sign if the keys are present" — is convenient during commissioning and dangerous in production, because a deployment that forgets an environment variable would silently degrade to an unsigned bus. Setting the catalogue key <code>require_bus_signing=1</code> on both sides removes that failure mode: the tape daemon refuses to start and the cluster scripts refuse to publish if the signing or verification key is missing.</p>
+<div class="flag">
+<span class="lbl">Deployment check — signing enforcement is conditional at install time</span>
+<p>The shipped role configuration files set <code>BRIC_REQUIRE_SIGNING=1</code>, and the setup script defaults to the same. However, the setup script writes <code>require_bus_signing=1</code> into the catalogue <em>only if the corresponding key files already exist on that host at setup time</em>; otherwise it writes <code>0</code> and prints a warning telling the operator to enable it after distributing the keys. The database default in the shipped schema is also <code>0</code>. Enforcement must therefore be verified after deployment rather than assumed:</p>
+<pre><code>sqlite3 $BRIC_DB "SELECT value FROM config WHERE key='require_bus_signing';"
+sqlite3 $BRIC_TAPE_DB "SELECT value FROM config WHERE key='require_bus_signing';"</code></pre>
+<p>Both must return <code>1</code> in production. This is listed as a required acceptance check in <a href="#s17-3">§17.3</a>.</p>
+</div>
+<h3 id="s8-4"><span class="num">8.4</span>Export permissions — a security control, not an option</h3>
+<p>The bus may be <em>readable</em> by authorised hosts because payloads are ciphertext, but write access must be limited to principals that are intentionally allowed to participate in the archive protocol. In the current local-mode implementation that set necessarily includes the onboarded researcher's process: preflight and activation explicitly test that the user can write <code>BRIC_QNAP</code>, and the user process publishes reservation, chunk and close markers itself. The older wording “service accounts only” is therefore too narrow. NFS host allow-lists, coherent mapping/squash and restrictive setgid/ACL policy remain essential to exclude arbitrary campus/NFS clients, but they do not isolate one onboarded archive user from another. Marker signing adds protection against writers without the relevant private key; under the current shared cluster-signing-key model it is not a per-user authorisation control.</p>
+<h3 id="s8-5"><span class="num">8.5</span>Bus lifetime and cleanup</h3>
+<p>The bus is transport, not storage. Individual blobs are freed as soon as both tape copies are verified — not at the end of the run — which bounds peak staging occupancy to roughly the sliding-window size. Whole run directories are removed only after the cluster catalogue records a terminal state <em>and</em> the corresponding signed receipt has been verified: <code>run.CLOSED</code> for a successful run, <code>run.DENIED</code> for a refused one, and <code>run.ABORT_DONE</code> for a failed or cancelled one. Cleanup is path-bound (the run identifier must be prefixed by the project name, and the resolved path must match the expected bus location exactly) so a malformed name cannot cause a deletion elsewhere. Operators can inspect and remove leftovers from older releases with <code>bric-bus-cleanup --dry-run</code> followed by <code>bric-bus-cleanup</code>. Setting <code>BRIC_KEEP_TERMINAL_BUS=1</code> retains terminal directories for forensic work.</p>
+<h2 id="s9"><span class="num">9</span>Backup: end-to-end walkthrough</h2>
+<p>This section follows a single command from the shell prompt to a sealed pair of cartridges. The deployment currently runs in <code>BRIC_RUN_MODE=local</code>, in which the whole pipeline executes on the gate host; <a href="#s9-10">§9.10</a> covers the Slurm-distributed mode.</p>
+<h3 id="s9-1"><span class="num">9.1</span>Command entry, validation and preflight</h3>
+<p>The user runs:</p>
+<pre><code>bric backup mouse_rnaseq /mnt/isilon/projects/mouse_rnaseq</code></pre>
+<p>The installed <code>bric</code> command is the operational wrapper. In order it: answers <code>version</code> and every form of <code>help</code> <em>before</em> loading any runtime, running preflight or creating a job record; normalises the friendly positional form into the explicit long form; then fully validates the operand set, so that a typo or a missing operand can never leave a stray <code>backup.unknown</code> job record behind.</p>
+<p>Only then does it load the user's <code>~/.bric/env.sh</code>, resolve an OpenSSL runtime (keeping the current binary when it is already version 3 or newer, otherwise initialising Environment Modules and selecting the newest module this UID can actually load — the configured module name is a preference, not a requirement), and run preflight:</p>
+<ol>
+<li>Runtime availability: OpenSSL for local mode, or <code>sbatch</code> and the executable job scripts for Slurm mode.</li>
+<li>Bus mount: the exact declared mount point must be a mount point, and with <code>BRIC_REQUIRE_NFS_BUS=1</code> its type must be NFS; the bus root must exist under it and be writable by the caller.</li>
+<li>Personal key: present, non-empty and readable. If not, the message names the exact administrative command needed.</li>
+<li>If <code>require_bus_signing=1</code>: this user must be able to read both the cluster signing key and the tape public key.</li>
+<li>Source integrity: the scan described next.</li>
+</ol>
+<p>Any failure prints a numbered <code>[FAIL]</code> line and stops. <code>--skip-preflight</code> exists and is documented as discouraged.</p>
+<p>Once preflight passes, a local-mode backup <strong>detaches by default</strong>. The wrapper starts a supervisor in its own session and process group, records a job identifier, PID, action, project, start time and log path under <code>~/.bric/pids</code>, redirects all output to a private log under <code>~/.bric/log/jobs</code>, and prints the job id together with the exact commands to follow or cancel it. The researcher can close the SSH session; the archive continues. <code>--wait</code> keeps the historical foreground behaviour.</p>
+<h3 id="s9-2"><span class="num">9.2</span>Source-integrity gate — before any tape is committed</h3>
+<p>This gate runs as the calling UID before any tape reservation, so append-only media are not consumed only to discover late that part of the requested tree was unreadable.</p>
+<ul>
+<li>Every explicit <code>--exclude RELPATH</code> is an exact, validated relative subtree and is recorded as a user-declared exclusion.</li>
+<li>Directories must be readable/traversable and regular files readable; symbolic links are archived as links.</li>
+<li>Without <code>--force</code>, every precisely identified unreadable/untraversable path is reported and the run stops before reservation.</li>
+<li>With <code>--force</code>, only the precisely identified unreadable paths are omitted and recorded with reason <code>force-unreadable</code>; source sizing/reservation are recomputed over the remaining readable scope. Unclassified traversal or I/O failures remain fatal. <code>--force</code> is therefore not equivalent to skipping preflight.</li>
+<li>A separate scan records regular-file count, logical bytes and allocated bytes for progress/capacity context. GNU tar remains authoritative for the archived bytes.</li>
+</ul>
+<p>Exclusions, forced omissions and scan denominators are stored in the catalogue and copied into the encrypted project catalogue so future recovery can distinguish intentional scope decisions from missing data.</p>
+<h3 id="s9-3"><span class="num">9.3</span>Run creation and tape reservation</h3>
+<p>The planner creates the run and its scope record in <strong>one</strong> transaction, so a run cannot exist with an ambiguous scope. The insert is conditional:</p>
+<pre><code>INSERT INTO runs (...) SELECT ...
+WHERE NOT EXISTS (SELECT 1 FROM runs
+ WHERE project_name = ?
+ AND status IN ('PLANNING','RESERVED','PRODUCING','DRAINING','CLOSING'));</code></pre>
+<p>If the insert affects no rows, another run is already active for that project and the command stops (invariant I2). Run identifiers are <code>&lt;project&gt;__&lt;UTC timestamp&gt;__&lt;counter&gt;</code>, with the counter incremented inside an explicit immediate transaction so two runs starting in the same second cannot collide. The identifier's lexicographic order is therefore also its chronological order, which disaster recovery later relies on to decide which run wins when a path exists in several.</p>
+<p>Policy checks at this point: the project must belong to the requesting owner; if <code>require_user_escrow=1</code>, the owner must have an escrow row; if <code>require_bus_signing=1</code>, signing keys must be configured.</p>
+<p>The planner then requests capacity. Because a streaming producer does not know its final size in advance, it asks for an initial allocation of roughly one chunk plus ten per cent, publishes a signed <code>run.RESERVE_REQUEST</code>, and waits for <code>run.RESERVED</code> or <code>run.DENIED</code>. The response's signature is verified and its <code>run_id</code> must bind to this run. A denial is recorded with its reason, audited, notified, cleaned up from the bus and reported to the user. A grant records the number of pairs and the granted logical capacity in bytes.</p>
+<div class="note">
+<span class="lbl">Semantics B — media before bytes</span>
+<p>No byte of ciphertext is produced before tape has been reserved. Reservations are computed on the <em>ciphertext</em> size, adding tar framing overhead and a configurable margin (<code>reservation_overhead_pct</code>, default 2%), so a project with very many small files is not under-reserved. Reservations carry a TTL (192 hours) and a heartbeat, so a dead run releases its media automatically.</p>
+</div>
+<h3 id="s9-4"><span class="num">9.4</span>Parallel tar-stream producer</h3>
+<p>Local mode is still one user-visible backup and one <code>run_id</code>, but the source producer is parallel by default. After preflight and reservation it builds a cluster-local, NUL-safe manifest of the included scope, assigns each regular file to exactly one worker using logical-byte balancing, and launches up to four independent GNU-tar → <code>bric-tar-stream</code> pipelines concurrently.</p>
+<p>All workers publish into one global contiguous chunk namespace. A host-local allocator lock plus a SQLite <code>BEGIN IMMEDIATE</code> transaction reserve the next chunk number and account for already published and currently allocated worker chunks before production proceeds. Directory and symlink metadata are emitted once after all regular-file workers, keeping restrictive directory metadata globally last.</p>
+<p>The default target is <strong>128,000,000,000 bytes (128 GB decimal)</strong> per worker chunk. GNU tar uses a 4 MiB outer record (<code>tar_blocking_factor=8192</code>) to reduce pipe/syscall overhead. The tar-aware Go helper still computes each regular file’s plaintext SHA-256 while consuming the actual source stream; no content-hash pre-pass is introduced.</p>
+<ul>
+<li><strong>Name safety.</strong> Absolute names, <code>..</code> components and embedded NULs are rejected.</li>
+<li><strong>Chunking.</strong> Normal members accumulate into independent <code>TAR_PART</code> archives; an oversized regular file is split into ordered <code>LARGE_FILE_CHUNK</code> byte ranges.</li>
+<li><strong>Encryption.</strong> Each chunk is encrypted in streaming OpenSSL-compatible AES-256-CBC form while ciphertext SHA-256 and HMAC-SHA256 are accumulated.</li>
+<li><strong>Capacity.</strong> Workers cannot allocate another chunk without passing the shared stream gate; reservation extension remains signed and pair-based.</li>
+</ul>
+<h4>Sparse files</h4>
+<p>Sparse handling uses GNU PAX 0.1 sparse-map records from the authoritative tar stream rather than filesystem block accounting. Materially sparse members may be batched into a valid multi-member sparse <code>TAR_PART</code> (default mapped-data target 4 GiB). Byte content is authoritative; allocation topology is not guaranteed, so zero ranges may restore as holes even when the source had physically allocated zero blocks.</p>
+<h3 id="s9-5"><span class="num">9.5</span>Flow control</h3>
+<p>Several independent limits bound staging and source/network pressure.</p>
+<div class="table-wrap"><table><thead><tr><th>Limit</th><th>Default</th><th>Effect</th></tr></thead><tbody>
+<tr><td>Internal workers per local run</td><td><code>stream_parallel_workers=4</code></td><td>Up to four source/tar/chunker pipelines work on the same project/run.</td></tr>
+<tr><td>Worker chunk target</td><td><code>128000000000</code></td><td>Bounds first-READY latency and random-restore read amplification.</td></tr>
+<tr><td>Per-run published window</td><td><code>max_inflight_chunks=8</code></td><td>Limits published encrypted blobs waiting on QNAP.</td></tr>
+<tr><td>System-wide producing runs</td><td><code>max_concurrent_producers=1</code></td><td>Run-level admission; distinct from the four internal workers.</td></tr>
+<tr><td>Global bus budget</td><td><code>qnap_budget_bytes≈92 TB</code></td><td>Defensive cap on total staged ciphertext; <code>0</code> disables it.</td></tr>
+</tbody></table></div>
+<p>The occupancy probe counts both completed <code>.enc</code> blobs and in-progress <code>.enc.part</code> files. Before tape reservation, parallel local mode also checks QNAP free space against a conservative window derived from published slots plus active workers. A genuine NFS occupancy-probe failure pauses production and retries; persistent probe failure aborts fail-closed rather than staging while free space is unknown.</p>
+<h3 id="s9-6"><span class="num">9.6</span>Publication of a chunk</h3>
+<p>Before a parallel worker opens a new chunk, <code>bric-stream-allocate.sh</code> obtains the per-run host-local allocator lock, evaluates reservation headroom and atomically reserves <code>MAX(chunk_no)+1</code> in the catalogue as <code>ALLOCATED</code>. When ciphertext is complete, publication:</p>
+<ol>
+<li>atomically converts the placeholder to the completed chunk row and commits the file rows;</li>
+<li>writes the ciphertext SHA-256 and HMAC sidecars;</li>
+<li>publishes the signed chunk metadata marker;</li>
+<li>publishes the signed <code>READY</code> marker;</li>
+<li>derives run chunk/byte totals from authoritative catalogue rows and emits structured progress.</li>
+</ol>
+<p>The tape daemon can therefore observe <code>READY</code> only after the chunk is complete, catalogued and hashed. Concurrent workers never create synthetic sub-runs or overlapping chunk numbers.</p>
+<h3 id="s9-7"><span class="num">9.7</span>Source-consistency policy</h3>
+<p>Each parallel GNU-tar worker has independent stderr/result state. After all data workers finish, the coordinator combines and classifies the diagnostics once:</p>
+<div class="table-wrap"><table><thead><tr><th>Condition</th><th><code>strict</code> (default)</th><th><code>record</code></th></tr></thead><tbody>
+<tr><td>All tar workers rc = 0</td><td>Proceed</td><td>Proceed</td></tr>
+<tr><td>Only safely classified <em>file changed as we read it</em> diagnostics</td><td><strong>Abort.</strong> Use a quiescent/snapshot source.</td><td>Proceed and catalogue every diagnostic.</td></tr>
+<tr><td>Mixed/unclassified warning, permission change after preflight, or tar rc ≥ 2</td><td colspan="2"><strong>Fatal.</strong></td></tr>
+<tr><td>Any chunker/worker failure</td><td colspan="2"><strong>Fatal.</strong></td></tr>
+</tbody></table></div>
+<p>Parallelism does not provide snapshot semantics: true whole-run consistency still depends on operational source quiescence or a storage snapshot. The catalogue records the policy, verdict and any accepted changes.</p>
+<h3 id="s9-8"><span class="num">9.8</span>Drain and finalisation</h3>
+<p>When the stream ends, the run moves to <code>DRAINING</code> and the finaliser waits for every chunk's receipt. Its behaviour on each pass:</p>
+<ul>
+<li><strong>Up-front reconciliation.</strong> Any chunk still in <code>PLANNED</code>, <code>PENDING</code>, <code>PRODUCING</code> or <code>ERROR</code> at this point means a producer died without leaving a marker. That is detected immediately rather than after the drain timeout.</li>
+<li><strong>Receipt verification.</strong> For each <code>DONE</code> marker the signature is verified and the <code>run_id</code> binding checked <em>before</em> the staged blob is freed. This is the single most important verification in the system: a forged <code>DONE</code> would delete data that never reached tape.</li>
+<li><strong>Error propagation.</strong> A verified <code>ERROR</code> marker fails the run with the tape server's own reason.</li>
+<li><strong>Heartbeat.</strong> The reservation heartbeat is refreshed on every pass so a long, healthy drain does not expire its own media reservation.</li>
+<li><strong>Failure path.</strong> On any failure the run is marked <code>FAILED</code>, a signed <code>run.ABORTED</code> is published, and the finaliser waits for the tape server's <code>run.ABORT_DONE</code> before cleaning the bus. If the acknowledgement does not arrive, the bus directory is deliberately preserved for daemon recovery.</li>
+</ul>
+<p>When all chunks are verified on both cartridges, the run moves to <code>CLOSING</code>, the private run-state scratch is removed, and a signed <code>run.PROJECT_CLOSING</code> is published.</p>
+<h3 id="s9-9"><span class="num">9.9</span>Close: what is actually written to the cartridges</h3>
+<p>Closing is a four-message handshake and is the part of the protocol most hardened against partial completion.</p>
+<ol>
+<li>The daemon answers <code>PROJECT_CLOSING</code> with a signed <code>run.CLOSE_PLACEMENT</code> listing, for every chunk, the volume tag and file number of both copies, plus the project's cartridges.</li>
+<li>The cluster records the cartridges in <code>project_tapes</code> and builds the close artefacts <strong>on local storage</strong>, never on the shared bus:
+ <ul>
+<li><code>catalog_project.enc</code> — a SQL dump of everything about this project (projects, runs, chunks, files, exclusions, source scan, source semantics, source changes, project tapes) plus an embedded <code>placement</code> table mapping chunk to cartridge and file number, encrypted with the <strong>owner's</strong> key.</li>
+<li><code>user_key_escrow.v1</code> — the already master-wrapped, authenticated escrow ciphertext, bound to project and owner. The close job never reads the master key.</li>
+<li><code>schema.sql</code>, <code>README_RECOVERY.txt</code>, <code>restore_from_tape.sh</code> — plaintext, non-secret, self-contained recovery kit.</li>
+</ul>
+ The plaintext catalogue dump is created in local scratch and deleted immediately after encryption; the passphrase file is mode <code>0600</code> and removed on every exit path.</li>
+<li>The cluster publishes a signed <code>run.CLOSE_CATALOGS</code> carrying a <strong>manifest</strong> of exactly those artefacts as <code>artifact|name|kind|sha256</code> lines.</li>
+<li>The daemon verifies the manifest signature and bindings, then enforces it: every listed artefact must be present on the bus, must match its declared SHA-256, and must be appended and read-back-verified on <em>every</em> cartridge of the project. Only then are the tables of contents written — last — and only when every artefact is <code>VERIFIED</code> on every cartridge, and both drives are confirmed empty with the media back in their slots, is <code>run.CLOSED</code> published.</li>
+</ol>
+<p>Two refusal rules are absolute. A missing or mismatched artefact <strong>blocks</strong> sealing; the run stays unsealed and is retried on the next pass. An artefact already <code>VERIFIED</code> under the same identity but with <em>different</em> content is a fatal error, never a silent skip.</p>
+<p>The cluster verifies the <code>run.CLOSED</code> signature and binding before recording the run as closed, notifying the owner, writing the audit entry and cleaning the bus.</p>
+<h3 id="s9-10"><span class="num">9.10</span>Slurm mode</h3>
+<p>The distributed mode is retained and will be used once the compute nodes have the Isilon and QNAP mounts. Its differences are operational rather than architectural:</p>
+<ul>
+<li><code>bric backup</code> does not plan on the login node. It submits a short <strong>orchestrator job</strong> that plans, waits for the reservation, submits the chunk array and the dependent finalise job, and exits — so an SSH drop cannot kill the pipeline. The export to jobs is an explicit whitelist of <code>BRIC_*</code> variables, never <code>--export=ALL</code>.</li>
+<li>The finalise job depends <code>afterany</code>, not <code>afterok</code>, so it runs even when array tasks fail; it is the single reconciliation handler.</li>
+<li><code>--requeue</code> is safe because everything is idempotent: a re-executed task whose chunk is already complete exits zero without re-staging, and the tape server re-publishes <code>DONE</code> from the verified catalogue rows rather than writing a duplicate segment.</li>
+<li>The archive partition is sized as I/O-bound work (2 CPUs, 2 GB, constrained to nodes with the mounts) and is configured as a good neighbour: low queue priority, no pre-emption of running jobs.</li>
+<li>Slurm mode retains the serial/per-file planner rather than the local parallel tar-stream producer. It records current large-file mode/metadata fields and applies the same regular-file special-bit policy. <code>--exclude</code> and <code>--source-change-policy record</code> remain local-producer-only and are refused in Slurm mode rather than silently ignored.</li>
+</ul>
+<h3 id="s9-11"><span class="num">9.11</span>Fidelity and metadata limits</h3>
+<p>Archive-time preservation and restore-time replay are deliberately treated as different questions. BRIC records the byte content and the selected metadata that the source exposes at archive time; whether every recorded metadata item can later be reproduced depends on the capabilities and identity environment of the restore destination.</p>
+<div class="table-wrap"><table><thead><tr><th>Captured / preserved by the archive</th><th>Restore-time limits</th></tr></thead><tbody><tr><td><ul>
+<li>Regular-file contents, byte-exact, with plaintext SHA-256 per file</li>
+<li>Directories, including empty directories</li>
+<li>Modification times</li>
+<li>Ordinary regular-file permission bits (<code>0777</code>)</li>
+<li>Directory mode semantics, including sticky directories</li>
+<li>Symbolic links, archived as links</li>
+<li>File names containing spaces/newlines and other hostile bytes supported by the catalogue path handling</li>
+<li>Selected ACL/xattr metadata for current archives where it is exposed by the source: <code>user.*</code>, POSIX ACL representation and <code>system.nfs4_acl</code></li>
+<li>Sparse byte content; materially sparse files remain tape-efficient</li>
+</ul></td><td><ul>
+<li><strong>Destination capability is authoritative.</strong> A future filesystem may not support, expose or permit writes for the same ACL/xattr model that existed at archive time.</li>
+<li><strong>Identity mapping can change independently of filesystem support.</strong> An ACL may be representable but contain principals whose UID/GID, SID, group, realm or directory-service mapping no longer exists.</li>
+<li><strong>UID/GID ownership</strong> is not replayed by BRIC — restore uses <code>--no-same-owner</code>; objects are owned by the restoring identity.</li>
+<li><strong>Setuid, setgid and sticky bits on regular files</strong> are deliberately cleared because ownership is not restored; directory sticky semantics are retained where applicable.</li>
+<li><strong>SELinux/security/trusted and unrelated system xattrs</strong> are outside the archival contract.</li>
+<li><strong>Hard-link identity</strong> is not preserved; hard links restore as independent regular files.</li>
+<li><strong>FIFOs, sockets and device nodes</strong> are not treated as archive data.</li>
+<li><strong>Allocation topology</strong> is not guaranteed; byte content is authoritative.</li>
+</ul></td></tr></tbody></table></div>
+<div class="note">
+<span class="lbl">Protocol- and vendor-neutral rule</span>
+<p>BRIC does not define metadata fidelity by filesystem name or protocol version. NFSv3, NFSv4, a future NFS generation, SMB, a local filesystem or a future storage platform may expose different capabilities under different administrative policies. Restore decisions must therefore be based on what the destination can actually represent and apply, not on a hard-coded assumption such as “NFSv4 supports ACLs”.</p>
+</div>
+<p>For <code>TAR_PART</code> objects current archives can carry ACL/xattr records inside the tar stream. For <code>LARGE_FILE_CHUNK</code>, ordinary mode plus a versioned Base64 metadata envelope are stored in the encrypted project catalogue. Archives created before those metadata fields existed cannot reconstruct metadata that was never recorded; their already-catalogued mtime remains recoverable. Preservation of a metadata record on tape is not, by itself, a guarantee that a future destination can replay it.</p>
+<h2 id="s10"><span class="num">10</span>The tape subsystem</h2>
+<h3 id="s10-1"><span class="num">10.1</span>Hardware and device map</h3>
+<p>The library is an HPE MSL3040 with two LTO-9 Ultrium drives, attached to <code>brictape</code>. The production device map recorded in the tape role configuration is:</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Setting</th><th>Value</th><th>Note</th></tr></thead>
+<tbody>
+<tr><td><code>BRIC_TAPE_BACKEND</code></td><td><code>real</code></td><td><code>sim</code> is a directory-based library used by the test suite; the same four I/O functions serve both.</td></tr>
+<tr><td><code>BRIC_CHANGER</code></td><td><code>/dev/sg4</code></td><td>Medium changer.</td></tr>
+<tr><td><code>BRIC_DRIVE0</code> / <code>BRIC_DRIVE1</code></td><td><code>/dev/nst0</code> / <code>/dev/nst1</code></td><td><strong>Site caveat:</strong> the changer element numbering on this library is inverted relative to the Linux device order — changer element 0 corresponds to <code>/dev/nst1</code>. The mapping must be verified with <code>mtx status</code> and the configuration adjusted accordingly before the first production run; the hardware preflight checks element-to-device correspondence for exactly this reason.</td></tr>
+<tr><td><code>BRIC_TAPE_DRIVES</code> / <code>BRIC_PARALLEL_DRIVES</code></td><td><code>0 1</code> / <code>2</code></td><td>PRIMARY and BACKUP written concurrently on the two drives.</td></tr>
+<tr><td><code>BRIC_TAPE_BLOCK</code></td><td><code>262144</code></td><td><strong>Part of the format.</strong> Never change it on a library that already holds written cartridges.</td></tr>
+<tr><td>Capacity model</td><td>18.0 TB capacity, 0.30 TB headroom</td><td>Headroom reserves room for close artefacts, tables of contents and end-of-media margin.</td></tr>
+<tr><td>Timeouts</td><td>ready/unload 900 s, control command 600 s, stream 21600 s</td><td>Per-drive overrides exist for asymmetric hardware (<code>BRIC_DRIVE_READY_TIMEOUT_1</code> and similar).</td></tr>
+</tbody>
+</table></div>
+<p>All physical tape access goes through the <code>lib_tape_io.sh</code> abstraction, with simulated and real backends. The real backend uses <code>mtx</code> for the changer, <code>mt</code> for positioning and <code>dd</code>/streaming helpers for I/O. Ordinary arbitrary reads and immediate post-write verification have separate positioning paths, but share the same byte-count/hash verification contract.</p>
+<p>Before any operation that will drive the library, a fast read-only hardware gate runs (about one to two seconds; a no-op in simulation). It executes in a subshell, so a broken library denies the operation with an explicit diagnosis instead of killing the daemon. The separate, more thorough <code>bric-library-preflight</code> tool is non-destructive — it never writes to tape, never moves media and never touches firmware — and checks device nodes, SCSI inquiry including a warning when the two drives run different firmware revisions, test-unit-ready, changer request-sense (specifically the "manual intervention required" condition, sense key 0x02 / ASC 0x04 / ASCQ 0x03, which blocks all robotics until cleared), <code>mtx</code> inventory parsing, per-drive <code>mt</code> status including Linux ST driver option safety, barcode format and duplicate checks, and an optional cross-check against the catalogue.</p>
+<div class="note">
+<span class="lbl">Why ST driver options are checked</span>
+<p>Two Linux SCSI tape driver options would silently break BRIC's physical file-number invariant: <code>MT_ST_TWO_FM</code> (0x10) makes a close write two filemarks, and <code>MT_ST_FAST_MTEOM</code> (0x20) positions to end-of-data by a route after which the kernel documents the file number as invalid. The append path asserts a contiguous single-filemark file mode before writing.</p>
+</div>
+<h3 id="s10-2"><span class="num">10.2</span>Inventory, pairing and roles</h3>
+<p>Cartridges are registered from the physical library with <code>bric-tape-import-inventory --dry-run</code> followed by <code>--apply</code>, which reads <code>mtx status</code>, backs up the catalogue before the transaction, never reinterprets a cartridge that is already written or project-assigned, and reports and skips incomplete pairs.</p>
+<p>Pairing follows barcode parity: by default even barcodes are PRIMARY/on-site and odd are BACKUP/off-site, with the BACKUP of a pair always <code>PRIMARY+1</code>. The parity convention is configurable and is used only for initial assignment, pairing derivation and rebuild fallback — <strong>the authoritative role at runtime is the <code>tapes.role</code> column</strong>, not the label digits. A cartridge is assigned to exactly one project (<code>tape_exclusivity=project</code>); the other two values in the schema are reserved for future work and the daemon refuses to start on them rather than silently treating them as <code>project</code>.</p>
+<h3 id="s10-3"><span class="num">10.3</span>Capacity model and project-scoped reservations</h3>
+<p>Usable capacity per cartridge is <code>capacity_tb − headroom_tb</code>. With an 18.0 TB cartridge, 0.30 TB headroom and the current 128 GB decimal target, approximately <strong>138 target-sized chunks</strong> fit before the reserved headroom. A chunk never spans tape pairs, so reducing the target from the former near-terabyte scale also reduces worst-case packing tail and bounds random-restore read amplification.</p>
+<p>A reservation is project-scoped. It considers only complete healthy pairs already assigned to the project plus the minimum complete unassigned healthy pairs needed to cover requested bytes. Selected media transition atomically to <code>RESERVED</code> and are bound to project/owner. If capacity remains short, only pairs newly selected by that request are rolled back; existing project media stay assigned. Denials are signed and include the concrete reason/shortfall.</p>
+<h3 id="s10-4"><span class="num">10.4</span>Write path and verification</h3>
+<p>For each physical copy of each chunk the daemon:</p>
+<ol>
+<li><strong>Records intent before tape I/O</strong> in a <code>segments</code> row with state <code>WRITING</code>.</li>
+<li>Positions to end-of-data and validates the physical file counter.</li>
+<li>Streams the QNAP blob to the non-rewinding tape device. QNAP input uses a larger application read block (default 4 MiB) while physical tape records remain <code>262144</code> bytes.</li>
+<li>Relies on the driver’s single flushing filemark and verifies that the physical file number advances by exactly one.</li>
+<li>Marks the segment <code>WRITTEN</code> and records its physical file number.</li>
+<li><strong>Verifies by streaming the just-written tape file</strong> through simultaneous byte counting and SHA-256 calculation. No segment-sized read-back tempfile is materialised on local disk.</li>
+<li>On exact size and hash match, atomically marks the segment <code>VERIFIED</code> and accounts consumed capacity.</li>
+<li>On a clean short stream or exact-size hash corruption, abandons the physical append, accounts its consumed capacity and penalises media health (<code>SUSPECT</code> for immediate write verification; periodic verification can mark media <code>BAD</code>). A transport/local verification failure is kept distinct so a local host failure is not automatically blamed on the cartridge.</li>
+</ol>
+<p>A chunk <code>DONE</code> receipt is published only after both physical copies are <code>VERIFIED</code>. Existing verified copies are reused idempotently after retries; if only one partner copy survives, only the missing partner is rewritten when its payload identity still matches.</p>
+<h3 id="s10-5"><span class="num">10.5</span>Positioning and filemark semantics</h3>
+<p>Arbitrary reads — restore, periodic re-verification, TOC sniffing and disaster-recovery scans — use absolute positioning (<code>rewind + fsf</code>) because the requested tape file may be anywhere.</p>
+<p>Immediate post-write verification has more context and uses an <strong>adaptive</strong> choice between:</p>
+<ul><li>relative positioning from end-of-data (<code>eod + bsfm 2</code>), with file-number post-conditions; and</li><li>absolute <code>rewind + fsf</code>.</li></ul>
+<p>The choice uses configured/measured rewind, forward-filemark and reverse-media costs. Any failed command or landing-position mismatch causes a safe absolute fallback. The selected method, estimates, landing checks and fallback reason are logged. The physical tape block size remains unchanged.</p>
+<h3 id="s10-6"><span class="num">10.6</span>Concurrency, locking and the singleton</h3>
+<p>Three locking layers coexist:</p>
+<dl>
+<dt>Daemon singleton</dt>
+<dd>An absolute-path singleton lock (canonically <code>/var/lock/bric_tape.lock</code>) is acquired non-blocking. The daemon also acquires every historically deployed lock namespace so an older daemon blocks a new generation and vice versa. Relative/symlinked or otherwise unsafe lock paths are rejected fail-closed.</dd>
+<dt>Generation work fence</dt>
+<dd>A second lock, inherited by every worker and every external command the daemon launches, and acquired <em>blocking</em> at startup. If a daemon is killed with <code>SIGKILL</code>, a surviving <code>dd</code>, <code>mt</code> or command substitution still holds the fence; the new daemon may take the singleton immediately but cannot begin recovery or reclaim until every known generation fence is clear. Workers close the singleton descriptors immediately and keep only the fence, which is exactly the asymmetry the property requires.</dd>
+<dt>Changer and per-drive locks</dt>
+<dd>The changer lock is held only while inventory is inspected or media is moved. Once cartridges are loaded, each drive has its own lock, so the two drives stream PRIMARY and BACKUP concurrently without any command touching the same device. Media are normalised onto two distinct drives — resolving a swapped or preloaded pair — <em>before</em> the parallel workers are forked, with both drive locks and the changer lock held in a fixed order.</dd>
+</dl>
+<p>Parallel copies are asynchronous and independently timed: each drive has its own readiness, I/O and unload timing and may finish much earlier than the other. There is no lockstep requirement and no timeout keyed to whichever drive finishes first. What there <em>is</em> is a barrier: <code>DONE</code> and <code>CLOSED</code> cannot be published until append, filemark, read-back and hash have completed on both sides and the cartridges are back in their slots.</p>
+<p>Even the idle sleep is guarded — it runs in a subshell that first closes both the singleton and the fence descriptors, so a daemon killed while sleeping does not leave a lock held by a sleeping process.</p>
+<h3 id="s10-7"><span class="num">10.7</span>On-tape layout and the table of contents</h3>
+<p>A cartridge is a sequence of numbered tape files. Chunk payloads are appended as they arrive; at each project close, the recovery artefacts are appended and then a plaintext table of contents is appended <strong>last</strong>:</p>
+<pre><code># BRIC tape TOC v1
+volumetag=&lt;barcode&gt;
+run_id=&lt;run&gt;
+project=&lt;project&gt;
+file|kind|run_id|chunk_no|copy_role|filename|sha256
+7|CHUNK|proj__20260904T101500Z__0012|3|PRIMARY||&lt;sha256&gt;
+8|ARTIFACT|proj__20260904T101500Z__0012|||catalog_project.enc|&lt;sha256&gt;
+...</code></pre>
+<p>The index is never rewritten. Each close appends a new cumulative TOC built <strong>only from <code>VERIFIED</code> rows</strong>, so abandoned partial writes are never referenced even though their blocks physically remain on the append-only medium. In disaster recovery the latest valid TOC found by scanning backwards from end-of-data wins.</p>
+<p>The TOC deliberately contains only safe values — integers, hexadecimal hashes, charset-validated run identifiers and fixed artefact names. No user path ever appears in it; paths live encrypted inside <code>catalog_project.enc</code>. A guard enforces this: the number of data lines must equal the number of verified records, so if any field ever contained a newline the close fails loudly instead of writing an index that the pattern-based recovery parser could misread.</p>
+<h3 id="s10-8"><span class="num">10.8</span>Media health and re-verification</h3>
+<p>The <code>tapes</code> table carries wear and health telemetry: write count, mount count, write errors, read errors, last verification timestamp and a health state of <code>OK</code>, <code>SUSPECT</code> or <code>BAD</code>. A failed write verification marks the cartridge <code>SUSPECT</code>; a failed read during restore staging does the same. Cartridges marked <code>BAD</code> are excluded from new reservations and from pair capacity.</p>
+<p>Scheduled re-verification is the control that catches slow LTO degradation <em>before</em> the data is needed:</p>
+<pre><code>bric-tape-daemon --verify VOLUMETAG</code></pre>
+<p>It re-reads every verified segment and artefact on the cartridge, re-computes the ciphertext SHA-256, updates <code>last_verify</code>, the read-error counter and the health state, and writes an audit entry. The intended operational pattern is one cartridge per night from cron. <strong>This is a recommended standing operational control</strong>, not an optional extra: it is the only mechanism that detects bit-rot on media that has not been read for years.</p>
+<h2 id="s11"><span class="num">11</span>Restore</h2>
+<p>A normal restore uses the cluster catalogue and the reverse bus. Single-file restore can address the stable logical namespace:</p>
+<pre><code>bric restore PROJECT DEST
+bric restore PROJECT DEST --file LOGICAL_ROOT/path/to/file
+bric restore PROJECT DEST --run RUN_ID --file path/to/file
+bric restore PROJECT DEST --require-destination-verify
+bric restore PROJECT DEST --allow-metadata-degradation --require-destination-verify</code></pre>
+
+<h3 id="s11-1"><span class="num">11.1</span>Data integrity and metadata fidelity</h3>
+<p>BRIC treats restore correctness as two independent results:</p>
+<div class="table-wrap"><table><thead><tr><th>Result dimension</th><th>Question answered</th><th>Authoritative evidence</th></tr></thead><tbody>
+<tr><td><strong>Data integrity</strong></td><td>Were the archived file contents recovered without loss or corruption?</td><td>Ciphertext HMAC before decryption, successful extraction/assembly, and plaintext destination checksum verification. A restore with checksum mismatches or missing objects is a failure, never a degraded success.</td></tr>
+<tr><td><strong>Metadata fidelity</strong></td><td>Were the archived modes, timestamps, ACLs and selected extended attributes reproduced with the same semantics?</td><td>Per-metadata application results, destination capabilities and identity resolution. This result may be <code>DEGRADED</code> even when every file byte is verified.</td></tr>
+</tbody></table></div>
+<div class="note"><span class="lbl">The essential distinction</span>
+<p><strong>Metadata degraded does not mean data degraded.</strong> A restore may recover and independently verify every file while the destination refuses one or more historical ACL/xattr operations. Conversely, a metadata warning can never excuse a missing file, a checksum mismatch, a failed HMAC, a decryption error or a payload extraction error.</p></div>
+
+<h3 id="s11-2"><span class="num">11.2</span>Destination capabilities and identity namespaces</h3>
+<p>The restore destination is not assumed to resemble the source. This is essential to the fifteen-year recovery promise: filesystem protocols, storage vendors, directory services and administrative policies may all change during the lifetime of an archive.</p>
+<p>Four layers are considered separately:</p>
+<dl>
+<dt>Archived metadata</dt><dd>What BRIC captured from the source at archive time: mode, mtime and selected ACL/xattr representations where available.</dd>
+<dt>Destination capabilities</dt><dd>What the restore target can actually represent and write. Capability is determined by behaviour, not by the advertised filesystem name or NFS protocol version.</dd>
+<dt>Identity resolution</dt><dd>Whether principals referenced by an archived ACL still resolve in the current environment. ACL semantics can depend on UID/GID, named Unix users/groups, Active Directory SIDs, domains/realms and storage-specific mappings between them.</dd>
+<dt>Destination policy and inheritance</dt><dd>The storage administrator may define ACL inheritance, identity mapping, access-zone/export policy and which metadata operations clients are permitted to perform. A user can therefore be able to create and modify file contents while being unable to replace the file's security ACL.</dd>
+</dl>
+<p>For documentation and operational review, metadata outcomes are classified as follows:</p>
+<div class="table-wrap"><table><thead><tr><th>Status</th><th>Meaning</th></tr></thead><tbody>
+<tr><td><code>RESTORED</code></td><td>The destination accepted the metadata and its referenced principals are usable in the current identity environment.</td></tr>
+<tr><td><code>UNSUPPORTED</code></td><td>The destination cannot represent or does not permit the required metadata operation through the available interface.</td></tr>
+<tr><td><code>UNMAPPABLE</code></td><td>The metadata model is supported, but one or more archived identities/principals cannot be resolved or mapped meaningfully in the current identity environment.</td></tr>
+<tr><td><code>SKIPPED-DEGRADED</code></td><td>The operator explicitly accepted metadata loss for this restore; data verification remains mandatory.</td></tr>
+</tbody></table></div>
+<p>The current recovery candidate also ships <code>bric-restore-capability-probe.sh</code> as an operator tool. It safely tests a destination's effective create/write/unlink behaviour and its available POSIX ACL, NFSv4 ACL and xattr interfaces using a temporary probe directory. The normal <code>bric restore</code> path does not yet automatically run that probe; capability evidence is therefore an operational preflight when metadata fidelity is uncertain.</p>
+
+<h3 id="s11-3"><span class="num">11.3</span>Degraded restore semantics</h3>
+<p>Strict restore remains the default. The explicit <code>--allow-metadata-degradation</code> mode exists for recovery onto a destination that can safely receive and verify the data but cannot reproduce all archived ACL/xattr metadata. In the current implementation it is intentionally restricted to a <strong>fresh, empty destination</strong>, checked before the tape request is published, so degraded metadata handling cannot silently mutate pre-existing content.</p>
+<p>The payload path remains fail-closed. Ciphertext authentication, decryption, tar/large-file extraction, file presence/type and requested destination verification remain fatal requirements. Metadata degradation is never used to convert a payload error into success.</p>
+<p>When degradation is explicitly allowed, supported metadata is still restored where possible; unsupported/rejected selected metadata can be skipped and reported without preventing later metadata such as mtime from being attempted. The overall restore is then recorded as <code>result=DEGRADED</code> and <code>metadata_fidelity=DEGRADED</code>.</p>
+<div class="flag"><span class="lbl">Restoring into an existing managed hierarchy</span>
+<p>If the original directory hierarchy still exists and retains a valid current ACL policy, newly restored files may inherit that policy and therefore be fully usable by the intended current users even though BRIC cannot prove that each historical ACL was replayed byte-for-byte. This can be the correct operational result, especially on centrally managed storage. It must still be reported as metadata-degraded unless BRIC can demonstrate equivalence to the archived access-control metadata.</p></div>
+<p>The restore sequence remains:</p>
+<ol>
+<li><strong>Resolve the archive view.</strong> Full restore uses the latest <code>CLOSED</code> run. Automatic single-file restore resolves the newest closed run containing the requested <code>LOGICAL_ROOT/RELATIVE_PATH</code>; an explicit <code>--run</code> selects an exact historical run.</li>
+<li><strong>Validate destination paths.</strong> Absolute paths, <code>..</code> traversal, wrong logical roots and symlink escapes outside the canonical destination are refused.</li>
+<li><strong>Open a restore metadata transaction.</strong> A per-UID SQLite journal on a host-local filesystem records directory metadata. Existing ancestors are snapshotted and restrictive directories are temporarily relaxed so later chunks and verification can traverse the tree. A live journal blocks a second restore to the same destination; stale journals are recovered before new work.</li>
+<li><strong>Request progressive staging.</strong> The signed request advertises <code>restore-progressive-v1</code>. The tape daemon verifies it, chooses a verified physical copy (PRIMARY first, BACKUP on failure), and emits signed <code>request.PROGRESS</code> while positioning and reading.</li>
+<li><strong>Read and verify ciphertext in one pass.</strong> The tape stream is simultaneously written to the staged <code>.enc.part</code> object and SHA-256 hashed; there is no second full QNAP read merely to compute the ciphertext digest. A bad primary copy marks that media appropriately and the backup copy is tried.</li>
+<li><strong>Authenticate before decrypting.</strong> After signed READY, the cluster verifies the staged ciphertext HMAC before passing anything to OpenSSL or tar. Only after successful decrypt/extract or large-file append does it publish signed <code>CONSUMED</code>, allowing the daemon to stage the next chunk.</li>
+<li><strong>Handle timeout/cancellation by progress, not total elapsed time.</strong> The default queue allowance is 24 hours; once signed progress has started, the default inactivity limit is 30 minutes. On a normal cluster-side failure/timeout the client publishes signed <code>request.CANCELLED</code>. The tape daemon finishes the current tape-file read, discards staged ciphertext, releases media and does not start another chunk.</li>
+<li><strong>Synchronise and verify the destination.</strong> After payload placement BRIC runs <code>sync -f DEST</code> where supported, then verifies regular files while directories remain traversable. Results distinguish <code>VERIFIED-DESTINATION</code>, <code>VERIFIED-STREAM</code>, <code>CHECKSUM-MISMATCH</code> and <code>MISSING/WRONG-TYPE</code>. <code>--require-destination-verify</code> makes any stream-only result a restore failure.</li>
+<li><strong>Finalize metadata.</strong> Directory metadata is replayed deepest-first only after payload verification. In strict mode unsupported metadata remains a failure. In explicitly degraded mode only the approved metadata-error classes are downgraded; unrelated storage/path errors remain fatal.</li>
+<li><strong>Clean up and audit.</strong> Staged ciphertext, passphrase files and local scratch are removed, the journal is finalized, and the result is logged, audited and notified. A degraded success is persisted as such rather than being collapsed into ordinary success.</li>
+</ol>
+<div class="note"><span class="lbl">Meaning of VERIFIED-STREAM</span><p><code>VERIFIED-STREAM</code> means authenticated/decrypted extraction completed without reported error but BRIC could not independently re-read and hash the final destination object. It is not a claim that the bytes were physically persisted by remote storage. Use <code>--require-destination-verify</code> when that stronger post-condition is required.</p></div>
+
+<h3 id="s11-4"><span class="num">11.4</span>User-visible result and communication</h3>
+<p>A degraded restore must never be communicated merely as “partial success” or “restore degraded”, because that wording can be mistaken for corrupted file content. The user-visible message must state the two dimensions separately and explain the practical permission consequence.</p>
+<pre><code>DATA INTEGRITY: VERIFIED
+All requested file contents were restored and verified successfully.
+
+METADATA FIDELITY: DEGRADED
+The destination could not reproduce all archived access-control metadata.
+
+Possible affected metadata:
+- ACLs
+- extended attributes
+- identity/principal mappings
+
+The restored files may therefore inherit the current access policy of the
+destination storage system instead of reproducing the historical permissions
+exactly. This does not indicate corruption or loss of the file contents.</code></pre>
+<p>Where known, the operator-facing record should additionally identify each relevant metadata class as <code>RESTORED</code>, <code>UNSUPPORTED</code>, <code>UNMAPPABLE</code> or <code>SKIPPED-DEGRADED</code>. The current recovery-candidate audit record persists the aggregate <code>metadata_fidelity=DEGRADED</code>; per-class persistence is a desirable extension because it makes a fifteen-year-old restore report self-explanatory without reconstructing old logs.</p>
+<p>Catalogue-only queries require no tape. By default <code>bric contents</code> and <code>bric find</code> build a logical union of closed runs using <code>LOGICAL_ROOT/rel_path</code>, newest closed version winning for duplicate keys while older-only files remain visible. <code>--history</code> exposes all versions and <code>--run RUN_ID</code> selects one exact closed run.</p>
+<h2 id="s12"><span class="num">12</span>Disaster recovery</h2>
+<p>This is the section that distinguishes an archive from a backup, and it is exercised by an automated test that destroys both catalogues, the QNAP bus and every key except the user's own, then rebuilds everything from the cartridges.</p>
+<h3 id="s12-1"><span class="num">12.1</span>Owner recovery from tapes and key</h3>
+<pre><code>bric-dr-from-tapes.sh --project mouse_rnaseq \
+ --user-key-file ~/.bric/my_user_key.txt --dest /restore \
+ [--file raw/sample01.bam] [--tapelib DIR]</code></pre>
+<p>No cluster, no catalogue, no daemon, no QNAP. The same tape abstraction is used, so the tool runs identically against real LTO hardware and against a directory of tape images. The algorithm:</p>
+<ol>
+<li><strong>Find the index.</strong> For each cartridge, scan <strong>backwards from end-of-data all the way to file 1</strong> looking for the TOC magic line. There is no fixed window: a later run appends chunks to both cartridges of a pair before its own close, so if disaster struck mid-run, dozens of chunk blobs may follow the last valid TOC. A fixed window would silently make whole cartridges — and therefore whole projects — invisible to recovery.</li>
+<li><strong>Sniff, do not read.</strong> Each candidate is recognised by reading <em>one 256 KiB block</em>, not the whole file. A non-TOC candidate is a 128 GB blob; reading it per probe would turn a real-hardware recovery into days of work. Only the file recognised as a TOC is read in full.</li>
+<li><strong>Build the map.</strong> From all matching TOCs, build chunk-to-(cartridge, file number) for both copies, and locate <code>catalog_project.enc</code>, <code>user_key_escrow.v1</code> and, on legacy media, <code>catalog_system.enc</code>.</li>
+<li><strong>Integrity before decryption, for catalogues too.</strong> The catalogue artefact's SHA-256 is checked against the value in the plaintext TOC before it is decrypted; a mismatch reports media corruption and points at the other cartridge of the pair.</li>
+<li><strong>Open the catalogue</strong> with the two keys derived from the user key, and load the SQL dump into a temporary SQLite database. The user key is unset from the environment immediately after deriving the working keys.</li>
+<li><strong>Rebuild the data.</strong> Runs are processed in run-identifier order — which is chronological — so when the same path exists in several runs the latest deterministically wins. Within a run, chunks are processed in chunk order, interleaving <code>TAR_PART</code> and <code>LARGE_FILE_CHUNK</code> exactly as normal restore does, so the trailing metadata chunk carrying possibly restrictive directory modes is extracted last.</li>
+<li><strong>Verify and self-heal.</strong> Each blob is authenticated with its HMAC before decryption; on failure the tool automatically falls back to the other copy of the pair. Every restored file is re-hashed against the catalogue's plaintext checksum, and the tool exits non-zero if any verification failed.</li>
+</ol>
+<p>Path safety survives this route as well: catalogue reads use SQLite's ASCII mode with unit and record separators, so a file name containing a newline arrives intact at the final comparison, and the TOC parser recognises data lines by pattern rather than by line number.</p>
+<p>Recovery independence extends to observability: the DR script loads the standalone logging library if it is present and degrades to a no-op if it is not, so a bare recovery host without the full tree still works. This addresses a previously observed failure in which the DR script called a logging function without sourcing its library.</p>
+<p>Disaster recovery uses the same destination metadata transaction and the same separation between <strong>data integrity</strong> and <strong>metadata fidelity</strong> as normal restore, including per-UID journalling, restrictive-directory relaxation, final deepest-first metadata replay and the optional <code>--require-destination-verify</code> policy. The current recovery path also accepts explicit <code>--allow-metadata-degradation</code> for a fresh/empty destination when ACL/xattr replay is impossible but payload recovery and verification remain possible. For archives created with the current metadata fields, large-file ordinary mode and selected ACL/xattrs are attempted after payload verification; legacy archives recover only metadata that was originally recorded. A DR result must not claim full metadata fidelity when the recovery host or destination cannot represent the historical ACL model or resolve its principals.</p><h3 id="s12-2"><span class="num">12.2</span>Administrator break-glass</h3>
+<pre><code>bric-dr-from-tapes.sh --project mouse_rnaseq \
+ --master-key-file /secure/master.key --dest /restore/mouse_rnaseq</code></pre>
+<p>Used when a researcher has lost their key or has left the institution. The tool reads <code>user_key_escrow.v1</code> from tape, verifies its SHA-256 against the TOC, checks the <code>BRIC-USER-ESCROW-V1</code> header, checks that the <code>project</code> field binds to the requested project, decodes and verifies the escrow HMAC under the master-derived authentication key, unwraps the user key with the institution master key, and then cross-checks that the owner named in the escrow matches the owner recorded inside the decrypted project catalogue. Any of those checks failing aborts. From that point recovery proceeds exactly as the owner path. Legacy cartridges carrying <code>catalog_system.enc</code> are still supported through an equivalent route.</p>
+<p>This is a privileged, auditable action: it requires administrative access to the institution master key. If the operational custody procedure keeps the recovery copy offline, it also requires obtaining that protected copy through the defined break-glass process. The code itself does not enforce offline custody.</p>
+<h3 id="s12-3"><span class="num">12.3</span>Tape-catalogue rebuild</h3>
+<pre><code>bric-tape-rebuild-catalog.sh --out /path/new_tape_catalog.db \
+ --tapelib /path/to/tapes --verify</code></pre>
+<p>If the tape server's SQLite catalogue is lost but the cartridges survive, this reads the most recent TOC from each cartridge and rewrites <code>tapes</code>, <code>segments</code> and <code>tape_artifacts</code>. <code>--verify</code> re-reads every file and re-checks hashes and sizes. An automated test asserts that the rebuilt catalogue is equivalent to the original. Two caveats are documented: <code>segments.owner</code> remains empty, because owner lives encrypted in the project catalogue; and PRIMARY/BACKUP pairing is re-derived from barcode numbering and must be revalidated against the physical inventory (<code>mtx status</code>) before writing resumes.</p>
+<h3 id="s12-4"><span class="num">12.4</span>Manual recovery without any BRIC software</h3>
+<p>Every cartridge carries <code>README_RECOVERY.txt</code> in plaintext, stating the pinned parameters and the exact commands. The complete recipe, using only <code>openssl</code>, <code>sha256sum</code> and <code>tar</code>:</p>
+<pre><code>ENC_PASS=$(printf '%s:encryption' "$USER_KEY" | sha256sum | awk '{print $1}')
+HMAC_KEY=$(printf '%s:authentication' "$USER_KEY" | sha256sum | awk '{print $1}')
+
+# authenticate BEFORE decrypting (expected value: chunks.payload_hmac in the catalogue)
+test "$(openssl dgst -sha256 -hmac "$HMAC_KEY" chunk_0001.enc | awk '{print $NF}')" = "$EXPECT_HMAC"
+
+printf '%s' "$ENC_PASS" &gt; pass.txt &amp;&amp; chmod 600 pass.txt
+openssl enc -d -aes-256-cbc -pbkdf2 -iter 10000 -pass file:pass.txt \
+ -in catalog_project.enc -out catalog_project.sql
+openssl enc -d -aes-256-cbc -pbkdf2 -iter 10000 -pass file:pass.txt \
+ -in chunk_0001.enc | tar -x</code></pre>
+<p>A scripted version, <code>restore_from_tape.sh</code>, is also written to every cartridge; it verifies the HMAC when the expected value is supplied and prints an explicit warning when it is not. This manual recipe is exercised end to end by an automated test using nothing but those three tools, so the documentation cannot drift away from the format.</p>
+<h3 id="s12-5"><span class="num">12.5</span>Expected recovery cost</h3>
+<p>Recovery remains deliberately sequential and should be planned in minutes to hours depending on scope. TOC discovery scans backwards from end-of-data using one small 256 KiB sniff per candidate rather than reading candidate payloads in full. The current 128 GB chunk target bounds random single-chunk tape streaming to roughly tens of minutes on the measured hardware path (about 18–20 minutes at ~117 MB/s), rather than the multi-hour amplification of the former near-terabyte chunks. Whole-project recovery is still dominated by total LTO streaming volume and cartridge changes.</p>
+<h2 id="s13"><span class="num">13</span>Failure handling and state machines</h2>
+<h3 id="s13-1"><span class="num">13.1</span>The two state machines</h3>
+<pre><code>run PLANNING -&gt; RESERVED -&gt; PRODUCING -&gt; DRAINING -&gt; CLOSING -&gt; CLOSED
+ \-&gt; DENIED (no reservation granted)
+ FAILED / CANCELLED (signed abort protocol)
+
+chunk (bus marker) PRODUCED -&gt; READY -&gt; CLAIMED -&gt; DONE (ERROR on failure)
+ (tape segment) WRITING -&gt; WRITTEN -&gt; VERIFIED (ABANDONED on recovery)</code></pre>
+<h3 id="s13-2"><span class="num">13.2</span>Crash recovery — strategy A</h3>
+<p>The segment row is written <em>before</em> the tape write. On restart, the daemon abandons every segment left in <code>WRITING</code> or <code>WRITTEN</code>, accounting their consumed capacity conservatively in the same transaction, and abandons every close artefact left in <code>WRITING</code>. Their chunks are re-claimed and rewritten.</p>
+<p>The system is honest about the physical consequence: the abandoned copy remains physically on the append-only cartridge. What is guaranteed is that <strong>the catalogue never references a duplicate</strong> — the TOC and all restore paths use only <code>VERIFIED</code> rows. Capacity accounting counts the orphan, so the space is not double-booked.</p>
+<p>At startup, after both the singleton and the generation fence are held, every unresolved non-terminal <code>CLAIMED</code> marker is requeued immediately rather than waiting out the six-hour TTL — safe precisely because the fence guarantees no older worker can still be touching tape.</p>
+<h3 id="s13-3"><span class="num">13.3</span>Terminal fencing</h3>
+<p>Terminal markers are a <strong>safety fence, never destructive authority</strong>. The distinction is deliberate and was introduced after a rejected release:</p>
+<ul>
+<li>The mere <em>existence</em> of <code>run.ABORTED</code>, <code>run.ABORT_DONE</code>, <code>run.CLOSED</code> or <code>run.DENIED</code> — even unsigned or torn — stops all new tape I/O for that run. Fencing must not depend on cryptography being enabled.</li>
+<li><strong>Deleting</strong> ciphertext or staging, by contrast, happens only after the corresponding terminal marker has been signature-verified and path-bound. An unsigned <code>run.ABORTED</code> can stop tape I/O; it cannot cause a deletion or produce an <code>ABORT_DONE</code>. A dedicated signing-enabled regression test proves exactly this.</li>
+<li><code>CLOSED</code> is a hard fence for new writes but still permits one protocol-level idempotency: reconstructing a <code>DONE</code> receipt for a chunk whose two copies are already <code>VERIFIED</code>. <code>ABORTED</code> and <code>DENIED</code> permit no chunk handling at all.</li>
+</ul>
+<h3 id="s13-4"><span class="num">13.4</span>The abort protocol</h3>
+<p>On failure the cluster marks the run <code>FAILED</code> and publishes a signed <code>run.ABORTED</code>. The tape server verifies it, orphans all of that run's segments, releases the reservation so the pairs become reusable, removes every pending data-path marker and staged ciphertext, and acknowledges with <code>run.ABORT_DONE</code>. Consumed tape is left honestly accounted as orphan. The cluster waits for the acknowledgement before cleaning the bus; if it does not arrive within the timeout, the bus directory is preserved for daemon recovery rather than removed.</p>
+<p>This protocol is what prevents the two historical failure shapes: runs stuck forever in <code>PRODUCING</code>, and reservations that only released when their TTL expired.</p>
+<h3 id="s13-5"><span class="num">13.5</span>The silent-failure discipline</h3>
+<p>Several defects found in this system shared one shape: an error that produced a wrong result without an error message. The countermeasures now applied throughout are worth listing, because they are the design principle a reviewer should test against.</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Failure shape</th><th>Countermeasure now in place</th></tr></thead>
+<tbody>
+<tr><td>Shell <code>set -e</code> suppressed inside guarded function calls, so a worker failure looked like success</td><td>Tape pair preparation and media release propagate worker exit codes explicitly.</td></tr>
+<tr><td>A drain loop with no terminal-state check spun forever</td><td>Explicit terminal-state checks on every pass.</td></tr>
+<tr><td>A relative lock path let an old daemon survive for weeks</td><td>Lock paths must be absolute and are asserted as such at startup; historical namespaces are also fenced.</td></tr>
+<tr><td>NUL bytes silently stripped by shell command substitution corrupted escrows</td><td>Base64 armour on every binary ciphertext that passes through a shell variable, plus an immediate unwrap-and-compare self-check.</td></tr>
+<tr><td>A test asserted a log string and therefore silently skipped an entire code path when the wording changed</td><td>Test contracts are behavioural: they assert state transitions and observable effects, not diagnostic wording.</td></tr>
+<tr><td>Masked stderr turned an architecture mismatch into an unexplained error</td><td>Error paths surface the underlying tool's own message — for example, a signing failure reports OpenSSL's text, the version, and the key file size.</td></tr>
+<tr><td>A failed bus-blob deletion was invisible while logs reported success</td><td>Deletion is attempted, then <em>verified</em>, then warned about loudly by path and identity if the file survived.</td></tr>
+</tbody>
+</table></div>
+<h3 id="s13-6"><span class="num">13.6</span>Cancellation</h3>
+<p>A detached local job runs in its own session and process group. <code>bric cancel JOB_ID</code> sends <code>SIGTERM</code> to the whole group, so the producer's own traps mark the active run <code>FAILED</code> and publish the signed abort rather than leaving it wedged. Job state, exit code and end time are recorded in the job metadata file.</p>
+<h2 id="s14"><span class="num">14</span>Logging, audit and notifications</h2>
+<h3 id="s14-1"><span class="num">14.1</span>Operational logging is a correctness requirement</h3>
+<p>Invariant I10 treats logging as part of correctness. With <code>BRIC_REQUIRE_LOGGING=1</code>, a process refuses to proceed when neither its primary nor fallback destination can persist structured events.</p>
+<p>Root/system components use the system log tree under <code>/var/log/bric</code>. Activated researchers use a central per-user primary tree, normally <code>/var/log/bric/users/&lt;user&gt;</code>, and a private fallback under <code>~/.bric/log</code>. The per-user central directory is owned by the user but ACL-isolated from broad owning groups and grants the configured BRIC administrator group read/traverse access. Runtime-created files are normalized to the same isolation policy; if ACL enforcement on the central destination fails, logging falls back rather than leaving an ambiguously protected central file.</p>
+<h3 id="s14-2"><span class="num">14.2</span>The BRICLOGv1 record</h3>
+<p>Every structured record is one line of exactly 23 pipe-delimited fields:</p>
+<pre><code>BRICLOGv1|time|host|role|user|component|pid|ppid|level|event|run|project|
+chunk|copy|drive|vt|attempt|rc|duration_ms|bytes|slurm_job|slurm_task|message</code></pre>
+<p>Values are line-safe, timestamps are UTC ISO-8601 with milliseconds, and the version prefix is mandatory. Event paths recompute the UTC day for each record so a long-running daemon naturally rolls over at midnight. Raw stdout/stderr remain separate process-lifetime files. Structured primary-log failure first persists the triggering event on the fallback and emits a <code>LOG_FAILOVER</code> breadcrumb plus a stderr warning.</p>
+<h3 id="s14-3"><span class="num">14.3</span>Audit trail</h3>
+<p>Both catalogues carry an <code>audit_log</code> table with timestamp, actor, action, object, result and detail. The cluster records user-facing actions — run requested, reserved or denied, run closed, restore requested and completed, user registered and user activated. The tape server records physical actions — reservation, segment verified, verification failure, tape full, close, abort and re-verification. Structured operational logs provide an additional chronological record of system activity.</p>
+<h3 id="s14-4"><span class="num">14.4</span>Notifications</h3>
+<p>Backup start, completion, denial and failure, and restore start, completion and failure, produce a notification. E-mail is opt-in (<code>BRIC_NOTIFY_MAIL=auto</code>, address derived as <code>&lt;owner&gt;@&lt;domain&gt;</code>); the structured notification log line is always written and records whether mail was sent, failed, skipped or not attempted. Every statement in the notification path is armoured against failure, because the function runs inside scripts under <code>set -e</code> invoked by non-root users, and an unprotected line once killed every run immediately after the reservation was granted.</p>
+<div class="note"><span class="lbl">Restore notification requirement</span>
+<p>When a restore completes with <code>metadata_fidelity=DEGRADED</code>, the user-facing communication must explicitly say <strong>“data integrity: verified”</strong> when destination verification passed, separately say <strong>“metadata fidelity: degraded”</strong>, and explain that ACLs/xattrs or identity mappings could not be reproduced exactly. It must also explain that files may inherit the destination's current access policy. The words “partial restore” or an unexplained “degraded” result are insufficient because they can be misread as file-content corruption.</p>
+<p>The current recovery-candidate notification records the aggregate result and metadata-fidelity state. The longer explanatory wording above is the required operational interpretation and should be incorporated directly into the final user notification before promotion.</p>
+</div>
+<h2 id="s15"><span class="num">15</span>Web interface</h2>
+<p>A small optional web interface exists for researchers who do not use the command line. Its security model is deliberately simple and worth stating precisely, because "web interface" and "genomic archive" in the same sentence invites scrutiny.</p>
+<ul>
+<li>It is launched as a <strong>Slurm job by the user</strong>, on the same pattern as the site's RStudio template, and is reached through an <strong>SSH tunnel</strong>. The tunnel is the network boundary.</li>
+<li>The process runs with the launching user’s UID. Every <code>bric</code> command therefore inherits that user’s KU identity, filesystem permissions and access to the protected personal key in the user’s cluster home. There is one session per user and no second application login.</li>
+<li>Each URL carries a random session token as a capability path segment; a request without it receives <code>403</code>. This is defence in depth in case someone on the cluster network reaches the node's port directly.</li>
+<li>The session expires with the job's Slurm walltime.</li>
+<li>Implementation is a single Python 3 file using only the standard library — no third-party packages. It is confined to the UI layer and does not touch the recovery path.</li>
+<li>All mutations go through the <code>bric</code> CLI invoked with an argument vector, <strong>never</strong> <code>shell=True</code>, so shell injection is not possible. The catalogue is opened <strong>read-only</strong> through a SQLite URI. Project names are validated against the same charset as the shell library.</li>
+<li>Destructive operations are not exposed. The interface can start a backup, show the user's own runs, and restore.</li>
+</ul>
+<p>Two residual points for the reviewer: the capability token appears in the URL and can therefore land in browser history or a proxy log — acceptable behind an SSH tunnel with a job-lifetime session, but worth knowing; and the directory browser lets the user navigate the filesystem, bounded exactly by their own UID's permissions, granting nothing the shell would not.</p>
+<h2 id="s16"><span class="num">16</span>Deployment and operations</h2>
+<h3 id="s16-1"><span class="num">16.1</span>Installation</h3>
+<p><code>bric-setup.sh</code> initialises a host and is <strong>safe to re-run</strong>: schema creation uses <code>IF NOT EXISTS</code>, cartridges are inserted with <code>INSERT OR IGNORE</code> so a cartridge in use is never reinterpreted, the master key is never rotated, user escrows are idempotent, no <code>DROP</code> is ever issued, and any existing catalogue is copied to a timestamped backup before being touched. <code>--dry-run</code> previews without writing.</p>
+<pre><code>./bric-setup.sh --role slurm # gate host: cluster catalogue, master key, config, man page, links
+./bric-setup.sh --role tape # tape host: tape catalogue, inventory, systemd unit
+./bric-setup.sh --role all # single-host staging for end-to-end proof
+</code></pre>
+<p>Setup verifies the host's capabilities rather than assuming them: it proves that SQLite WAL works, and that OpenSSL can both <em>sign and verify</em> — not merely generate a key, because generating an Ed25519 key succeeds on OpenSSL 1.1.1 while signing it is impossible there, and a keygen-only probe once reported success on a host that could not sign. Real barcodes must be supplied through <code>BRIC_BARCODES_FILE</code>; the pattern fallback exists only for staging.</p>
+<p>The tape host also receives a systemd unit that runs the daemon as root with <code>RequiresMountsFor=/mnt/data</code>, a syntax check of the daemon script as a start pre-condition, a preserved runtime directory, <code>SIGTERM</code> with a 120-second stop timeout, and restart-on-failure with a burst limit.</p>
+<h3 id="s16-2"><span class="num">16.2</span>Configuration model</h3>
+<p>One file per host, <code>/etc/bric/bric.conf</code>, root-owned, mode <code>0644</code>. Precedence is <strong>environment &gt; file &gt; built-in defaults</strong>. The file is <em>parsed, never executed</em>: only lines of the form <code>BRIC_NAME=value</code> are honoured, so it cannot run code. <code>BRIC_FAULT_*</code> keys are actively refused by the loader, because fault injection must never be persistable. <code>BRIC_CONFIG=none</code> disables loading entirely, which is how the test suite achieves hermeticity.</p>
+<h3 id="s16-3"><span class="num">16.3</span>Versioning and in-place updates</h3>
+<p>A complete installation records its software version in <code>/opt/bric2/RELEASE</code>, readable with <code>bric version</code> or <code>bric-update --current</code>. Updates are applied from a freshly extracted package, never from the installed tree:</p>
+<pre><code>sudo ./bric-update --target /opt/bric2 # role read from /etc/bric/bric.conf</code></pre>
+<p>The updater verifies the package manifest, <strong>refuses to run while archive or tape work is active</strong>, replaces only managed static files whose content actually changed, backs up every replaced file under <code>/var/backups/bric2</code>, updates host integrations (command links, man page, systemd unit), and preserves catalogues, configuration, keys, logs, user homes and the QNAP bus. It reads the host role from the configuration file, refuses a conflicting role argument, and refuses to proceed if a foreign or extracted-tree daemon remains active after systemd has been asked to stop the service.</p>
+<h3 id="s16-4"><span class="num">16.4</span>Standing operational procedures</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Cadence</th><th>Action</th></tr></thead>
+<tbody>
+<tr><td>Before the first production run, and after any hardware intervention</td><td><code>bric-library-preflight</code> on the tape host; verify the changer-element-to-device mapping against <code>mtx status</code>; run the scratch-cartridge read-back procedure documented in <code>docs/RUNBOOK_scratch_tape.md</code>.</td></tr>
+<tr><td>After every deployment or update</td><td>Confirm <code>require_bus_signing=1</code> and <code>require_user_escrow=1</code> in <em>both</em> catalogues; confirm <code>bric version</code> matches on both hosts; confirm the systemd unit is active.</td></tr>
+<tr><td>Nightly</td><td>One cartridge through <code>bric-tape-daemon --verify VOLUMETAG</code> from cron.</td></tr>
+<tr><td>Continuously</td><td>Monitor the notification log and the structured event log for <code>ERROR</code> level records; monitor <code>tapes.health</code> for any cartridge that becomes <code>SUSPECT</code> or <code>BAD</code>; monitor bus occupancy.</td></tr>
+<tr><td>Per new user</td><td>Follow <a href="#s6-7">§6.7</a>: retain the formal e-mail request and management approval; run the standard activation procedure; verify the protected <code>0600</code> cluster key and authenticated escrow; deliver the dedicated USB key copy; obtain the signed receipt; and confirm the user can run the BRIC CLI through the normal KU environment.</td></tr>
+<tr><td>When a cartridge pair fills</td><td>Move the BACKUP cartridge off site; the on-site PRIMARY remains in the library.</td></tr>
+<tr><td>Periodically (recommended)</td><td>A rehearsed disaster-recovery drill: recover one project from cartridges plus a key on a host that has no BRIC installation, using only the on-tape kit.</td></tr>
+</tbody>
+</table></div>
+<h3 id="s16-5"><span class="num">16.5</span>Timeout tuning</h3>
+<p>Timeouts are operational parameters rather than format constants. Tape control/ready/unload operations use bounded per-command timeouts, while progressive restore separates queue delay from active liveness: the default queue allowance is 86,400 seconds and the default inactivity timeout after signed progress begins is 1,800 seconds. The tape daemon also has a progressive READY→CONSUMED wait (default 21,600 seconds). The 128 GB chunk target is specifically intended to keep individual restore/read-back operations within manageable time windows without changing the physical on-tape format.</p>
+<h2 id="s17"><span class="num">17</span>Assurance, validation status and residual risk</h2>
+<h3 id="s17-1"><span class="num">17.1</span>Automated test suite</h3>
+<p>The current source tree contains 84 <code>run_*.sh</code> scripts. The standard runner excludes itself and the explicitly destructive real-tape smoke, yielding an <strong>82-test standard suite</strong>. The runner verifies the release manifest, sanitises inherited <code>BRIC_*</code> state, uses <code>BRIC_CONFIG=none</code> for hermetic tests and prints explicit <code>[N/82]</code> progress.</p>
+<p>Coverage now includes parallel same-run production, 128 GB policy, progressive restore, logical namespace, forced unreadable-source exclusions, restore metadata transactions, ACL/xattr metadata fidelity, regular-file special-bit policy, streaming tape verification, media-health attribution, signing, crash/fault injection, disaster recovery, update safety and user/logging isolation.</p>
+<p>The package’s bundled validation record is intentionally conservative: syntax/static-helper and focused metadata/restore tests are recorded as passing, but the complete native 82-test gate is <strong>not claimed by the package itself</strong>. Native <code>sqlite3</code>, ACL and xattr tooling are required for the independent gate.</p>
+<h3 id="s17-2"><span class="num">17.2</span>Hardware validation status</h3>
+<p>Current hardware and validation evidence must be read in layers:</p>
+<div class="table-wrap"><table><thead><tr><th>Item</th><th>Status</th></tr></thead><tbody>
+<tr><td>Current standard software gate</td><td><strong>82 tests defined.</strong> The current package records focused pre-gate validation but does not itself claim a complete native 82/82 result.</td></tr>
+<tr><td>Current metadata changes</td><td>Static Go builds and vet pass for both helpers; tar-stream metadata regressions, serial-planner probes and restore-journal multi-UID probes pass in the development validation. Native ACL/xattr execution remains an independent-gate requirement.</td></tr>
+<tr><td>Streaming tape verification</td><td>Previously demonstrated on real LTO-9 with a dense ~54.9 GB ciphertext copy on both drives without segment-sized local scratch. Later cluster-side metadata changes do not change <code>BRIC-FORMAT-V1</code>; the current package reports the tape runtime subtree unchanged from its immediate baseline.</td></tr>
+<tr><td>Two-pair physical operation</td><td>A real two-pair smoke reached complete tape-side close with six verified chunks across two pairs and all close artefacts verified. That campaign exposed a late-abort/CLOSED-barrier defect which was subsequently fixed and regression-tested; the original run is therefore evidence of physical placement/close behavior, not a clean end-to-end acceptance certificate for the current package.</td></tr>
+<tr><td>Progressive restore / 128 GB policy</td><td>Covered by simulation/native software tests and derived from a real restore that exposed the former near-terabyte latency problem. A current full independent native gate remains required before treating the present candidate as production-certified.</td></tr>
+</tbody></table></div>
+<h3 id="s17-3"><span class="num">17.3</span>Security observations and recommendations</h3>
+<p>The following observations remain relevant to deployment and review.</p>
+<h4>O-1 · Cluster-side marker signing is shared with archive-user processes — <em>architectural</em></h4>
+<p>When signing is mandatory, user-side archive processes must be able to read the cluster signing private key. The mechanism therefore authenticates “a process possessing the cluster-side key”, not a privileged service distinct from every onboarded user. It protects against a QNAP-only/unauthorised writer without that key, but not against a malicious onboarded user. A stronger boundary would require a privileged signing broker or per-user identities.</p>
+<h4>O-2 · Verify <code>require_bus_signing=1</code> after deployment — <em>deployment check</em></h4>
+<p>The schema default is <code>0</code>; setup enables enforcement only when the required keys are already present. Production acceptance should verify the catalogue value on both cluster and tape hosts.</p>
+<h4>O-3 · Derived HMAC keys appear in process arguments — <em>code hardening recommended</em></h4>
+<p>Some OpenSSL HMAC calls pass a derived authentication key via argv. This does not reveal the independent encryption key, but another process able to inspect the command line at the right moment could obtain a MAC key. A non-argv key interface or in-process HMAC implementation would remove that exposure.</p>
+<h4>O-4 · Institution master-key custody is an operational control</h4>
+<p>The software protects the master-key file with root-only permissions and never sends it to tape, QNAP or user jobs. Backup/offline custody, break-glass approval, succession and recovery ceremony must be defined operationally by BRIC/KU.</p>
+<h4>O-5 · QNAP permissions must match the real trust model</h4>
+<p>Local-mode archive users intentionally write their own bus objects, so NFS host allow-lists, UID/GID mapping/squash, setgid/ACL policy and the actual set of writable principals must be verified. Payload confidentiality does not make protocol availability/integrity irrelevant.</p>
+<h4>O-6 · Metadata fidelity is destination- and identity-dependent</h4>
+<p>Current archives preserve ordinary regular-file permissions, mtime and selected ACL/xattr representations where the source exposes them, including <code>user.*</code>, POSIX ACL information and <code>system.nfs4_acl</code>. That is a preservation statement, not a promise that a future destination can replay every item. Destination filesystem capabilities, export/access-zone policy, ACL inheritance, directory services and identity mappings can all change independently over the archive lifetime.</p>
+<p>UID/GID ownership is not restored; regular-file setuid/setgid/sticky bits are deliberately removed; SELinux/security/trusted and unrelated system xattrs are outside the archival contract; sparse allocation topology is not guaranteed. ACLs add a second long-term limitation: an archived principal may become <code>UNMAPPABLE</code> even when the destination technically supports the ACL model. Full metadata fidelity therefore requires both a compatible destination capability and meaningful identity resolution at restore time. These are data-owner-visible semantics rather than hidden implementation details.</p>
+<h3 id="s17-4"><span class="num">17.4</span>Accepted residual risks</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Risk</th><th>Rationale for acceptance</th></tr></thead>
+<tbody>
+<tr>
+<td><strong>In-place marker replay.</strong> Path binding and domain separation prevent a signed marker from being <em>moved</em>; they do not prevent re-placing the identical file and its signature at their original location.</td>
+<td>Markers are write-once with atomic rename, every operation is idempotent (a re-published <code>READY</code> for an already-verified chunk is a no-op, not a duplicate), and write access to the bus is restricted. Full anti-replay would require monotonic per-run nonce state checked at every marker — cross-cutting state for an attacker who has write access to the QNAP but is not the cluster, which is outside the model and contrary to the simplicity the recovery promise depends on.</td>
+</tr>
+<tr>
+<td><strong>Orphaned blocks on append-only media</strong> after a crash or abort.</td>
+<td>Physically unavoidable on append-only media. What is guaranteed is that the catalogue and the TOC never reference them, and that their consumed capacity is honestly accounted.</td>
+</tr>
+<tr>
+<td><strong>Hard links multiply tape space</strong> and restore as separate copies.</td>
+<td>Deduplication would introduce a cross-file dependency that breaks the "each segment is independently recoverable" invariant.</td>
+</tr>
+<tr>
+<td><strong>Allocation topology is not guaranteed</strong> for sparse files.</td>
+<td>The source protocol cannot expose it reliably. Byte content is authoritative and the limitation is recorded explicitly in the encrypted catalogue rather than being left implicit.</td>
+</tr>
+<tr>
+<td><strong>Loss of all recoverable user-key copies and the institution master key is unrecoverable.</strong></td>
+<td>This is the confidentiality design. Normal operation has a protected cluster/home key, a user-held USB copy and encrypted institutional escrow; if all usable plaintext copies are gone and the master key cannot unwrap escrow, the archive cannot be decrypted.</td>
+</tr>
+<tr>
+<td><strong>Historical ACLs may be preserved but not replayable years later.</strong></td>
+<td>The destination may not support the archived ACL/xattr model, may intentionally forbid clients from replacing security metadata, or may no longer resolve the original UID/GID, SID, group, domain or realm. BRIC separates verified file contents from metadata fidelity and records degraded recovery rather than claiming equivalence. Current destination policy/inheritance may be operationally correct without being historically identical.</td>
+</tr>
+<tr>
+<td><strong>Correctness depends on POSIX semantics of the shared export.</strong></td>
+<td>Documented explicitly (<a href="#s4-5">§4.5</a>); must be re-validated if the staging appliance or its export configuration is ever replaced.</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="s17-5"><span class="num">17.5</span>Open work</h3>
+<ol>
+<li>Complete the independent native 82-test gate with native SQLite, ACL and xattr tools; preferably repeat the full serial gate to demonstrate determinism.</li>
+<li>Continue exercising metadata-fidelity and capability-probe paths on real production filesystems and future destination platforms; validation must remain capability-based rather than tied to a particular NFS generation or storage vendor.</li>
+<li>Persist per-metadata-class restore outcomes (<code>RESTORED</code>, <code>UNSUPPORTED</code>, <code>UNMAPPABLE</code>, <code>SKIPPED-DEGRADED</code>) and include the explicit data-integrity/metadata-fidelity explanation directly in degraded-restore user notifications.</li>
+<li>Validate the complete Slurm-distributed path on site once all required source/staging mounts are available on compute nodes.</li>
+<li>Continue periodic real-media verification and disaster-recovery drills, including restore from tapes plus authorised key material on a host without the normal BRIC services.</li>
+<li>Close or formally accept the remaining deployment/security observations in §17.3.</li>
+</ol>
+<h2 id="sA"><span class="num">A</span>Command reference</h2>
+<h3>Researcher commands</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Command</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td><code>bric backup PROJECT SOURCE [--as LOGICAL_ROOT] [--exclude RELPATH ...] [--source-change-policy strict|record] [--force] [--wait]</code></td><td>Create an encrypted archive backup. Local mode detaches by default; --as defines the stable logical root.</td></tr>
+<tr><td><code>bric restore PROJECT DEST [--file LOGICAL_ROOT/REL] [--run RUN_ID] [--require-destination-verify] [--allow-metadata-degradation] [--wait]</code></td><td>Restore the latest run, one logical path, or an exact historical run. <code>--require-destination-verify</code> requires final destination re-hash verification. <code>--allow-metadata-degradation</code> is an explicit recovery opt-in for a fresh/empty destination when payload recovery can be verified but some archived ACL/xattr metadata cannot be reproduced.</td></tr>
+<tr><td><code>bric status [--project PROJECT]</code></td><td>Recent runs, chunk progress, scan-relative percentage, source-consistency verdict.</td></tr>
+<tr><td><code>bric list [--long] [--all]</code></td><td>Projects; <code>--long</code> adds run count and assigned cartridge barcodes.</td></tr>
+<tr><td><code>bric contents PROJECT [--run RUN_ID] [--history] [--type TYPE] [--long] [--limit N] [--offset N]</code></td><td>Browse the logical union of closed runs, all historical versions, or one exact run. No tape is read.</td></tr>
+<tr><td><code>bric find PROJECT QUERY [--run RUN_ID] [--history] [...]</code></td><td>Case-insensitive search over the logical archive namespace. No tape is read.</td></tr>
+<tr><td><code>bric exclusions PROJECT [--run]</code></td><td>Intentionally omitted subtrees recorded for a closed run.</td></tr>
+<tr><td><code>bric source-changes PROJECT [--run]</code></td><td>Source-consistency semantics and any recorded change diagnostics.</td></tr>
+<tr><td><code>bric jobs</code> / <code>bric log [JOB_ID|PID]</code> / <code>bric cancel JOB_ID|PID</code></td><td>Manage detached local jobs.</td></tr>
+<tr><td><code>bric version</code> / <code>bric help [COMMAND]</code> / <code>man bric</code></td><td>Software version and documentation.</td></tr>
+</tbody>
+</table></div>
+<h3>Administrator commands</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Command</th><th>Host</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td><code>bric-activate-user NAME</code></td><td>gate</td><td>One-command activation: protected home key, authenticated escrow, runtime/logging/lock setup and strict post-verification; USB copy delivery follows §6.7.</td></tr>
+<tr><td><code>cluster/scripts/bric-setup-user.sh --user NAME [--strict-runtime-checks]</code></td><td>gate</td><td>Canonical root provisioning implementation used by activation; creates/repairs the protected user key and authenticated escrow.</td></tr>
+<tr><td><code>./bric-setup.sh --role slurm|tape|all [--dry-run]</code></td><td>both</td><td>Idempotent host bootstrap.</td></tr>
+<tr><td><code>sudo ./bric-update --target /opt/bric2</code> · <code>bric-update --current</code></td><td>both</td><td>In-place static-file update and installed-version reporting.</td></tr>
+<tr><td><code>bric-tape-import-inventory --dry-run|--apply</code></td><td>tape</td><td>Populate the catalogue from <code>mtx status</code>.</td></tr>
+<tr><td><code>bric-library-preflight</code></td><td>tape</td><td>Non-destructive hardware health check.</td></tr>
+<tr><td><code>cluster/scripts/bric-restore-capability-probe.sh --dest DIR [--source-dir DIR]</code></td><td>gate</td><td>Non-destructive restore-destination capability probe: effective create/write/unlink plus available ACL/xattr interfaces. Uses a temporary directory and does not modify the archived source tree.</td></tr>
+<tr><td><code>bric-tape-daemon [--once|--loop|--recover|--verify VOLUMETAG]</code></td><td>tape</td><td>The polling daemon; recovery; media re-verification.</td></tr>
+<tr><td><code>tape/scripts/bric-tape-rebuild-catalog.sh --out DB --tapelib DIR [--verify]</code></td><td>tape</td><td>Rebuild the tape catalogue from cartridges.</td></tr>
+<tr><td><code>cluster/scripts/bric-dr-from-tapes.sh --project P --dest D (--user-key-file F | --master-key-file F) [--file REL] [--require-destination-verify] [--allow-metadata-degradation]</code></td><td>any</td><td>Disaster recovery from cartridges and a key, with the same independent data-integrity and metadata-fidelity semantics as normal restore.</td></tr>
+<tr><td><code>bric-bus-cleanup [--dry-run]</code></td><td>gate</td><td>Remove leftover terminal bus directories.</td></tr>
+<tr><td><code>cluster/scripts/bric-reset-catalog.sh --yes</code></td><td>gate</td><td>Reset operational catalogue state, preserving escrow and configuration.</td></tr>
+<tr><td><code>test/run_all_tests.sh [--only PATTERN]</code></td><td>either</td><td>Full 82-test standard validation from a complete manifest-clean source tree.</td></tr>
+</tbody>
+</table></div>
+<h2 id="sB"><span class="num">B</span>Configuration reference</h2>
+<h3>Catalogue configuration keys (stored in the databases)</h3><div class="table-wrap"><table><thead><tr><th>Key</th><th>Default</th><th>Meaning</th></tr></thead><tbody>
+<tr><td><code>segment_target_bytes</code></td><td>128000000000</td><td>128 GB decimal chunk target; bounds restore read amplification.</td></tr>
+<tr><td><code>compression</code></td><td><code>none</code></td><td>Payload is not compressed by BRIC.</td></tr>
+<tr><td><code>qnap_budget_bytes</code></td><td>~92 TB</td><td>Global ciphertext staging cap; 0 disables.</td></tr>
+<tr><td><code>max_inflight_chunks</code></td><td>8</td><td>Per-run published staging window.</td></tr>
+<tr><td><code>max_concurrent_producers</code></td><td>1</td><td>Run-level admission to the PRODUCING phase.</td></tr>
+<tr><td><code>stream_parallel_workers</code></td><td>4</td><td>Parallel source/tar workers inside one local-mode run.</td></tr>
+<tr><td><code>stream_worker_chunk_bytes</code></td><td>128000000000</td><td>Per-worker target, clamped by <code>segment_target_bytes</code>.</td></tr>
+<tr><td><code>tar_blocking_factor</code></td><td>8192</td><td>4 MiB GNU-tar outer record.</td></tr>
+<tr><td><code>sparse_batch_target_bytes</code></td><td>4 GiB</td><td>Mapped-data target for batched sparse TAR_PARTs.</td></tr>
+<tr><td><code>source_change_policy</code></td><td><code>strict</code></td><td>Abort on safely classified source changes unless <code>record</code> is explicitly requested.</td></tr>
+<tr><td><code>reservation_overhead_pct</code></td><td>2</td><td>Framing margin for capacity reservation.</td></tr>
+<tr><td><code>tape_exclusivity</code></td><td><code>project</code></td><td>Implemented media-assignment policy.</td></tr>
+<tr><td><code>require_user_escrow</code></td><td>enabled by onboarding</td><td>Refuse new runs for owners without institutional escrow.</td></tr>
+<tr><td><code>require_bus_signing</code></td><td>0 in schema; 1 required in production</td><td>Fail closed when signing/verification keys are unavailable.</td></tr>
+<tr><td><code>format_version</code></td><td>1</td><td>Persistent BRIC-FORMAT-V1 generation.</td></tr>
+<tr><td><code>tape_headroom_tb</code></td><td>0.30</td><td>Reserve for close artefacts, TOC and media margin.</td></tr>
+<tr><td><code>chunk_target_bytes</code> (tape catalogue)</td><td>128000000000</td><td>Mirror of the cluster chunk target for tape capacity/FULL decisions.</td></tr>
+<tr><td><code>parallel_drives</code></td><td>1 schema; 2 production</td><td>Concurrent PRIMARY/BACKUP writing when configured.</td></tr>
+<tr><td><code>poll_seconds</code></td><td>10</td><td>Daemon polling interval.</td></tr>
+<tr><td><code>claim_ttl_hours</code></td><td>6</td><td>Stale claim reclamation threshold.</td></tr>
+<tr><td><code>primary_parity</code></td><td><code>even</code></td><td>Initial pairing convention; catalogue role remains authoritative.</td></tr>
+</tbody></table></div><h3>Security-relevant environment settings</h3>
+<div class="table-wrap"><table><thead><tr><th>Variable</th><th>Production value</th><th>Why it matters</th></tr></thead><tbody>
+<tr><td><code>BRIC_ROLE</code></td><td><code>slurm</code> / <code>tape</code></td><td>Commands assert the required host role.</td></tr>
+<tr><td><code>BRIC_REQUIRE_NFS_BUS</code></td><td><code>1</code></td><td>Fail closed if the staging mount is missing or not NFS.</td></tr>
+<tr><td><code>BRIC_REQUIRE_LOGGING</code></td><td><code>1</code></td><td>Refuse unlogged archive transitions.</td></tr>
+<tr><td><code>BRIC_MASTER_KEY_FILE</code></td><td>root-only cluster path</td><td>Institutional escrow/break-glass key; never in normal user jobs or tape server.</td></tr>
+<tr><td><code>BRIC_USER_KEY_FILE</code></td><td><code>~/.bric/&lt;user&gt;_user_key.txt</code>, mode 0600</td><td>User data-encryption key inside the KU-managed cluster environment.</td></tr>
+<tr><td><code>BRIC_USER_LOG_ROOT</code></td><td><code>/var/log/bric/users</code></td><td>Central per-user primary logging with administrator-read ACLs.</td></tr>
+<tr><td><code>BRIC_LOG_FALLBACK_DIR</code></td><td><code>~/.bric/log</code></td><td>Private fallback if central user logging cannot be used safely.</td></tr>
+<tr><td><code>BRIC_LOCAL_LOCK_ROOT</code></td><td><code>/var/lib/bric/locks/users</code></td><td>Host-local allocator locks; network filesystems are refused.</td></tr>
+<tr><td><code>BRIC_RESTORE_QUEUE_TIMEOUT</code></td><td>86400</td><td>Maximum queue delay before signed restore progress starts.</td></tr>
+<tr><td><code>BRIC_RESTORE_INACTIVITY_TIMEOUT</code></td><td>1800</td><td>Failure only after no new signed progress while active.</td></tr>
+<tr><td><code>BRIC_RESTORE_JOURNAL_ROOT</code></td><td>optional local shared base</td><td>Per-UID private restore-journal roots; network filesystems refused.</td></tr>
+<tr><td><code>BRIC_BUS_SIGN_KEY</code> / <code>BRIC_BUS_VERIFY_KEY</code></td><td>configured on both roles</td><td>Own private signing key and peer public verification key.</td></tr>
+<tr><td><code>BRIC_LOCAL_TMPDIR</code></td><td>host-local path</td><td>Transient passphrases/catalogue scratch; never NFS.</td></tr>
+<tr><td><code>BRIC_TAPE_BLOCK</code></td><td>262144</td><td>Physical tape record size; part of the established media format.</td></tr>
+<tr><td><code>BRIC_TAPE_STAGE_READ_BLOCK</code></td><td>4194304</td><td>QNAP staging read size; tape output records remain 256 KiB.</td></tr>
+<tr><td><code>BRIC_TAPE_VERIFY_POSITION_MODE</code></td><td><code>adaptive</code></td><td>Selects relative vs absolute immediate verify positioning.</td></tr>
+<tr><td><code>BRIC_FAULT_*</code></td><td>never set</td><td>Fault injection is refused by persistent configuration loading.</td></tr>
+</tbody></table></div>
+<h2 id="sC"><span class="num">C</span>On-disk and on-tape formats</h2>
+<h3>Encrypted chunk blob</h3>
+<pre><code>offset 0 : "Salted__" 8 bytes, ASCII
+offset 8 : salt 8 random bytes
+offset 16 : AES-256-CBC ciphertext, PKCS#7 padded
+
+key material: PBKDF2-HMAC-SHA256(passphrase = ENC_PASS, salt, 10000) -&gt; 48 bytes
+ bytes 0..31 = AES-256 key
+ bytes 32..47 = CBC IV
+integrity : HMAC-SHA256(entire file, including the 16-byte header) under HMAC_KEY
+ expected value stored in chunks.payload_hmac
+digest : SHA-256(entire file), stored in chunks.payload_sha256 and in the tape TOC</code></pre>
+<p>Chunk types: <code>TAR_PART</code> is an independent tar archive that may contain many members, including a valid multi-member GNU sparse archive; <code>LARGE_FILE_CHUNK</code> is a raw contiguous byte range of one oversized file, reassembled in chunk order.</p>
+<h3>Signed marker envelope</h3>
+<pre><code>signed bytes = "BRIC-MARKER-V1\n" + project + "/" + run_id + "/" + marker_name + "\n" + body
+signature = ECDSA P-256 over SHA-256, base64, in the sidecar &lt;marker&gt;.sig
+publication = write .sig first, then the marker itself, each by atomic rename</code></pre>
+<h3>Files present on a closed cartridge</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>File</th><th>Encrypted with</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>chunk payloads</code> (many tape files)</td><td>user key</td><td>The data.</td></tr>
+<tr><td><code>catalog_project.enc</code></td><td>user key</td><td>Encrypted project catalogue: logical namespace, file map, plaintext checksums, placement, exclusions/source semantics and large-file mode/selected metadata envelope.</td></tr>
+<tr><td><code>user_key_escrow.v1</code></td><td>institution master key</td><td>Project-bound authenticated escrow ciphertext. Not a usable data key.</td></tr>
+<tr><td><code>schema.sql</code></td><td>plaintext</td><td>Rebuild a database from the catalogue dump.</td></tr>
+<tr><td><code>README_RECOVERY.txt</code></td><td>plaintext</td><td>The pinned parameters and the manual recovery recipe.</td></tr>
+<tr><td><code>restore_from_tape.sh</code></td><td>plaintext</td><td>Standalone chunk-level restore, HMAC-verifying by default.</td></tr>
+<tr><td><code>TAPE_TOC.txt</code></td><td>plaintext, written last</td><td>The index disaster recovery reads first.</td></tr>
+</tbody>
+</table></div>
+<h2 id="sD"><span class="num">D</span>Glossary</h2>
+<dl>
+<dt>Archive vs backup</dt><dd>An archive is judged by recoverability without its original environment; a backup by restore speed into an existing one. BRIC is the former.</dd>
+<dt>Bus</dt><dd>The shared QNAP NFS directory tree used for all communication and payload transport between the two hosts. Transient, opaque, never authoritative.</dd>
+<dt>Chunk</dt><dd>One unit of archived payload: an independent encrypted tar archive, or a raw byte range of one oversized file.</dd>
+<dt>Segment</dt><dd>One physical copy of one chunk on one cartridge, at one file number.</dd>
+<dt>Run</dt><dd>One invocation of <code>bric backup</code>. The first run of a project is the initial archive; later runs are self-contained appends.</dd>
+<dt>Marker</dt><dd>A small text file on the bus used as a protocol message, published by atomic rename, optionally with a detached signature.</dd>
+<dt>PRIMARY / BACKUP</dt><dd>The two roles in a cartridge pair. PRIMARY is intended to remain on site; BACKUP is intended for off-site storage when full.</dd>
+<dt>Pair</dt><dd>Two cartridges, one of each role, holding identical copies of a project's segments.</dd>
+<dt>Semantics B</dt><dd>The reservation rule: tape is reserved before any ciphertext is produced. Insufficient media means stop, not partial production.</dd>
+<dt>Strategy A</dt><dd>The crash rule: record write intent before touching tape; on restart abandon interrupted writes rather than interpreting the tail.</dd>
+<dt>Encrypt-then-MAC</dt><dd>Compute the MAC over the ciphertext and verify it before decrypting. Never decrypt unauthenticated data.</dd>
+<dt>Escrow</dt><dd>A user's personal key, encrypted and authenticated under the institution master key, stored centrally and copied to every project cartridge as ciphertext.</dd>
+<dt>Break-glass</dt><dd>Administrator recovery of a user's data using the institution master key, without that user's participation. Offline custody is an operational policy, not a software-enforced property.</dd>
+<dt>TOC</dt><dd>The plaintext table of contents appended last on each cartridge at every close, mapping tape file numbers to their contents. The latest valid one wins.</dd>
+<dt>Generation fence</dt><dd>A blocking lock inherited by every tape worker, which a new daemon must acquire before recovery, guaranteeing no surviving worker from an older generation is still touching hardware or catalogue.</dd>
+<dt>Crypto-erase</dt><dd>Rendering archives computationally unreadable by destroying the personal key and all recoverable escrow copies. This is a technical property; legal sufficiency for a particular deletion obligation is a separate governance decision.</dd>
+<dt>Logical root</dt><dd>A stable one-component name bound to a canonical source path and used to address files across multiple CLOSED runs without exposing the original absolute source path.</dd>
+<dt>Data integrity</dt><dd>The statement that restored file contents are present and match the archived plaintext checksums. It is independent of ACL/xattr fidelity.</dd>
+<dt>Metadata fidelity</dt><dd>The degree to which archived non-payload metadata — such as mode, mtime, ACLs and selected xattrs — has been reproduced with equivalent semantics on the destination.</dd>
+<dt>Degraded restore</dt><dd>A restore whose file contents satisfy the required integrity checks but whose metadata fidelity is explicitly incomplete. It is not a synonym for corrupted or partially restored file contents.</dd>
+<dt>UNSUPPORTED</dt><dd>A metadata outcome meaning that the destination cannot represent or does not permit the requested metadata operation.</dd>
+<dt>UNMAPPABLE</dt><dd>A metadata outcome meaning that the destination supports the metadata model but one or more archived identity principals cannot be resolved or mapped meaningfully in the current identity environment.</dd>
+<dt>Progressive restore</dt><dd>Reverse-bus protocol that stages one encrypted chunk at a time, uses signed progress heartbeats and requires a signed CONSUMED acknowledgement before the next chunk is staged.</dd></dl>
+<hr/>
+<p class="small">BRIC Archive 2.0 — technical and security description. Behavioural statements are maintained against the current source tree; validation evidence and remaining open work are stated separately in §17. Restore reporting distinguishes verified data integrity from metadata fidelity so that future destination-storage limitations are explicit rather than hidden.</p>
+</main>
+</div>
+</body>
+</html>
